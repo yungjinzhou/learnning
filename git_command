@@ -1,0 +1,15 @@
+GIT HELP -- WEB LOG
+git diff  commit1   comit2
+git diff  head  head～1
+git diff HEAD  HEAD^
+git diff HEAD  HEAD^^
+git diff  head  head～2
+
+
+git push origin  dev_yjz:dev
+             远端仓库名  本地分支:远端分支
+
+
+
+Rebase的使用命令
+RESET  REVERT区别
