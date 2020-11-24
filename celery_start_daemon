@@ -1,0 +1,14 @@
+/usr/local/bin/celery
+celery -A celery_tasks.main worker -l debug -f logs.log
+
+
+
+前台启动命令： celery -A 项目名worker -loglevel=info 
+ 
+后台启动命令： celery multi start w1 -A 项目名 -l info 
+ 
+后台重启命令： celery multi start w1 -A 项目名 -l info 
+ 
+后台停止命令： celery multi stop w1 -A 项目名 -l info 
+ 
+前后台的区别： 后台是mult启动
