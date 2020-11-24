@@ -1,0 +1,14 @@
+[Unit]
+Description=Celery Service
+After=network.target
+[Service]
+Type=forking
+User=celery
+Group=celery
+EnvironmentFile=/etc/conf.d/celery
+WorkingDirectory=/root/celery_crontab
+ExecStart=/usr/local/bin/celery multi start work -A main -l info -B --logfile=celerylog.log
+ExecStop=/usr/local/bin/celery multi stop work -A main -l info -B --logfile=celerylog.log
+ExecReload=/usr/local/bin/celery multi restat work -A main -l info -B --logfile=celerylog.log
+[Install]
+WantedBy=multi-user.target

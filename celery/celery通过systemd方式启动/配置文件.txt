@@ -1,0 +1,36 @@
+1.创建/etc/conf.d/celery
+将celery内容复制到celery
+配置项说明
+2.1 CELERYD_NODES=“work”,启动的celery进程的进程名为work
+2.2 CELERY_BIN="/usr/local/bin/celery",celery安装目录，可使用which celery找到
+2.3 CELERY_APP=“celery_crontab” ,在celery项目的配置文件config.py中，创建Celery实例对象APP时给APP定义的名字，一定要保持一致,如：
+# config.py中创建celery对象时的命名
+app = Celery('celery_crontab', broker='amqp://guest@localhost//')
+
+
+
+
+2. 创建/etc/systemd/system/celery.service
+将celery.service文件复制到相应文件
+
+配置项说明
+[Unit]
+Description:对当前服务的简单描述,如说明一下功能
+After:表示celery.service应该在network.target后启动
+[Service]
+Type:定义启动类型，forking表示以fork（）方式启动
+User:指定启动任务的用户(提前创建好用户和所属组,设置好用户权限)
+Group:指定用户的组
+EnvironmentFile:指定celery项目的systemd配置文件：/etc/conf.d/celery
+WorkingDirectory:指定celery项目的启动目录，项目启动文件main.py所在目录
+ExecStart:在执行systemctl start celery.service命令时，会执行ExecStart
+ExecStop:在执行systemctl stop celery.service命令时，会执行ExecStop
+ExecReload:在执行systemctl restart celery.service命令时，会执行ExecReload
+[Install]
+WantedBy=multi-user.target：表示重启系统后自动启动celery.service
+
+
+
+
+
+
