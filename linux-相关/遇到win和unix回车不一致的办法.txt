@@ -1,0 +1,11 @@
+在linux下，不可避免的会用VIM打开一些windows下编辑过的文本文件。我们会发现文件的每行结尾都会有一个^M符号，这是因为 DOS下的编辑器和Linux编辑器对文件行末的回车符处理不一致，
+
+对于回车符的定义：
+windows：0D0A
+unix\linux: 0A
+MAC: 0D
+
+
+在终端下敲命令：
+$ dos2unix filename
+直接转换成unix格式，就OK了！

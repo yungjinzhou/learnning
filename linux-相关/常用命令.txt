@@ -1,0 +1,114 @@
+python setup.py install  安装pip包安装方式
+
+pip install package_name==version  pip安装方式
+
+yum install package_name==version  yum安装方式
+
+yum search package_name  yum搜索可用安装包
+
+
+
+cat /var/log/apmapi.log  查看apmapi日志看uwsgi启动是否成功
+tail -f /var/log/message 动态查看运行日志文件底部数据/循环监视日志文件
+
+uwsgi --ini name.ini   uwsgi启动方式
+uwsgi --stop apmapi.pid  uwsgi停止方式
+sh ./Cache.sh start    缓存Cache启动方式
+#重启
+uwsgi --reload apmapi.pid  
+
+
+
+make clean
+nake distclean
+make remove
+
+virtualenv env
+
+
+chmod +x file_name.sh
+./file_name.sh（可以写全路径）  or  sh file_name.sh  or  bash file_name.sh  三种运行方式
+sh ./zkServer.sh start开启zookeeper
+sh ./zkCli.sh 开启zookeeper客户端，根据get /ApmConfig/Redis查看配置
+
+
+sh ./DomainConfig.sh start开启domainconfig进程
+开启具体worker进程的debug模式，
+./apm worker --debug -q Q:DomainConfig
+
+
+
+
+客户端登陆zookeeper后获取get  /ApmConfig/Redis
+set  /ApmConfig/Redis  {"Master": "10.24.0.102:6379"}       zookeeper配置
+
+
+1. 启动ZK服务:?????? sh bin/zkServer.sh start 
+2. 查看ZK服务状态: sh bin/zkServer.sh status 
+3. 停止ZK服务:?????? sh bin/zkServer.sh stop 
+4. 重启ZK服务:?????? sh bin/zkServer.sh restart
+
+---------------------
+
+ 
+ctrl + z后台运行进程
+
+
+
+
+
+
+系统路径中的分割函数使用
+os.path.splitext()
+os.path.splitext() 函数将文件名和扩展名分开
+os.path.split()
+os.path.split() 函数将文件路径和文件名分开
+
+{}的作用是区别与普通字符变量，便于输出
+var=foo
+echo $varbar
+# Prints nothing because there is no variable 'varbar'
+echo ${var}bar
+# foobar
+
+
+$var和"$var"的区别，后者将参数作为整体，一个词
+var="foo bar"
+for i in "$var"; do # Expands to 'for i in "foo bar"; do...'
+    echo $i         #   so only runs the loop once
+done
+# foo bar
+
+var="foo bar"
+for i in $var; do # Expands to 'for i in foo bar; do...'
+    echo $i       #   so runs the loop twice, once for each argument
+done
+# foo
+# bar
+
+
+
+
+
+dig  域名
+查看域名的CNAME和A
+
+
+查看centosi系统内核
+uname -a
+查看发行版本
+cat /etc/redhat-release
+
+cat /etc/grub.conf
+
+
+ ./apm worker --debug -q Q:A
+
+./bin/zkCli.sh -server `hostname`:2181
+
+
+sh ./change_config.sh test
+
+
+
+

@@ -1,0 +1,11 @@
+Xshell快捷键
+
+alt+ o  新建session
+
+ctrl + tab / shift +tab 切换窗口
+
+alt + enter  全屏，退出全屏
+
+快捷键Alt + Enter
+
+

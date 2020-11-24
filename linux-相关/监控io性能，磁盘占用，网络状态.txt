@@ -1,0 +1,59 @@
+yum search后安装
+
+iostat -x 磁盘使用
+iotop 磁盘使用
+
+监控系统状态
+netstat 查看网络状态
+netstat -lnp查看监听端口
+netstat -an 查看系统的网络连接状况
+netstat -lntp 只看tcp的，不包含socket
+netstat -ltunp  tcp和udp的连接， 命令中u代表udp， t代表tcp
+netstat -an | awk '/^tcp/ {++sta[$NF]} END {for(key in sta) print key, "\t",sta[key]}'   查看与服务器连接的个数（lestablished）和通信个数(listen)
+     
+
+
+
+top命令，查看cpu情况
+CPU
+-id:CPU处于空闲状态时间百分比,如果空闲时间(cpu id)持续为0并且系统时间(cpu sy)是用户时间的两倍(cpu us) 系统则面临着CPU资源的短缺. 
+-us:用户进程消耗的CPU时间百分
+us的值比较高时，说明用户进程消耗的CPU时间多，但是如果长期超50%的使用，那么我们就该考虑优化程序算法或者进行加速（比如PHP/PERL）
+-sy:内核进程消耗的CPU时间百分比（sy的值高时，说明系统内核消耗的CPU资源多，这并不是良性表现，我们应该检查原因）
+
+-wa:IO等待消耗的CPU时间百分比
+wa的值高时，说明IO等待比较严重，这可能由于磁盘大量作随机访问造成，也有可能磁盘出现瓶颈（块操作）。
+
+
+
+
+iostat查看磁盘i/o情况
+iostat -x 1
+
+
+%util:  一秒中有百分之多少的时间用于 I/O 操作，即被io消耗的cpu百分比
+
+
+一秒中有百分之多少的时间用于 I/O 操作，或者说一秒中有多少时间 I/O 队列是非空的。即 delta(use)/s/1000 (因为use的单位为毫秒)
+
+如果 %util 接近 100%，说明产生的I/O请求太多，I/O系统已经满负荷，该磁盘可能存在瓶颈。
+
+
+%steal：管理程序维护另一个虚拟处理器时，虚拟CPU的无意识等待时间百分比。
+
+%idle：CPU空闲时间百分比。
+
+备注：
+如果%iowait的值过高，表示硬盘存在I/O瓶颈，
+
+                %idle值高，表示CPU较空闲，
+
+           如果%idle值高但系统响应慢时，有可能是CPU等待分配内存，此时应加大内存容量。
+%idle值如果持续低于10，那么系统的CPU处理能力相对较低，表明系统中最需要解决的资源是CPU。
+
+
+
+svctm: 平均每次设备I/O操作的服务时间 (毫秒)。
+
+	svctm一项，反应了磁盘的负载情况，如果该项大于15ms，并且util%接近100%，那就说明，磁盘现在是整个系统性能的瓶颈了。
+

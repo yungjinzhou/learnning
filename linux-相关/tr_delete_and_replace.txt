@@ -1,0 +1,7 @@
+last | tr [a-z] [A-Z]将信息中的小写都换成大写
+cat /etc/passwd | tr -d ":"删除信息中的冒号
+cat /root/passwd | tr -d '\r'  删除断行字符
+
+tr -s替换掉重复的字符，-s 删除所有重复出现字符序列，只保留第一个；即将重复出现字符串压缩为一个字符串。
+cat file | tr "abc" "xyz" > new_file 
+这里，凡是在file中出现的"a"字母，都替换成"x"字母，"b"字母替换为"y"字母，"c"字母替换为"z"字母。而不是将字符串"abc"替换为字符串"xyz"。

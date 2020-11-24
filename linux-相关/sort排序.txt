@@ -1,0 +1,47 @@
+1 sort的工作原理
+
+ 
+
+sort将文件的每一行作为一个单位，相互比较，比较原则是从首字符向后，依次按ASCII码值进行比较，最后将他们按升序输出。
+sort seq.txt
+
+
+sort的-u选项
+它的作用很简单，就是在输出行中去除重复行。sort -u seq.txt
+
+
+
+sort的-r选项
+sort默认的排序方式是升序，如果想改成降序，就加个-r就搞定了。sort -r number.txt
+
+
+
+sort的-o选项
+
+由于sort默认是把结果输出到标准输出，所以需要用重定向才能将结果写入文件，形如sort filename > newfile。
+但是，如果你想把排序结果输出到原文件中，用重定向可就不行了。可以用-o
+
+
+
+
+sort -r number.txt -o number.txt
+
+
+就要使用-n选项，来告诉sort，“要以数值来排序”！ sort -n number.txt
+
+
+这个文件有三列，列与列之间用冒号隔开了，第一列表示水果类型，第二列表示水果数量，第三列表示水果价格。
+那么我想以水果数量来排序，也就是以第二列来排序，如何利用sort实现？
+幸好，sort提供了-t选项，后面可以设定间隔符。（是不是想起了cut和paste的-d选项，共鸣～～）
+指定了间隔符之后，就可以用-k来指定列数了。
+sort -n -k 2 -t : facebook.txt
+
+
+
+
+排序后将重复的数据仅列出一行
+last | cut -d ' ' -f1 | sort | uniq
+last | cut -d ' ' -f1 | sort | uniq -c显示重复次数
+
+
+

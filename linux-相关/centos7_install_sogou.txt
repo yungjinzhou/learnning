@@ -1,0 +1,22 @@
+
+download sogou  sogoupinyin-1.2.0.0056-1.fc22.x86_64
+downlaod url
+https://pan.baidu.com/s/1sYXwOgQX6W49Tk8bGxrKRg    
+qpfs 
+
+yum install -y sogoupinyin-1.2.0.0056-1.fc22.x86_64
+
+
+setup
+
+Region & Language
+
+add  input Sources Chinese(INtelligent Pinyin)
+
+shift   change pinyin
+
+
+
+
+
+

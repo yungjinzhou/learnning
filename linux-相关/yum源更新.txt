@@ -1,0 +1,113 @@
+yum localinstall *.rpm----------------这种方式可以处理依赖安装
+
+
+
+
+mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.backup
+
+
+
+
+
+
+cd /etc/yum.repos.d/
+
+CentOS6 
+
+
+wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-6.repo
+
+CentOS7 
+
+
+
+wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo 
+
+
+
+centos7新系统执行----nginx-test
+mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.backup
+cd /etc/yum.repos.d/
+CentOS7 
+wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo 
+
+
+yum install -y net-tools
+yum install -y wget
+yum install -y openssh-clients
+yum install -y gcc
+
+yum install epel-release
+yum install -y vim-enhanced.x86_64
+
+yum install -y gcc gcc-c++
+$ cd /usr/local/
+ 
+$ wget http://jaist.dl.sourceforge.net/project/pcre/pcre/8.33/pcre-8.33.tar.gz
+ 
+$ tar -zxvf pcre-8.36.tar.gz
+
+
+
+
+
+
+nginx设置
+ulimit -a查看open file连接数
+查看ulimit -n 1000修改限制
+
+cat /proc/sys/fs/file-max查看系统理论能打开的最大文件数
+修改系统
+vim /etc/security/limits.conf修改系统最大连接数、
+
+
+nginx.conf
+
+main主函数
+sendfile ---on，将客户请求的相应数据不经过(存储)用户空间，直接发送给客户
+tcp_nopush---on
+tcp_nodelay---on，这两个参数表示每次传输发送的数据量一定时才会发送连接，不要一个字节发送一次，影响其他连接
+keepalive_timeout   65;     过了65秒，发送探测包，如果没有响应或者异常响应，关闭连接；
+
+
+
+server: 提供域名，端口
+     # 反向代理设置
+     location：提供域名:端口后的route路由
+               proxy_pass: 设置代理
+       
+
+      # 采用uwsgi方式
+       location /python/  {
+                  include  uwsgi_params;
+                   uwsgi_pass   ip:prot
+                 }
+
+
+       #访问本机ｎｇｉｎｘ文件
+　　loctation   /  {
+                  root  /home/yang/;
+                   index   index.html  index.htm;       
+       }
+
+upstream  负载均衡模块
+
+upstream  abc.com  {
+               ip_hash;----均衡方式
+               server  1.1.1.1:80;
+                server   1.1.1.2:80   down;-----该ip下线   
+                server  1.1.1..3:80      max_fails=3  fail_timeout=20s;---------失败3次后暂停该服务器20s后在启动
+              }
+
+
+
+
+
+
+
+
+
+
+
+
+

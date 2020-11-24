@@ -1,0 +1,7 @@
+连表查询，从hz_mp4中筛选出数据和sh_mp4表对比；
+select a.name,a.md5,a.size,b.md5,b.size from (select name,md5,size from hz_mp4 order by name limit 0,100) a, sh_mp4 as b where a.name=b.name and a.md5!=b.md5;
+
+
+
+
+

@@ -1,0 +1,38 @@
+使用state.sls, 后面用自己定义的sls文件处理
+salt '*' state.sls stuff pillar='{"foo": "bar"}'
+salt '*' state.sls nginx test=True
+Execute the states in one or more SLS files
+
+
+使用state.highstate
+Retrieve the state data from the salt master for this minion and execute it
+salt '*' state.highstate
+
+
+使用state.apply
+
+自动判断并调用highstate或者state.sls执行
+
+
+
+使用salt.request
+salt '*' state.request
+salt '*' state.request stuff
+salt '*' state.request stuff,pkgs
+Request that the local admin execute a state run via salt-call state.run_request. All arguments match those of state.apply.
+
+
+
+使用state.high
+salt '*' state.high '{"vim": {"pkg": ["installed"]}}'
+Execute the compound calls stored in a single set of high data
+
+
+
+
+
+
+
+
+jingjia使用例子
+{% for mnt in salt['cmd.run']('ls /dev/data/moose*').split() %}

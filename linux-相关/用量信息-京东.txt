@@ -1,0 +1,86 @@
+0-9点：电信 8G；联通4G
+9-18点： 电信3G；联通3G
+
+
+
+
+[work@sd3-jn-tnm-tmc25 tmp]$ ll /tmp/tencent_vod_meituan_store_new.tar.gz
+
+
+
+
+
+
+
+split -l 100000 ./../bili.inject.url.finish -d -a 2 10w_
+
+0 18 * * * kill -s SIGTERM `ps uax | grep mss_to_jcloud | grep -v grep | awk '{print $2}'`
+
+nohup python2.7 bili_mss_to_jcloud_storage.py /home/yangjinzhou/bili_task/1w/1w_04 &
+
+curl myip.ipip.net 查看外网ip
+
+
+
+
+0-9点
+23机器：8x20并发
+24机器：9x20并发
+25机器：9x20并发
+
+9-18点
+23机器：8x20并发
+24机器：0
+25机器：7x20并发
+
+
+
+
+
+23机器
+已完成：
+lm_905/
+lts_905/904_03/904_02/lm_urllist.201905.3
+
+未完成：
+
+lts: /903_00/903_03/902_00
+bili_1
+
+day:
+lts: 902_03/902_04/902_05/902_06/902_07/902_08/
+lm: 902_0/902_1
+
+
+
+
+
+
+
+24机器：
+已完成：
+100w_lts_5/100w_lts_2/100w_lts_3/100w_lts_4/903_01/100w_lts_0/100w_lts_1/
+未完成：
+
+lts: /903_04//903_05/902_01/902_02/
+.lm：903_0/903_1
+
+
+
+
+
+
+
+25机器：
+已完成：812_01/812_02/812_03/812_05/812_00 /812_04/812_06
+
+未完成：
+lts: /904_01/904_04/904_05/903_02/
+lm: 904_0/904_1/
+
+
+
+
+
+
+

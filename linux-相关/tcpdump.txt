@@ -1,0 +1,191 @@
+tcpdump
+tcpdump -nn
+-nn选项的作用是让第3和4列显示成“IP + 端口号的形式”，如果不加则显示“主机名 + 服务名称”
+tcpdump -nn -i ens33
+tcpdump -nn port 80
+tcpdump -nn not port 22 and host 1.1.1.1
+tcpdump -nn -c 100 -w 1.cap
+
+安装wireshark
+使用 tshark 查看web服务器
+yum install -y wireshark
+tshark -n -t a -R http.request -T fields -e "frame.time" -e "ip.src" -e "http.host" -e "http.request.method" -e "http.request.uri"
+
+man tcpdump查看linux上的命令时用man 命令会有响应提示
+tcpdump的选项
+选项翻译如下：
+ 
+
+-l：使标准输出变为缓冲行形式；
+
+-c：抓包次数；
+
+-nn：直接以 IP 及 Port Number 显示，而非主机名与服务名称；
+
+-s ：<数据包大小> 设置每个数据包的大小；
+
+-i：指定监听的网络接口；
+
+-r：从指定的文件中读取包；
+
+-w：输出信息保存到指定文件；
+
+-a：将网络地址和广播地址转变成名字；
+
+-d：将匹配信息包的代码以人们能够理解的汇编格式给出；
+
+-e：在输出行打印出数据链路层的头部信息；
+
+-f：将外部的Internet地址以数字的形式打印出来；
+
+-t：在输出的每一行不打印时间戳；
+
+-v ：输出稍微详细的报文信息；
+--vv则输出更详细信息。
+
+
+-i any：监听所有网络接口
+
+
+-i eth0：监听指定的网络接口（eth0）
+
+
+-D：列出所有可用的网络接口
+
+
+-n：不解析主机名
+
+
+-nn：不解析主机名和端口名
+
+
+-q：输出较少的信息
+
+
+-t：更便于阅读的时间戳输出
+
+
+-tttt：最便于阅读的时间戳输出
+
+
+-X：以 HEX 和 ASCII 模式输出数据包的内容
+
+
+-XX：与 -X 选项相同，同时还输出 ethernet 头
+-s：定义 snaplength (size) ，-s0 表示获取全部
+
+
+-S：输出绝对序列号
+
+
+-e：获取 ethernet 头信息
+
+
+-E：通过提供 key 来解密 IPSEC 流量
+
+
+主要包括 src，dst，dst or src，dst and src， 这些关键字指明了传输的方向。举例说明，src 210.27.48.2 ，指明 ip 包中源地址是 210.27.48.2 ， dst net 202.0.0.0 指明目的网络地址是 202.0.0.0。如果没有指明 方向关键字，则缺省是 src or dst 关键字。
+
+与运算是'and','&&'; 或运算是'or' ,'||'； 非运算是'not' '!'
+
+gateway, broadcast, less（小于）, greater（大于）
+
+
+运行下面命令来从所有网卡中捕获数据包
+tcpdump -i any
+从指定网卡中捕获数据包
+tcpdump -i eth0
+
+
+将捕获的包写入文件
+使用 -w 选项将所有捕获的包写入文件：
+
+tcpdump -i eth1 -w packets_file
+
+
+
+读取之前产生的 tcpdump 文件
+使用下面命令从之前创建的 tcpdump 文件中读取内容：
+
+tcpdump -r packets_file
+
+
+
+获取更多的包信息，并且以可读的形式显示时间戳
+要获取更多的包信息同时以可读的形式显示时间戳，使用：
+
+tcpdump -ttttnnvvS
+
+
+
+tcpdump host hostname -w 2.cap
+
+查看整个网络的数据包
+要获取整个网络的数据包，在终端执行下面命令：
+
+tcpdump net 192.168.1.0/24
+
+
+
+根据 IP 地址查看报文
+要获取指定 IP 的数据包，不管是作为源地址还是目的地址，使用下面命令：
+
+tcpdump host 192.168.1.100
+
+
+
+要指定 IP 地址是源地址或是目的地址则使用：
+
+tcpdump src 192.168.1.100
+
+tcpdump dst 192.168.1.100
+
+
+
+查看某个协议或端口号的数据包
+要查看某个协议的数据包，运行下面命令：
+
+tcpdump ssh
+
+
+
+要捕获某个端口或一个范围的数据包，使用：
+
+tcpdump port 22
+tcpdump portrange 22-125
+
+
+
+理解抓取的报文
+08:41:13.729687 IP 192.168.64.28.22 > 192.168.64.1.41916: Flags [P.], seq 196:568, ack 1, win 309, options [nop,nop,TS val 117964079 ecr 816509256], length 372
+
+
+第一个字段 08:41:13.729687 是该数据报文被抓取的系统本地时间戳。
+
+然后，IP 是网络层协议类型，这里是 IPv4，如果是 IPv6 协议，该字段值是 IP6。
+
+192.168.64.28.22 是源 ip 地址和端口号，
+紧跟其后的是目的 ip 地址和其端口号，这里是 192.168.64.1.41916。
+在源 IP 和目的 IP 之后，可以看到是 TCP 报文标记段 Flags [P.]
+S	SYN	Connection Start
+F	FIN	Connection Finish
+P	PUSH	Data push
+R	RST	Connection reset
+.	ACK	Acknowledgment
+接下来是该数据包中数据的序列号。对于抓取的第一个数据包，该字段值是一个绝对数字，后续包使用相对数值，以便更容易查询跟踪。例如此处 seq 196:568 代表该数据包包含该数据流的第 196 到 568 字节。
+
+
+接下来是 ack 值：ack 1。该数据包是数据发送方，ack 值为 1。在数据接收方，该字段代表数据流上的下一个预期字节数据，例如，该数据流中下一个数据包的 ack 值应该是 568。
+
+接下来字段是接收窗口大小 win 309，它表示接收缓冲区中可用的字节数，后跟 TCP 选项如 MSS（最大段大小）或者窗口比例值。更详尽的 TCP 协议内容请参考 Transmission Control Protocol(TCP) Parameters。
+
+最后，length 372 代表数据包有效载荷字节长度。这个长度和 seq 序列号中字节数值长度是不一样的。
+
+
+
+
+
+
+
+
+

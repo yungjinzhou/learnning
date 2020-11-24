@@ -1,0 +1,104 @@
+
+在centos7
+gitlab安装
+
+yum install -y vim-enhanced.x86_64
+yum install -y epel-release.noarch
+安装gitlab需要的环境
+yum install -y curl policycoreutils-python openssh-server
+systemctl enable sshd
+systemctl start sshd
+firewall-cmd --permanent --add-service=http
+systemctl reload firewalld
+邮件安装
+yum install postfix
+systemctl enable postfix
+systemctl start postfix
+
+
+curl https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.rpm.sh | sudo bash
+cd /etc/yum.repos.d/
+vim gitlab_gitlab-ce.repo 
+
+下为编辑内容
+[gitlab-ce]
+name=gitlab-ce
+baseurl=http://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/yum/el7
+repo_gpgcheck=0
+gpgcheck=0
+enabled=1
+gpgkey=https://packages.gitlab.com/gpg.key
+
+
+
+yum makecache
+yum install gitlab-ce
+gitlab-ctl reconfigure
+
+
+cd /etc/gitlab/
+ 
+vim gitlab.rb 
+
+external_url 'http://localhost:90'
+修改 /etc/gitlab/gitlab.rb：
+unicorn['listen'] = '127.0.0.1'
+unicorn['port'] = 3000
+
+
+每次重新配置，都需要执行
+gitlab-ctl reconfigure
+gitlab-ctl status
+查看状态，如果没有启动，可以重新启动
+gitlab-ctl status|start|stop|restart
+gitlab-rails console production
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+gitlab
+设置root用户密码
+输入指令 gitlab-rails console production
+
+1获得用户数据
+(main):001:0> user = User.where(id: 1).first
+      查询
+irb(main):002:0> user.password=12345678
+user.password_confirmation=12345678
+irb(main):004:0> user.save!
+
+true
+
+irb(main):005:0> quit
+
+
+
+添加ssh-key
+1.首先打开linux服务器，输入命令：ls -al ~/.ssh，检查是否显示有id_rsa.pub或者id_dsa.pub存在，如果存在请直接跳至第3步
+2).在bash中输入ssh-keygen -t rsa -C ”yourEmail@example.com”,注意这个地方的邮箱地址地址替换成你自己的邮箱地址即可，在显示如下的输出后一直按回车即可：
+3).打开id_rsa.pub文件，并且复制全部内容。 
+4).打开GitLab账户，打开SSH Keys: 
+将刚刚复制的内容添加到Key的文本域中，然后点击Add key
+5).完成上面的步骤之后就可以使用ssh来连接GitLab，并进行相应的操作了。
+
+
+
+

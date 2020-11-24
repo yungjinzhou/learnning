@@ -1,0 +1,30 @@
+yum install crontabs
+
+
+service crontd status
+由于Cron是Linux的内置服务，可以用以下的方法启动.关闭这个服务:
+
+
+/sbin/service?crond?start???????????//启动服务
+
+/sbin/service?crond?stop????????????//关闭服务
+
+/sbin/service?crond?restart????????//重启服务
+
+/sbin/service?crond?reload?????????//重新载入配置
+
+
+
+serviece crontab start/stop
+
+cat /etc/crontab查看定时任务配置
+
+crontab -r删除所有定时任务
+
+crontab file.sh启动定时任务
+
+注意事项
+新创建的cron job，不会马上执行，至少要过2分钟才执行。如果重启cron则马上执行。
+当crontab失效时，可以尝试/etc/init.d/crond restart解决问题。或者查看日志看某个job有没有执行/报错tail -f /var/log/cron。
+
+

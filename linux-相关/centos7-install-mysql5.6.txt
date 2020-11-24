@@ -1,0 +1,73 @@
+构建的镜像可以在创建的docker中运行systemctl
+
+dockerfile内容
+
+FROM centos:7
+MAINTAINER “yang” yang@email.here
+ENV container docker
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in ; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); rm -f /lib/systemd/system/multi-user.target.wants/;rm -f /etc/systemd/system/.wants/;rm -f /lib/systemd/system/local-fs.target.wants/;rm -f /lib/systemd/system/sockets.target.wants/udev;rm -f /lib/systemd/system/sockets.target.wants/initctl;rm -f /lib/systemd/system/basic.target.wants/;rm -f /lib/systemd/system/anaconda.target.wants/*;
+VOLUME [ “/sys/fs/cgroup” ]
+CMD ["/usr/sbin/init"]
+
+
+命令
+docker build --rm -t docker-images .
+
+构建的镜像可以在创建的docker中运行systemctl
+
+启动docker命令 
+docker run -itd --privileged --name=dockername docker-images-name
+
+
+先卸载自带的mariadb（由于是build的，所以没有）
+（
+rpm -qa| grep mariadb
+rpm -e mariadb-libs --nodeps
+）
+
+安装mysql5.6
+下载rpm包
+curl -O https://cdn.mysql.com//Downloads/MySQL-5.6/MySQL-5.6.46-1.el7.x86_64.rpm-bundle.tar
+
+
+
+安装依赖包
+yum install -y numactl perl-Data-Dumper net-tools libaio
+
+安装server and client
+rpm -ivh  MySQL-server-5.6.36-1.el7.x86_64.rpm
+rpm -ivh  MySQL-client-5.6.36-1.el7.x86_64.rpm　
+
+手动新增配置文件，如下;
+cp /usr/share/mysql/my-default.cnf   /etc/my.cnf
+
+
+. 启动mysql 5.6
+systemctl  start  mysql　　　　#启动
+systemctl  status  mysql　　　　#查看状态
+
+
+如果要加入开机启动，执行如下：
+ystemctl enable mysql　　　　
+或
+/sbin/chkconfig mysql on   (本方法√)
+
+
+
+查看初始化生成的随机密码
+ cat /root/.mysql_secret
+
+登录mysql
+mysql  -uroot -p
+
+在mysql命令行修改密码
+SET PASSWORD = PASSWORD('mysql')
+
+
+
+
+
+
+
+
+参考链接：https://www.cnblogs.com/ding2016/p/6756941.html

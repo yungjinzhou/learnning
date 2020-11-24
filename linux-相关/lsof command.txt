@@ -1,0 +1,25 @@
+yum install lsof    centos系统适用
+lsof -p pid
+lsof -i:port      
+lsof -i:80 //显示所有打开80端口的进程
+lsof -i //显示所有打开的端口
+lsof -p 30297 //显示那些文件被pid为30297的进程打开
+lsof -u1000 //查看uid是100的用户的进程的文件使用情况
+lsof `which httpd` //那个进程在使用apache的可执行文件
+lsof /etc/passwd //那个进程在占用/etc/passwd
+lsof /dev/hda6 //那个进程在占用hda6
+lsof /dev/cdrom //那个进程在占用光驱
+lsof -c sendmail //查看sendmail进程的文件使用情况
+
+
+lsof输出各列信息的意义如下：
+COMMAND：进程的名称 PID：进程标识符
+USER：进程所有者
+FD：文件描述符，应用程序通过文件描述符识别该文件。如cwd、txt等 
+TYPE：文件类型，如DIR、REG等
+文件和目录分别称为 REG 和 DIR。而CHR 和 BLK，分别表示字符和块设备；或者 UNIX、FIFO 和 IPv4，分别表示 UNIX 域套接字、先进先出 (FIFO) 队列和网际协议 (IP) 套接字
+DEVICE：指定磁盘的名称
+SIZE：文件的大小
+NODE：索引节点（文件在磁盘上的标识）
+NAME：打开文件的确切名称
+

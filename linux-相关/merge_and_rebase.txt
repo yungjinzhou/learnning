@@ -1,0 +1,24 @@
+merge
+1. 
+本地分支是A-B-C-D，
+服务器上是A-B。
+
+这时候直接push，服务器上也会变成A-B-C-D，这种是快进式合并。结束后，历史树是一条线。
+
+
+
+2.本地分支A-B-C-D，
+服务器上是A-B-E。
+
+2.1 merge处理
+这时候直接push会提示non-fast-forward而失败，需要先pull一下再push，
+默认情况下git pull origin 远程分支，会把远程分支上的E更新到本地，然后merge到本地分支上。merge结束后，本地最新的一个commit就是F
+
+那最终服务器上会是A-B-分叉：一边是C-D，一边是E，然后E和D又连到一个新的merge commit F上。
+
+
+
+rebase处理
+如果先做一次rebase。
+git pull --rebase，那么本地分支就会被更新成A-B-E-C'-D'，把C-D的基从B上变到E上，
+这时再去push，那服务器上也变成A-B-E-C'-D'. 

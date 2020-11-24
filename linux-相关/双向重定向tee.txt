@@ -1,0 +1,2 @@
+last | tee last.list | cut -d " " -f1
+将last的列表输出到last.list并继续作为下个命令的输入

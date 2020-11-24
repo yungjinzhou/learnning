@@ -1,0 +1,24 @@
+lftp命令是一款优秀的文件客户端程序，它支持ftp、SETP、HTTP和FTPs等多种文件传输协议。lftp支持tab自动补全，记不得命令双击tab键，就可以看到可能的选项了。
+
+
+
+  net:max-retries (number)
+              the  maximum  number  of  sequential  tries  of an operation without success.  0 means
+              unlimited. 1 means no retries.
+
+lftp -u user,psword 1.2.1.1 -e "set net:max-retries 3; ls prod || mkdir prod; cd prod; ls $CI_PROJECT_NAME || mkdir $CI_PROJECT_NAME; cd $CI_PROJECT_NAME; mput ./* || exit -1 && exit 0"
+    
+
+
+ lftp --help
+Usage: lftp [OPTS] <site>
+`lftp' is the first command executed by lftp after rc files
+ -f <file>           execute commands from the file and exit
+ -c <cmd>            execute the commands and exit
+ --help              print this help and exit
+ --version           print lftp version and exit
+Other options are the same as in `open' command
+ -e <cmd>            execute the command just after selecting
+ -u <user>[,<pass>]  use the user/password for authentication
+ -p <port>           use the port for connection
+ <site>              host name, URL or bookmark name

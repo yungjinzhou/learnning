@@ -1,0 +1,8 @@
+utc = "2017-07-28T08:28:47.776Z"
+UTC_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+utcTime = datetime.datetime.strptime(utc, UTC_FORMAT)
+
+localtime = utcTime + datetime.timedelta(hours=8)
+localtime  = localtime.strftime("%Y-%m-%d %H:%M:%S")
+print(localtime)

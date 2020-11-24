@@ -1,0 +1,13 @@
+报错
+报错代码：UnicodeEncodeError: 'ascii' codec can't encode characters in position 8-11: ordinal not in range(128)
+
+解决方法
+1. import codecs
+with codecs.open(filename, 'ab+', encoding='utf-8') as f:
+
+
+
+2. 
+import sys
+reload(sys)
+sys.setdefaultencoding('utf8')

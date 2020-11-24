@@ -1,0 +1,113 @@
+查询字符串处理
+
+urllib.urlencode(query, doseq=0)
+urllib.urlencode({'name': u'老王'.encode('utf8'), 'sex': u'男'.encode('utf8')})
+编码后
+'name=%E8%80%81%E7%8E%8B&sex=%E7%94%B7'
+
+
+
+urllib.quote(s, safe='/')
+接受参数s为字符串，safe是指定某字符不被urlencode，默认为'/'，
+如指定'+'、'/'不需转换，传 '+/' 和 '+ /' 均可。另外此方法会将“空格”转换为“%20”
+ urllib.quote(u'老王 /+'.encode('utf8'))
+
+编码后
+'%E8%80%81%E7%8E%8B%20/%2B'
+
+
+
+urllib.quote_plus(s, safe='')
+此方法的源码为:
+
+def quote_plus(s, safe=''):
+????
+"""Quote the query fragment of a URL; replacing ' ' with '+'"""
+
+????if ' ' in s:
+????????
+        s = quote(s, safe + ' ')
+???????
+?       return s.replace(' ', '+')
+????
+   return quote(s, safe)
+
+可以看出它比quote多一些功能，但是会将“空格”转换成“加号”，默认safe为空。
+urllib.quote_plus(u'老王 /+'.encode('utf8'))
+
+编码
+'%E8%80%81%E7%8E%8B+%2F%2B'
+
+
+
+
+
+Python2.7 urlparse学习
+
+urlparse.urlparse
+解析url为6部分，返回对象，元祖
+p = urlparse('http://www.cwi.nl:80/%7Eguido/Python.html')
+ # doctest: +NORMALIZE_WHITESPACE
+ParseResult(scheme='http', netloc='www.cwi.nl:80', path='/%7Eguido/Python.html',
+            params='', query='', fragment='')
+
+
+urlparse.urlsplit
+主要是分析urlstring，返回一个包含5个字符串项目的元组：协议、位置、路径、查询、片段，不过它不切分URL的参数
+url=urlparse.urlsplit('http://www.baidu.com/index.php?username=guol')
+SplitResult(scheme='http', netloc='www.baidu.com', path='/index.php', query='username=guol', fragment='')
+
+
+
+
+
+
+urlparse.parse_qs
+解析查询字符串
+qs = 'a=b&c=d&e=f'
+解析后返回字典形式
+{'a': ['b'], 'c': ['d'], 'e': ['f']}
+
+
+
+
+urlparse.parse_qsl
+解析查询字符串
+qs = 'a=b&c=d&e=f'
+解析后返回列表形式
+[('a', 'b'), ('c', 'd'), ('e', 'f')]
+
+
+urlparse.urljoin(base, url[, allow_fragments])
+ urljoin主要是拼接URL，
+基地址并非以字符/结尾的话，那么URL基地址最右边部分就会被这个相对路径所替换
+urlparse.urljoin('http://www.oschina.com/tieba','index.php')   base_url没有/
+	'http://www.oschina.com/index.php'
+urlparse.urljoin('http://www.oschina.com/tieba/','index.php')   base_url有/
+	'http://www.oschina.com/tieba/index.php'
+
+
+
+urllib.urlopen(url[, data[, proxies]]) :
+创建一个表示远程url的类文件对象，然后像本地文件一样操作这个类文件对象来获取远程数据。
+
+参数proxies用于设置代理。
+urlopen返回 一个类文件对象，它提供了如下方法：
+read() , readline() , readlines() , fileno() , close() ：这些方法的使用方式与文件对象完全一样;
+info()：返回一个httplib.HTTPMessage 对象，表示远程服务器返回的头信息
+getcode()：返回Http状态码。如果是http请求，200表示请求成功完成;404表示网址未找到；
+geturl()：返回请求的
+
+
+urllib.urlretrieve(url[, filename[, reporthook[, data]]])
+参数说明：
+url：外部或者本地url
+filename：指定了保存到本地的路径（如果未指定该参数，urllib会生成一个临时文件来保存数据）；
+reporthook：是一个回调函数，当连接上服务器、以及相应的数据块传输完毕的时候会触发该回调。我们可以利用这个回调函数来显示当前的下载进度。
+data：指post到服务器的数据。该方法返回一个包含两个元素的元组(filename, headers)，filename表示保存到本地的路径，header表示服务器的响应头。
+
+
+
+
+
+

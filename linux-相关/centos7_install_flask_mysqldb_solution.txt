@@ -1,0 +1,7 @@
+yum install -y python2-pip 
+pip install Mysql-python
+yum install -y MySQL-python.x86_64
+（yum install -y mysql++-devel.x86_64） 
+yum install python-devel
+ （yum install mysql-devel.x86_64 -y）
+ pip install flask-mysqldb

@@ -1,0 +1,149 @@
+
+环境
+1. 解决docker不能上网，宿主机可以的办法
+
+cat /proc/sys/net/ipv4/ip_forward
+这个改成1（尝试可行）
+终端下输入sysctl -w net.ipv4.ip_forward=1
+或者
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+
+
+
+网络搜索的办法
+编辑虚拟机文件：vim /etc/sysctl.conf
+增加：net.ipv4.ip_forward=1
+重启服务：systemctl restart network
+查看属性是否修改成功：sysctl net.ipv4.ip_forward
+
+
+
+环境，centos6.9，
+
+yum install -y epel-release
+yum search docker
+yum install -y docker-io.x86_64
+
+# 启动docker
+sudo service docker start
+
+# 停止docker
+sudo service docker stop
+
+# 重启docker
+sudo service docker restart
+
+拉取docker镜像
+docker pull image_name
+拉取docker镜像指定版本
+ docker pull centos:6.9
+
+
+查看宿主机上的镜像，Docker镜像保存在/var/lib/docker目录下:
+docker images
+
+删除镜像
+docker rmi  docker.io/tomcat:7.0.77-jre7   或者  docker rmi b39c68b7af30
+一条命令实现停用并删除所有容器：(先查看所有容器，以免误删)
+docker stop $(docker ps -q) & docker rm $(docker ps -aq)
+
+
+创建容器
+docker -h host_name 指定docker启动的hostname,不指定默认是container_id， 
+登陆后就是root@id,指定后root@host_name
+docker run -d -i -t <imageID> /bin/bash（没有/bin/bash会立刻退出）
+docker run -itd --name=install_py2.7 657531b0552b /bin/bash
+
+启动容器，并挂载本地目录文件(-v),冒号前为本地目录，冒号后为容器目录
+docker run -it -v /home/work/Downloads:/home  image_name/image_id  /bin/bash
+创建并启动容器，指定端口，9099是宿主机端口，发往宿主机的会转发到docker的8081端口上
+docker run -it -d -v /home/apm_redis/apm/:/home/work/apm  -p 9099:8081 centos:6.9 /bin/bash
+
+查看当前有哪些容器正在运行
+docker ps
+
+查看所有容器
+docker ps -a
+
+退出容器exit
+
+启动、停止、重启容器命令：
+docker start container_name/container_id
+docker stop container_name/container_id
+docker restart container_name/container_id
+停用全部运行中的容器:
+docker stop $(docker ps -q)
+删除全部容器：((先查看所有容器，以免误删))
+docker rm $(docker ps -aq)
+
+后台启动一个容器后，如果想进入到这个容器，可以使用attach命令：
+docker attach container_name/container_id
+
+
+进入容器:
+docker exec -it 65712e2397 /bin/bash
+
+通过制定 -it 参数来保持标准输入打开, 并且分配一个伪终端. 通过 exec 命令对容器执行操作是最为推荐的方式
+
+
+
+删除容器的命令：
+docker rm container_name/container_id
+
+删除所有停止的容器：
+docker rm $(docker ps -a -q)
+
+查看当前系统Docker信息
+docker info
+
+
+从Docker hub上下载某个镜像:
+docker pull centos:latest
+docker pull centos:latest
+
+查找Docker Hub上的nginx镜像
+docker search nginx
+
+
+
+
+下载cantos6.9版本的镜像
+docker pull centos:6.9
+
+
+
+
+
+
+
+
+docker下的centos6.9镜像
+镜像是最小化配置，并未安装相关命令，
+安装net-tools
+yum install -y net-tools
+yum install -y  wget
+
+docker rename old容器名  new容器名
+
+
+备份
+docker commit 30b8f18f20b4 container-backup
+docker save -o ~/container-backup.tar container-backup
+
+恢复
+docker load -i ~/container-backup.tar
+加载到镜像后
+docker images查看
+docker run -------
+
+修改docker中的时间
+复制主机的localtime
+docker cp /etc/localtime:【容器ID或者NAME】/etc/localtime
+如果docker版本低，不支持cp可以scp拷贝
+
+
+
+运行dockerfile
+docker build -t zingdocker/jdk-tomcat .
+zingdocker/jdk-tomcat是镜像名称， 后面的点是Dockefile的路径

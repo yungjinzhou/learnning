@@ -1,0 +1,73 @@
+git log
+
+git show commit_id
+
+
+
+
+
+
+git branch -D branchname强制删除本地分支
+
+git branch -d branchname删除本地分支
+
+
+git checkout branchname 切换分支
+
+
+
+git checkout -b dev   创建并切换到dev分支
+
+git push origin dev   将本地提交到远程分支dev，如果远程没有则创建
+
+git pull origin dev     将远程分支dev代码下载并合并到本地当前分支
+
+git pull origin next:master  取回origin主机的next分支，与本地的master分支合并，相当于get fetch origin    
+git merge origin/next
+
+git branch --set-upstream master origin/next
+git clone ""    git自动追踪当前分支与对应远程分支
+
+
+git merge dev    将分支dev合并到当前分支中，自动进行新的提交：
+
+
+git stash 保存当前未提交进度，切换分支
+
+git stash pop，切换回此分支，删除缓存，恢复未提交进度
+
+
+
+
+配置别名
+
+git config --global alias.st status
+
+git config --global alias.ckt checkout
+git config --global alias.cmt commit
+
+git config --global alias.br branch
+
+
+git config --global user.email "你的git的注册邮箱"
+git config --global user.user"你的git用户名"
+
+使用git pull或者git push每次都需要输入用户名和密码很不人性化，耽误时间，现在教大家一条命令实现保存用户名和密码不用再输入
+
+
+git config --global credential.helper store
+
+
+git pull /git push (这里需要输入用户名和密码，以后就不用啦)
+
+
+
+Git commit --amend——将暂存区的更改添加到最近一次提交中。适用于已经cmt一次了，但是有新的更改，可以将新的更改add进暂存区，然后用此命令，相当于一次提交。
+
+
+git reset –-hard HEAD——撤销最近提交以来暂存区文件和非暂存区的改动。将暂存区的文件恢复到非暂存区并且还原为未修改状态
+git reflog——显示本地代码库 HEAD 的更改日志。这个命令很适合查找丢失的工作。
+Git revert my commit——撤销 my_commit 中的更改。当用 revert 撤销改动时，它会产生新的提交。撤销本次提交的所有改动，恢复到未改动状态
+
+更改文件为0755可执行权限
+git update-index --chmod=+x foo.sh

@@ -1,0 +1,35 @@
+下载对应的redis版本
+curl -O http://download.redis.io/releases/redis-2.8.10.tar.gz
+tar -zxvf redis-2.6.13.tar.gz
+进入目录，执行make
+
+
+修改为在linux任意目录下用redis-server和redis-cli
+
+修改profile文件：?
+
+#vi /etc/profile?
+
+
+在最后行添加:?
+
+
+export PATH=$PATH:/home/work/redis-2.8.23/src  ?
+注意：/opt/software/redis/src 表示的是redis-cli 命令存在的目录路径
+
+
+
+重新加载/etc/profile
+#source /etc/profile
+
+在任意目录执行命令
+
+#redis-cli
+
+
+mysql安装
+yum install -y mysql-server mysql
+启动
+/etc/init.d/mysqld start
+
+

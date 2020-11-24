@@ -1,0 +1,35 @@
+FQDN  全域名
+
+启动
+service salt-master start
+service salt-minion start
+
+key操作
+salt-key -L
+查看指纹
+salt-key -f minion-one
+在minion查看指纹
+salt-call --local key.finger
+
+接受key
+salt-key -a minion-one
+
+
+测试与测试模块
+salt "*" test.ping
+列出测试模块
+salt 'minion-one' sys.list_functions test
+
+以YAML格式输出
+salt --out=yaml "*" cmd.run_all "echo my salt"
+
+
+
+
+salt "minion-one" grains.ls
+
+salt "minion-one" grains.item cpu_model
+
+
+salt "minion-one" grains.items
+

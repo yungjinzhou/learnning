@@ -1,0 +1,11 @@
+#define    SIGHUP        1    /* Hangup.  */
+#define    SIGTERM        15    /* Termination request.  */
+#define    SIGKILL        9    /* Killed.  */
+#define    SIGCONT        19    /* Continue.  */   centos  18
+#define    SIGINT        2    /* Interactive attention signal.  */
+
+
+sighup用于暂停
+sigterm终止
+sigcont继续开始
+sigint 切换并发量

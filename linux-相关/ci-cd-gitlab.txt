@@ -1,0 +1,12 @@
+
+
+2. 创建一个Project
+创建好project后，就有了该project的URL。
+
+3.注册runner
+注册命令：
+gitlab-ci-multi-runner register
+#引导会让你输入gitlab的url，输入自己的url，例如http://gitlab.example.com/
+#引导会让你输入token，去相应的项目下找到token，例如ase12c235qazd32
+#引导会让你输入tag，一个项目可能有多个runner，是根据tag来区别runner的，输入若干个就好了，比如web,hook,deploy
+#引导会让你输入executor，这个是要用什么方式来执行脚本，图方便输入shell就好了

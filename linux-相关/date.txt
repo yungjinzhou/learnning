@@ -1,0 +1,2 @@
+date [OPTION]... [+FORMAT]
+(date --date='2 days ago' +%Y%m%d)  两天前的时间 date -d '2 days ago' +%Y%m%d

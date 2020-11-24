@@ -1,0 +1,23 @@
+salt "server2"  cmd.run 'ps aux | grep apm'
+
+所有minion
+salt '*' cmd.run 'ls'
+多个minion列表
+salt -L server1,server2 cmd.run 'ls'
+正则匹配
+salt -E '.*' cmd.run 'ls -l | grep foo'
+
+
+执行
+salt '*' cmd.exec_code python 'import sys; print sys.version'
+传参数
+alt '*' pip.install salt timeout=5 upgrade=True
+salt '*' cmd.run 'echo "Hello: $FIRST_NAME"' saltenv='{FIRST_NAME: "Joe"}'
+
+执行多个命令，对应多个参数
+salt '*' cmd.run,test.ping,test.echo 'cat /proc/cpuinfo',,foo
+
+
+
+
+

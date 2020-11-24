@@ -1,0 +1,24 @@
+1.sysctl
+
+sysctl命令被用于在内核运行时动态地修改内核的运行参数，可用的内核参数在目录/proc/sys中
+
+
+sysctl [options] parameters  
+常用的选项：
+[html] view plain copy 在CODE上查看代码片派生到我的代码片
+-w #当改变sysctl设置时使用此项  
+-p #加载指定的配置文件中的内核参数，默认是/etc/sysctl.conf  
+-a #打印当前所有可用的内核参数变量和值  
+-A #以表格方式打印当前所有可用的内核参数变量和值  
+
+
+
+
+
+
+
+
+
+
+sysctl -a | grep timestamps
+sysctl -a | grep tw
