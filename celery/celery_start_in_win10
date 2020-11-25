@@ -1,3 +1,2 @@
 celery -A celery_tasks.main worker -l debug -P eventlet
 
-
