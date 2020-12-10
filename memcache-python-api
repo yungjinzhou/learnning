@@ -1,0 +1,35 @@
+Memcached API
+set(key,val,time=0,min_compress_len=0)
+无条件键值对的设置，其中的time用于设置超时，单位是秒，而min_compress_len则用于设置zlib压缩(注:zlib是提供数据压缩用的函式库)
+
+set_multi(mapping,time=0,key_prefix='',min_compress_len=0)
+设置多个键值对，key_prefix是key的前缀，完整的键名是key_prefix+key, 使用方法如下
+
+  >>> mc.set_multi({'k1' : 1, 'k2' : 2}, key_prefix='pfx_') == []
+
+  >>> mc.get_multi(['k1', 'k2', 'nonexist'], key_prefix='pfx_') == {'k1' : 1, 'k2' : 2}
+
+add(key,val,time=0,min_compress_len=0)
+添加一个键值对，内部调用_set()方法
+
+replace(key,val,time=0,min_compress_len=0)
+替换value，内部调用_set()方法
+
+get(key)
+根据key去获取value，出错返回None
+
+get_multi(keys,key_prefix='')
+获取多个key的值，返回的是字典。keys为key的列表
+
+delete(key,time=0)
+删除某个key。time的单位为秒，用于确保在特定时间内的set和update操作会失败。如果返回非0则代表成功
+
+incr(key,delta=1)
+自增变量加上delta，默认加1，使用如下
+
+>>> mc.set("counter", "20")  
+
+>>> mc.incr("counter")
+
+decr(key,delta=1)
+自减变量减去delta，默认减1
