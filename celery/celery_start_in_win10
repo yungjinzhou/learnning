@@ -1,2 +1,7 @@
 celery -A celery_tasks.main worker -l debug -P eventlet
 
+
+
+
+  -P POOL, --pool POOL  Pool implementation: prefork (default), eventlet,
+                        gevent or solo.
