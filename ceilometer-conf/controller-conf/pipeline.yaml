@@ -1,0 +1,38 @@
+---
+sources:
+    - name: test_meter
+      meters:
+          - hardware.cpu.load.1min
+          - hardware.cpu.load.5min
+          - hardware.cpu.load.15min
+          - hardware.cpu.util
+          - hardware.cpu.user
+          - hardware.cpu.nice
+          - hardware.cpu.system
+          - hardware.cpu.idle
+          - hardware.cpu.wait
+          - hardware.cpu.kernel
+          - hardware.cpu.interrupt
+          - hardware.disk.size.total
+          - hardware.disk.size.used
+          - hardware.memory.total
+          - hardware.memory.used
+          - hardware.memory.swap.total
+          - hardware.memory.swap.avail
+          - hardware.memory.buffer
+          - hardware.memory.cached
+          - hardware.network.ip.outgoing.datagrams
+          - ardware.network.ip.incoming.datagrams
+          - hardware.system_stats.cpu.idle
+          - hardware.system_stats.io.outgoing.blocks
+          - hardware.system_stats.io.incoming.blocks
+      resources:
+          - snmp://1.1.1.1    # 所要监控节点的ip
+      sinks:
+          - meter_snmp_sink
+
+sinks:
+    - name: meter_snmp_sink
+      transformers:
+      publishers:
+          - gnocchi://?filter_project=service&archive_policy=horizon-mimic
