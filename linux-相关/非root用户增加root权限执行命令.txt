@@ -1,0 +1,64 @@
+Linux系统下，如何为普通用户授权
+
+
+
+编辑sudoers
+
+vi /etc/sudoers(visudo)
+
+添加如下内容
+
+fly ALL=（ALL） ALL  (为普通用户fly赋予root权限）
+
+第一个ALL：所有地方都可以登陆，localhost只能本机登陆。
+
+第二个(ALL):表示什么身份的用户都执行。’
+
+第三个ALL：表示所有命令都可以使用。
+
+  1) /bin/fdisk, /sbin/init 表示只授权fly账号 fdisk命令和init命令。如果还需要其他命令可以用   逗号空格隔开然后继续添加。
+
+  2) 命令别名(可以和普通的授权一起使用)
+
+  Cmnd_Alias CMD = /sbin/init, /sbin/fdisk, /sbin/* !/sbin/poweroff
+
+  (/sbin/* 表示sbin下所有   命令,!/sbin/poweroff 表示poweroff命令除外)。
+
+  fly ALL=CMD ALL
+
+  3) 用户别名
+
+  User_Alias DIS = fly, test
+
+  DIS ALL=CMD ALL
+
+
+
+fly可以执行 sudo -l 列出可执行命令，（sudo fdisk fls执行fdisk命令）。
+
+
+
+如果我们希望fly用户 只能在本机以root身份执行/sbin/poweroff命令，应该这样配置
+
+fly localhost=(root) /sbin/poweroff
+
+如果fly登陆之后运行sudo 命令不满足上面三个条件执行命令均失败。
+
+
+
+fly ALL=(ALL) NOPASSWD: ALL 表示fly可以不需要输入密码执行sudo命令。%fly表示fly组。
+
+
+
+监控普通账号的sudo使用权限
+
+在sudo中定义日志文件
+
+visudo
+
+在sudo文件中添加
+
+Defaults logfile="var/log/sudo"
+
+定义好后普通账号执行sudo命令会记录到日志文件中。
+
