@@ -1,0 +1,31 @@
+python第三方模块
+shutil
+psutil
+os
+
+
+
+
+linux命令
+iostat -d -k -x 
+df -h
+lsblk -a
+fdisk -l
+
+
+
+查看文件或文件夹的磁盘使用空间
+du -h --max-depth=1 your_dest_dir
+
+
+
+
+
+
+产看docker 占用空间
+docker system df
+
+docker stats
+不想持续的监控容器使用资源的情况，可以通过 --no-stream 选项只输出当前的状态：
+docker stats --no-stream
+docker stats --no-stream container_id
