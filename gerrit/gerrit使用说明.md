@@ -1,10 +1,10 @@
+Gerrit 登录地址
 
+http://192.168.202.24/gerrit/c/MCS-horizon
 
-基本操作，解释见官方文档
+用户名: 姓名全拼
 
-http://gitlab.aotimes.com/root/readme/blob/master/Gerrit%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E.md
-
-
+初始密码: comleader@123
 
 
 
@@ -30,10 +30,10 @@ ssh-keygen -t tsa
 
 
 
-**在命令行执行下面的命令**，就可以把myproject工程给clone下来了
+**在命令行执行下面的命令**，就可以把MCS-horizon工程给clone下来了
 
 ```
-$ git clone "ssh://your_name@10.0.0.1:29418/myproject" && scp -p -P 29418 your_name@192.1610.0.0.1/commit-msg "MCmyprojectgit/hooks/"
+$ git clone "ssh://your_name@192.168.202.24:29418/MCS-horizon" && scp -p -P 29418 your_name@192.168.202.24:hooks/commit-msg "MCS-horizon/.git/hooks/"
 ```
 
 
@@ -67,12 +67,12 @@ $ git config user.email your_name@comleader.com.cn
   ! [remote rejected]   HEAD -> refs/for/master (commit 0a1dc25: missing Change-Id in message footer)
   根据git提示信息：
 gitdir=$(git rev-parse --git-dir); 
-scp -p -P 29418 your_name@10.0.0.1:hooks/commit-msg ${gitdir}/hooks/
+scp -p -P 29418 your_name@192.168.202.24:hooks/commit-msg ${gitdir}/hooks/
 git commit --amend --no-edit
 及 参考链接：https://stackoverflow.com/questions/59470484/git-push-failed-due-to-change-id
  
 最终执行命令
-scp -p -P 29418 your_name@10.0.0.1/commit-msg ".git/hooks/"
+scp -p -P 29418 your_name@192.168.202.24:hooks/commit-msg ".git/hooks/"
 git commit --amend
 push成功
 ```
@@ -166,10 +166,10 @@ git push origin HEAD:refs/for/master
 遇到如下问题：
 
 ```
-To ssh://10.0.0.1:29418/myproject
+To ssh://192.168.202.24:29418/MCS-horizon
  ! [remote rejected]   HEAD -> refs/for/develop (Pushing merges in commit chains with 'all not in target' is not allowed,
 to override please set the base manually)
-error: failed to push some refs to 'ssh://192.1610.0.0.1/MCmyproject
+error: failed to push some refs to 'ssh://192.168.202.24:29418/MCS-horizon'
 
 ```
 
