@@ -1,0 +1,33 @@
+---
+sources:
+  - name: some_pollsters
+    # for instance meters in compute node
+    interval: 30
+    meters:
+#        - "*"
+      - cpu
+      - vcpus
+#        - cpu_l3_cache
+      - memory
+      - memory.usage
+      - memory.resident
+      - memory.swap.in
+      - memory.swap.out
+      - memory.bandwidth.total
+      - memory.bandwidth.local
+      - network.incoming.bytes
+      - network.incoming.packets
+      - network.outgoing.bytes
+      - network.outgoing.packets
+      - network.incoming.packets.drop
+      - network.incoming.packets.error
+      - network.outgoing.packets.drop
+      - network.outgoing.packets.error
+      - disk.device.read.bytes
+      - disk.device.read.requests
+      - disk.device.write.bytes
+      - disk.device.write.requests
+      - disk.device.read.bytes.rate
+      - disk.device.read.requests.rate
+      - disk.device.write.bytes.rate
+      - disk.device.write.requests.rate

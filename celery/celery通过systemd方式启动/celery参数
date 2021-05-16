@@ -1,0 +1,13 @@
+celery -A celery_tasks.main worker -l debug -h
+
+
+
+  -c CONCURRENCY, --concurrency CONCURRENCY
+                        Number of child processes processing the queue. The
+                        default is the number of CPUs available on your
+                        system.
+  -P POOL, --pool POOL  Pool implementation: prefork (default), eventlet,
+                        gevent or solo.
+  -E, --task-events, --events
+                        Send task-related events that can be captured by
+                        monitors like celery events, celerymon, and others.
