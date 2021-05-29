@@ -214,15 +214,92 @@ True
 ```
 
 
+```
  如果你对这个区别很在意，可以使用 `fnmatchcase()` 来代替。它完全使用你的模式大小写匹配。比如： 
 
-```
 >>> fnmatchcase('foo.txt', '*.TXT')
 False
 >>>
 ```
 
 
+##### 11.匿名函数捕获变量值
+这其中的奥妙在于lambda表达式中的x是一个自由变量， 在运行时绑定值，而不是定义时就绑定，这跟函数的默认值参数定义是不同的。 因此，在调用这个lambda表达式的时候，x的值是执行时的值。
+```
+>>> x = 10
+>>> a = lambda y: x + y
+>>> x = 20
+>>> b = lambda y: x + y
+>>>
+>>> a(10)
+30
+>>> b(10)
+30
+>>>
 
+
+
+>>> funcs = [lambda x: x+n for n in range(5)]
+>>> for f in funcs:
+... print(f(0))
+...
+4
+4
+4
+4
+4
+>>>
+
+如果你想让某个匿名函数在定义时就捕获到值，可以将那个参数值定义成默认参数即可
+
+>>> funcs = [lambda x, n=n: x+n for n in range(5)]
+>>> for f in funcs:
+... print(f(0))
+...
+0
+1
+2
+3
+4
+
+```
+
+
+##### 12.闭包访问
+闭包的内部变量对于外界来讲是完全隐藏的。 但是，你可以通过编写访问函数并将其作为函数属性绑定到闭包上来实现这个目的。
+```
+
+def sample():
+    n = 0
+    # Closure function
+    def func():
+        print('n=', n)
+
+    # Accessor methods for n
+    def get_n():
+        return n
+
+    def set_n(value):
+        nonlocal n
+        n = value
+
+    # Attach as function attributes
+    func.get_n = get_n
+    func.set_n = set_n
+    return func
+下面是使用的例子:
+
+>>> f = sample()
+>>> f()
+n= 0
+>>> f.set_n(10)
+>>> f()
+n= 10
+>>> f.get_n()
+10
+>>>
+```
+
+##### 13.
 
 
