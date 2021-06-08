@@ -1,0 +1,3 @@
+查看NSUPDATE.py中的NSUPDATE是测试地址，(92,90)，
+去redis清除Q:NSupdate队列，(del Q:NSupdate)
+sh NsUPDATE.py start

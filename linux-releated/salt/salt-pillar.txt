@@ -1,0 +1,16 @@
+用于提供给（特定）minion全局信息的接口；
+
+指定minion发送，可以发送敏感信息
+
+
+配置pillar参数
+vim /etc/salt/master
+
+pillar_roots:
+  base:
+    - /srv/pillar
+
+pillar_opts: True
+
+
+

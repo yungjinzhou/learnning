@@ -1,0 +1,69 @@
+将时间字符串转换为时间戳（345224234.34s）
+create_date = float(time.mktime(time.strptime('2019/08/09 15:40:36', '%Y/%m/%d %H:%M:%S')))
+
+将时间戳转换为localtime
+x = time.localtime(1317091800.0)#localtime参数为float类型，这里1317091800.0为float类型
+locatime = time.strftime('%Y-%m-%d %H:%M:%S',x)
+
+
+utc时间转换为本地时间
+utc = "2017-07-28T08:28:47.776Z"
+UTC_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+utcTime = datetime.datetime.strptime(utc, UTC_FORMAT)
+
+localtime = utcTime + datetime.timedelta(hours=8)
+localtime  = localtime.strftime("%Y-%m-%d %H:%M:%S")
+print(localtime)
+
+
+
+
+
+
+TIME = '2018-05-08 06:17:00'    GMT格式
+
+首先是UTC：时间标准时间
+协调世界时（英：Coordinated Universal Time ，法：Temps Universel Coordonné），又称世界统一时间，世界标准时间，国际协调时间。英文（CUT）和法文（TUC）的缩写不同，作为妥协，简称UTC。
+格式：
+
+
+
+
+
+然后是GMT：格林尼治时间
+世界时UT  即格林尼治时间，格林尼治所在地的标准时间。以地球自转为基础的时间计量系统。地球自转的角度可用地方子午线相对于地球上的基本参考点的运动来度量。为了测量地球自转，人们在地球上选取了两个基本参考点：春分点（见分至点）和平太阳，由此确定的时间分别称为恒星时和平太阳时。
+格式：‘Tue, 08 May 2018 06:17:00 GMT’  GMT_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
+
+1、先看下如何将datetime类型转换成HTTP头所用的GMT时间格式字符串
+import datetime
+GMT_FORMAT =? '%a, %d %b %Y %H:%M:%S GMT'
+datetime.datetime.utcnow().strftime(GMT_FORMAT)
+
+将GMT时间格式的字符串转换成datetime类型：
+TIME = '2018-05-08 06:17:00'
+datetime.datetime.strptime(TIME,GMT_FORMAT)
+
+3、一般GMT时间与我国本地时间有个时间差，如果要转换成本地时间，需要再加减一段时间
+datetime.datetime.strptime(TIME,GMT_FORMAT)+datetime.timedelta(hours=8)? #这样就转换成了我国的时间了，北京时间是东八区，要加上8个小时
+
+
+
+
+
+首先字母T：他表示后面跟的时
+而最末尾的Z表示UTC统一时间
+
+
+
+
+GST时间：也就是北京时间   Tue Aug 09 18:01:54 CST 2016          2019/5/7 19:2:48
+
+
+
+将时间字符串转换为时间戳（345224234.34s）
+create_date = float(time.mktime(time.strptime('2019/08/09 15:40:36', '%Y/%m/%d %H:%M:%S')))
+
+将时间戳转换为localtime
+x = time.localtime(1317091800.0)#localtime参数为float类型，这里1317091800.0为float类型
+locatime = time.strftime('%Y-%m-%d %H:%M:%S',x)

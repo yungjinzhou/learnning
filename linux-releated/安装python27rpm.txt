@@ -1,0 +1,64 @@
+下载地址https://centos.pkgs.org/6/ius-archive-x86_64/python27-2.7.13-2.ius.centos6.x86_64.rpm.html
+二进制格式Binary Package
+wget https://dl.iuscommunity.org/pub/ius/archive/CentOS/6/x86_64//python27-2.7.13-2.ius.centos6.x86_64.rpm
+Source Package
+wget https://dl.iuscommunity.org/pub/ius/archive/CentOS/6/SRPMS/python27-2.7.13-2.ius.centos6.src.rpm
+
+
+
+在CentOS或者Fedora下有时候用yum安装软件的时候最后会提示： 
+warning: rpmts_HdrFromFdno: Header V3 DSA signature: NOKEY, key ID***** 
+这是由于yum安装了旧版本的GPG keys造成的，解决办法就是 
+rpm --import /etc/pki/rpm-gpg/RPM* 
+
+
+
+出现这个Header V4 DSA****NOKEY。的原因是linux的发行版和linux应用软件之间的兼容性出现问题，也就是LSB。 
+sudo yum install lsb
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+IUS（Inline with Upstream Stable）是一个社区项目，它旨在为Linux企业发行版提供可选软件的最新版RPM软件包。
+
+ius源依赖epel源，首先安装epel源
+yum install epel-release
+
+centos6
+# yum install https://dl.iuscommunity.org/pub/ius/stable/CentOS/6/x86_64/ius-release-1.0-15.ius.centos6.noarch.rpm
+centos7
+# yum install https://dl.iuscommunity.org/pub/ius/stable/CentOS/7/x86_64/ius-release-1.0-15.ius.centos7.noarch.rpm
+使用ius源安装python2.7.x
+
+# yum clean all
+# yum install python27
+pip 安装
+# yum install python27-pip
+
+
+
+
+
+
+
+
+

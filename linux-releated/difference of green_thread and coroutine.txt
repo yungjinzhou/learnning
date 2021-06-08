@@ -1,0 +1,7 @@
+A Fiber is a lightweight thread that uses cooperative multitasking instead of preemptive multitasking. A running fiber must explicitly "yield" to allow another fiber to run, which makes their implementation much easier than kernel or user threads.
+
+
+A Coroutine is a component that generalizes a subroutine to allow multiple entry points for suspending and resuming execution at certain locations. Unlike subroutines, coroutines can exit by calling other coroutines, which may later return to the point where they were invoked in the original coroutine.
+
+
+A Green Thread is a thread that is scheduled by a virtual machine (VM) instead of natively by the underlying operating system. Green threads emulate multithreaded environments without relying on any native OS capabilities, and they are managed in user space instead of kernel space, enabling them to work in environments that do not have native thread support.

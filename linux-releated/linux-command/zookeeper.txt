@@ -1,0 +1,16 @@
+
+下载zookeeper.tar.gz
+解压，
+配置文件zoo.cfg
+
+yum search jdk
+
+yum install java-1.7.0-openjdk-devel.x86_64
+
+
+./zkServer.sh start
+./zkCli.sh
+create /ApmConfig null
+create /ApmConfig/Redis {\"Master\":"192.168.95.139:6379\"}
+
+set /ApmConfig/Redis {\"Master\":"192.168.95.138:6379\"}

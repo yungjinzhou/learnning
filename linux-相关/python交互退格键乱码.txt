@@ -1,2 +1,0 @@
-yum -y install patch readline-devel
-pip2.7 install readline

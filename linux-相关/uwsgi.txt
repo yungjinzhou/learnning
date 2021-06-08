@@ -1,3 +1,0 @@
-uwsgi --reload /tmp/project-master.pid
-uwsgi --stop aaa.pid
-uwsgi --ini aaa.ini

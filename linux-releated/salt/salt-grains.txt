@@ -1,0 +1,25 @@
+salt '*' grains.ls
+
+salt '*' grains.items
+
+
+
+salt minion saltutil.refresh_modules
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

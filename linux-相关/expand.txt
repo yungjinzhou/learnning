@@ -1,4 +1,0 @@
-将tab键转换为空格，
-expand -t file
-
-expand -t 4 file将tab转换为4个字符(不指定默认是8个)

@@ -1,0 +1,35 @@
+curl -o/-O filename url，保存访问的网页或文件，
+-o参数是保存，filename是要保存的文件名，-o/--output <file> Write output to <file> instead of stdout
+-O是将远端的文件以远端文件的文件名自动保存到本地 -O/--remote-name   Write output to a file named as the remote file，这个命令主要是下载文件，如果需要获取多个文件，可以采用curl -O url1 -O url2，不下载可以用curl -OvL /dev/null url
+curl -v url
+-v参数是显示http访问的整个过程，即整个通信过程
+curl -I url    通过-I或者-head可以只打印出HTTP头部信息： curl -I 查看header头信息
+curl -i url，访问网页并显示response信息，
+-i参数是显示response信息，-I参数是只显示response头部信息
+curl -oV url
+
+curl -X GET http://localhost:8080/search?data=123  # -X GET是可选的
+curl -X POST -d"data=123&key=456" http://localhost:8080/search -v 
+
+curl -x小写表示使用代理访问
+curl -X GET -x 'https://10.20.0.212:443' -v https://test001.cdnlnkd.com/a.jpg
+-x/--proxy <host[:port]> Use HTTP proxy on given port
+有用户名密码的代理下载文件案例
+curl -x 'http://vivek:myPasswordHere@10.12.249.194:3128' -v -O https://dl.cyberciti.biz/pdfdownloads/b8bf71be9da19d3feeee27a0a6960cb3/569b7f08/cms/631.pdf
+
+
+curl -L url   -L/--location      Follow Location: hints (H)
+    --location-trusted Follow Location: and send auth to other hosts (H)
+
+
+curl -vo /dev/null http://test001.cdnlnkd.com/a.jpg -x test001.cdnlnkd.com.cdn.cloudflare.net:80  
+删除缓存后第一次请求 CF-Cache-Status: MISS， 第二次请求CF-Cache-Status: HIT
+`-v`参数可以显示一次http通信的整个过程，包括端口连接和http request头信息。
+如果要把这个网页保存下来，可以使用`-o`参数，这就相当于使用wget命令了。 $ curl -o [文件名] www.sina.com
+
+-H加请求头，&需要转移、&
+
+# curl -X POST  -H  "X-Registry-Auth: eyJ1c2VybmFtZSI6ICJhcG10ZXN0IiwgInBhc3N3b3JkIjogIkFwbTEyMzQ1In0="  http://10.18.0.151:2375/v1.24/images/10.18.0.154:30002/apmtest/hello/push?tag=v66
+
+-T 指定本地文件上传
+# curl -X POST  -T hello.tar http://10.18.0.151:2375/v1.24/images/create?repo=10.18.0.154%3A30002%2Fapmtest%2Fhello\&tag=v6\&fromSrc=-

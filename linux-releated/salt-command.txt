@@ -1,0 +1,10 @@
+salt "*" saltutil.running
+
+
+salt \* saltutil.sync_all
+
+salt-run jobs.lookup_jid
+
+salt-run jobs.active
+
+salt

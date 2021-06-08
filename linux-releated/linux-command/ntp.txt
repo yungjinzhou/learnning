@@ -1,0 +1,36 @@
+ntpd 是一个操作系统Daemon进程，用于校正本地系统与Internet标准时钟源之间的时间。
+
+配置文件-----/etc/ntp.conf
+
+可以配置
+server ntp1.aliyun.com   加上这个，因为默认是国外的时间同步服务器，使用国外的相对于使用阿里的，速度对比可想而知。
+
+
+
+启动ntp
+[root@m02 ~]# systemctl start ntpd
+
+
+apm使用server服务器去同步时间，server服务器使用的是源的同步时间
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (http://www.pool.ntp.org/join.html).
+server 10.18.0.141 iburst
+server 10.18.0.142 iburst
+
+
+
+
+运行一个NTP Server不需要占用很多的系统资源,所以也不用专门配置独立的服务器,就可以给许多client提供时间同步服务, 但是一些基本的安全设置还是很有必要的
+那么这里一个很简单的思路就是第一我们只允许局域网内一部分的用户连接到我们的服务器. 第二个就是这些client不能修改我们服务器上的时间
+
+关于权限设定部分
+权限的设定主要以 restrict 这个参数来设定，主要的语法为：
+restrict IP地址 mask 子网掩码 参数
+其中 IP 可以是IP地址，也可以是 default ，default 就是指所有的IP
+参数有以下几个：
+ignore　：关闭所有的 NTP 联机服务
+nomodify：客户端不能更改服务端的时间参数，但是客户端可以通过服务端进行网络校时。
+notrust ：客户端除非通过认证，否则该客户端来源将被视为不信任子网
+noquery ：不提供客户端的时间查询
+注意：如果参数没有设定，那就表示该 IP (或子网)没有任何限制！
+

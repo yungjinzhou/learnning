@@ -1,0 +1,14 @@
+cat /proc/sys/net/ipv4/ip_forward
+明天请早  13:31:54
+这个改成1看看
+
+
+
+
+
+网络搜索
+
+编辑虚拟机文件：vim /etc/sysctl.conf
+增加：net.ipv4.ip_forward=1
+重启服务：systemctl restart network
+查看属性是否修改成功：sysctl net.ipv4.ip_forward

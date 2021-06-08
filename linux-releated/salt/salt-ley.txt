@@ -1,0 +1,49 @@
+oot@localhost ~]# salt-key --help
+Usage: salt-key [options]
+
+
+
+1.删除salt-key
+删除指定minion的key
+salt-key -d salt-minion2.example.com
+删除所有minion的key
+salt-key -D -y
+
+
+salt-key --list-all
+
+5.master自动接受所有salt-key
+Master端配置文件/etc/salt/master
+# Enable auto_accept, this setting will automatically accept all incoming
+# public keys from the minions. Note that this is insecure.
+auto_accept: True
+
+
+#
+# 显示所有minion的认证信息
+salt-key -L
+
+# 接受192.168.0.100的认证信息
+salt-key -a 192.168.0.100
+
+# 接受192.168.0.100的认证信息，不需要手动验证
+salt-key -a 192.168.0.100 -y
+
+# 接受192.168.0.100的认证信息，即使该minion是Rejected Keys状态
+salt-key -a 192.168.0.100 --include-all
+
+# 接受所有 Unaccepted Keys 状态的minion的认证信息
+salt-key -A
+
+# 拒绝认证192.168.0.100
+salt-key -d 192.168.0.100
+
+# 拒绝所有 Unaccepted Keys 状态的minion
+salt-key -D
+
+
+
+
+
+
+

@@ -1,0 +1,4 @@
+du -hs /var/lib/docker/  查看docker目录占用大小
+
+
+du --max-depth=1 查看当前目录中的一级子目录占用空间大小

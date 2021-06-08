@@ -1,0 +1,6 @@
+
+
+
+minion机器上代码定位日志到local2
+同时在rsysconf.d/下创建配置文件，配置minion机器的local2（local2.*     /home/work/aaa/bb.log）,这样在minon端也有日志显示
+将minion机器上的local2日志发送到10.1.9.11机器，配置master机器的local2.*    /home/owrk/aaa/all.log
