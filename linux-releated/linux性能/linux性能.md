@@ -195,15 +195,70 @@ $ watch -d cat /proc/interrupts
 
 
 
+#### 3. cpu使用率
+
+​       对比一下 top 和 ps 这两个工具报告的 CPU 使用率，默认的结果很可能不一样，因为 top 默认使用 3 秒时间间隔，而 ps 使用的却是进程的整个生命周期。
+
+​         top 显示了系统总体的 CPU 和内存使用情况，以及各个进程的资源使用情况。ps 则只显示了每个进程的资源使用情况。
+
+##### 3.1 分析工具perf
+
+```
+$ perf top
+Samples: 833 of event 'cpu-clock', Event count (approx.): 97742399
+Overhead Shared Object Symbol
+7.28% perf [.] 0x00000000001f78a4
+4.72% [kernel] [k] vsnprintf
+4.32% [kernel] [k] module_get_kallsym
+3.65% [kernel] [k] _raw_spin_unlock_irqrestore
+
+输出结果中，第一行包含三个数据，分别是采样数（Samples）、事件类型（event）和事件总数量（Event count）。比如这个例子中，perf 总共采集了 833 个 CPU 时钟事件，而总事件数则为 97742399。
+
+第一列 Overhead ，是该符号的性能事件在所有采样中的比例，用百分比来表示。
+第二列 Shared ，是该函数或指令所在的动态共享对象（Dynamic Shared Object），如内核、进程名、动态链接库名、内核模块名等。
+第三列 Object ，是动态共享对象的类型。比如 [.] 表示用户空间的可执行程序、或者动态链接库，而 [k] 则表示内核空间。
+最后一列 Symbol 是符号名，也就是函数名。当函数名未知时，用十六进制的地址来表示。
+
+# -g 开启调用关系分析，-p 指定 php-fpm 的进程号 21515
+$ perf top -g -p 21515
 
 
 
 
 
+perf record 和 perf report。 perf top 虽然实时展示了系统的性能信息，但它的缺点是并不保存数据，也就无法用于离线或者后续的分析。而 perf record 则提供了保存数据的功能，保存后的数据，需要你用 perf report 解析展示。
+
+$ perf record # 按 Ctrl+C 终止采样
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.452 MB perf.data (6093 samples) ]
+$ perf report # 展示类似于 perf top 的报告
+```
 
 
 
+##### 3.2 案例
 
+1. 系统的 CPU 使用率很高，但却找不到高 CPU的应用
+
+​     使用execsnoop 就是一个专为短时进程设计的工具。它通过 ftrace 实时监控进程的 exec() 行为，并输出短时进程的基本信息，包括进程 PID、父进程 PID、命令行参数以及执行的结果。
+
+```
+# -a 表示输出命令行选项
+# p 表 PID
+# s 表示指定进程的父进程
+$ pstree -aps 3084
+
+
+
+dstat ，它的好处是，可以同时查看 CPU 和 I/O这两种资源的使用情况，便于对比分析。
+# 间隔 1 秒输出 10 组数据
+$ dstat 1 10
+You did not select any stats, using -cdngy by default.
+--total-cpu-usage-- -dsk/total- -net/total- ---paging-- ---system--
+usr sys idl wai stl| read writ| recv send| in out | int csw
+0 0 96 4 0|1219k 408k| 0 0 | 0 0 | 42 885
+0 0 2 98 0| 34M 0 | 198B 790B| 0 0 | 42 138
+```
 
 
 
