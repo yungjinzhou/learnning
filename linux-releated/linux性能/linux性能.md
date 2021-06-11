@@ -298,12 +298,6 @@ $ sar -n DEV 1
 
 
 
-
-
-
-
-
-
  ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234132735453.png) 
 
 
@@ -315,3 +309,12 @@ $ sar -n DEV 1
 
 
  ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234133395632.png) 
+
+
+
+
+
+
+
+
+
