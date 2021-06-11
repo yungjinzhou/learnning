@@ -262,3 +262,56 @@ usr sys idl wai stl| read writ| recv send| in out | int csw
 
 
 
+2. 软中断
+
+sar 是一个系统活动报告工具，既可以实时查看系统的当前活动，又可以配置保存和报告历史统计数据。
+hping3 是一个可以构造 TCP/IP 协议数据包的工具，可以对系统进行安全审计、防火墙测试等。
+tcpdump 是一个常用的网络抓包工具，常用来分析各种网络问题。
+
+```
+# -S 参数表示设置 TCP 协议的 SYN（同步序列号），-p 表示目的端口为 80
+# -i u100 表示每隔 100 微秒发送一个网络帧
+# 注：如果你在实践过程中现象不明显，可以尝试把 100 调小，比如调成 10 甚至 1
+$ hping3 -S -p 80 -i u100 192.168.0.30
+
+```
+
+
+
+```
+watch -d cat /proc/softirqs
+watch 命令，就可以定期运行一个命令来查看输出；如果再加上 -d 参数，还可以高亮出变化的部分，从高亮部分我们就可以直观看出，哪些内容变化得更快
+
+
+
+# -n DEV 表示显示网络收发的报告，间隔 1 秒输出一组数据
+$ sar -n DEV 1
+15:03:46 IFACE rxpck/s txpck/s rxkB/s txkB/s rxcmp/s txcmp/s rxmcs
+15:03:47 eth0 12607.00 6304.00 664.86 358.11 0.00 0.00 0
+
+第一列：表示报告的时间。
+第二列：IFACE 表示网卡。
+第三、四列：rxpck/s 和 txpck/s 分别表示每秒接收、发送的网络帧数，也就是 PPS。
+第五、六列：rxkB/s 和 txkB/s 分别表示每秒接收、发送的千字节数，也就是 BPS。
+后面的其他参数基本接近 0，显然跟今天的问题没有直接关系，你可以先忽略掉。
+```
+
+
+
+
+
+
+
+
+
+ ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234132735453.png) 
+
+
+
+
+
+ ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234132961834.png) 
+
+
+
+ ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234133395632.png) 
