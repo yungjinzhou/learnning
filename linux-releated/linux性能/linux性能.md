@@ -298,17 +298,15 @@ $ sar -n DEV 1
 
 
 
- ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234132735453.png) 
+![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16244955228161.png) 
 
 
 
-
-
- ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234132961834.png) 
+![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_1624495488667.png)  
 
 
 
- ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16234133395632.png) 
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16244954676633.png) 
 
 #### 4. 内存
 
@@ -320,13 +318,7 @@ $ sar -n DEV 1
 
 2. 虚拟内存空间分布
 
-
-
- ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16238465767688.png) 
-
-
-
-
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16238465767688.png) 
 
 
 
@@ -353,7 +345,7 @@ malloc() 或者 mmap() ，就可以分别在堆和文件映射段动态分配内
    SHR 是共享内存的大小，比如与其他进程共同使用的共享内存、加载的动态链接库以及程序的代码段等。
    %MEM 是进程使用物理内存占系统总内存的百分比。
 
-   ##### 4.2 内存指标
+##### 4.2 内存指标
 
    1. 简单来说，Buffer 是对磁盘数据的缓存，而 Cache 是文件数据的缓存，它们既会用在读
       请求中，也会用在写请求中。
@@ -384,13 +376,53 @@ malloc() 或者 mmap() ，就可以分别在堆和文件映射段动态分配内
    
    ```
 
-   
+共享内存是通过 tmpfs 实现的，所以它的大小也就是 tmpfs 使用的内存大小。tmpfs
+其实也是一种特殊的缓存。
 
 ##### 4.3 缓存使用及指标查看
 
+    两部分，一部分是磁盘读取文件的页缓存，用来缓存从磁盘读取的数据，可以加快以后再次访问的速度。另一部分，则是 Slab 分配器中的可回收内存。
+    是对原始磁盘块的临时存储，用来缓存将要写入磁盘的数据。
+
 1. 缓存指标查看
 
+```
+bcc 提供的所有工具就都安装到 /usr/share/bcc/tools 这个目录中了。
+不过这里提醒你，bcc 软件包默认不会把这些工具配置到系统的 PATH 路径中，所以你得
+自己手动配置：
+1 $ export PATH=$PATH:/usr/share/bcc/tools
+
+centos7上安装bcc-tools
+
+# 升级系统
+yum update -y
+# 安装 ELRepo
+rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+rpm -Uvh https://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+# 安装新内核
+yum remove -y kernel-headers kernel-tools kernel-tools-libs
+yum --enablerepo="elrepo-kernel" install -y kernel-ml kernel-ml-devel kernel-ml-headers
+# 更新 Grub 后重启
+grub2-mkconfig -o /boot/grub2/grub.cfg
+grub2-set-default 0
+reboot
+# 重启后确认内核版本已升级为 4.20.0-1.el7.elrepo.x86_64
+uname -r
+
+# 安装 bcc-tools
+yum install -y bcc-tools
+# 配置 PATH 路径
+export PATH=$PATH:/usr/share/bcc/tools
+# 验证安装成功
+cachestat
+
+
+```
+
+
+
    ```
+   bbc软件包的一部分
    cachestat 提供了整个操作系统缓存的读写命中情况。
    cachetop 提供了每个进程的缓存命中情况。
    
@@ -407,15 +439,152 @@ malloc() 或者 mmap() ，就可以分别在堆和文件映射段动态分配内
    CACHED_MB 表示 Cache 的大小，以 MB 为单位。
    
    
-   $ cachetop
-   而 READ_HIT 和 WRITE_HIT ，分别表示读和写的缓存命中率。
+$ cachetop
+而 READ_HIT 和 WRITE_HIT ，分别表示读和写的缓存命中率。
    
    ```
 
-   
+2. buffer和cache的区别
+
+	换句话说，磁盘是存储数据的块设备，也是文件系统的载体。所以，文件系统确实还是要通过磁盘，来保证数据的持久化存储。
+	在读写普通文件时，I/O 请求会首先经过文件系统，然后由文件系统负责，来与磁盘进行交互。而在读写块设备文件时，会跳过文件系统，直接与磁盘交互，也就是所谓的“裸I/O”。
+	这两种读写方式使用的缓存自然不同。文件系统管理的缓存，其实就是 Cache 的一部分。而裸磁盘的缓存，用的正是 Buffer。
+
+##### 4.4 内存泄漏
+
+1. **内存泄漏**的可能部分
+
+   有系统分配的内存一般会自动回收，不会造成内存泄漏。比如栈内存由系统自动分配和管理。
+   只读段，包括程序的代码和常量，由于是只读的，不会再去分配新的内存，所以也不会产生内存泄漏。
+   数据段，包括全局变量和静态变量，这些变量在定义时就已经确定了大小，所以也不会产生内存泄漏。
+   **堆内存**由应用程序自己来分配和管理。除非程序退出，这些堆内存并不会被系统自动释放，而是需要应用程序明确调用库函数 free() 来释放它们。
+   **内存映射段**，包括动态链接库和共享内存，其中共享内存由程序动态分配和管理。所以，如果程序在分配后忘了回收，就会导致跟堆内存类似的泄漏问题。
+
+2. 内存泄漏的工具
+
+   专门用来检测内存泄漏的工具，memleak。memleak 可以跟踪系统或指定进程的内存分配、释放请求，然后定期输出一个未释放内存和相应调用栈的汇总情况（默认 5 秒）。
+   memleak是bbc软件包的一个工具，运行/usr/share/bcc/tools/memleak就可以运行它。
+
+```
+# -a 表示显示每个内存分配请求的大小以及地址
+# -p 指定案例应用的 PID 号
+$ /usr/share/bcc/tools/memleak -a -p $(pidof app)
+WARNING: Couldn't find .text section in /app
+WARNING: BCC can't handle sym look ups for /app
+addr = 7f8f704732b0 size = 8192
+addr = 7f8f704772d0 size = 8192
+addr = 7f8f704712a0 size = 8192
+addr = 7f8f704752c0 size = 8192
+32768 bytes in 4 allocations from stack
+[unknown] [app]
+[unknown] [app]
+```
+
+##### 4.5 内存回收
+
+    内存回收，也就是系统释放掉可以回收的内存。
+    在内存资源紧张时，Linux 通过直接内存回收和定期扫描的方式，来释放文件页和匿名
+页，以便把内存分配给更需要的进程使用
+
+1. 文件页、脏页、匿名页
+
+   文件页：缓存和缓冲区，就属于可回收内存。它们在内存管理中，通常被叫做文件页。，通过内存映射获取的文件映射页，也是一种常见的文件页。
+   脏页：而那些被应用程序修改过，并且暂时还没写入磁盘的数据（也就是脏页），就得先写入磁盘，然后才能进行内存释放。脏页写入磁盘有两种方式：
+       可以在应用程序中，通过系统调用 fsync ，把脏页同步到磁盘中；
+       也可以交给系统，由内核线程 pdflush 负责这些脏页的刷新。
+   匿名页：应用程序动态分配的堆内存，也就是我们在内存管理中说到的匿名页（Anonymous Page）。
+
+2. swap原理
+
+    Swap 把这些不常访问的内存先写到磁盘中，然后释放这些内存，给其他更需要的进程使用。再次访问这些内存时，重新从磁盘读入内存就可以了。
+    Swap 说白了就是把一块磁盘空间或者一个本地文件（以下讲解以磁盘为例），当成内存来使用。它包括换出和换入两个过程。
+        换出：就是把进程暂时不用的内存数据存储到磁盘中，并释放这些数据占用的内存；
+        换入：则是在进程再次访问这些内存的时候，把它们从磁盘读到内存中。
+    我们常见的笔记本电脑的休眠和快速开机的功能，也基于 Swap 。
+
+3.  定期回收内存
+
+   除了直接内存回收，还有一个专门的内核线程用来定期回收内存，也就是kswapd0。为了衡量内存的使用情况，kswapd0 定义了三个内存阈值（watermark，也称为水位），分别是页最小阈值（pages_min）、页低阈值（pages_low）和页高阈值（pages_high）。剩余内存，则使用 pages_free 表示。
+
+    ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_1624580713665.png) 
+
+```
+可以通过内核选项 /proc/sys/vm/min_free_kbytes 来间接设置。min_free_kbytes 设置
+了页最小阈值，而其他两个阈值，都是根据页最小阈值计算生成的，
+pages_low = pages_min*5/4
+pages_high = pages_min*3/2
+
+```
+
+5. NUMA
+
+   你明明发现了 Swap 升高，可是在分析系统的内存使用时，却很可能发现，系统剩余内存还多着呢,，这正是处理器的 NUMA （Non-UniformMemory Access）架构导致的。
+在 NUMA 架构下，多个处理器被划分到不同 Node 上，且每个 Node 都拥有自己的本地内存空间。
+
+6. 调整内存回收机制：swappiness
+
+    对文件页的回收，当然就是直接回收缓存，或者把脏页写回磁盘后再回收。
+    对匿名页的回收，其实就是通过 Swap 机制，把它们写入磁盘后再释放内存。
+    Linux 提供了一个 /proc/sys/vm/swappiness 选项，用来调整使用 Swap 的积极
+程度。swappiness 的范围是 0-100，数值越大，越积极使用 Swap，也就是更倾向于回收匿名
+页；数值越小，越消极使用 Swap，也就是更倾向于回收文件页。
+
+6. 案例
+
+```
+# -r表示显示内存使用情况，-S表示显示Swap使用情况
+$ sar -r -S
+
+kbcommit，表示当前系统负载需要的内存。它实际上是为了保证系统内存不溢出，对
+需要内存的估计值。%commit，就是这个值相对总内存的百分比。
+kbactive，表示活跃内存，也就是最近使用过的内存，一般不会被系统回收。
+kbinact，表示非活跃内存，也就是不常访问的内存，有可能会被系统回收。
+总的内存使用率（%memused）
+剩余内存（kbmemfree）不断减少，而缓冲区（kbbuffers）则不断增大
+通过 /proc/zoneinfo ，观察剩余内存、内存阈值以及匿名页
+和文件页的活跃情况。
 
 
+# -d 表示高亮变化的字段
+# -A 表示仅显示 Normal 行以及之后的 15 行输出
+$ watch -d grep -A 15 'Normal' /proc/zoneinfo
 
+```
 
+7. 原理,三种回收方式
 
+    前两种方式，**缓存回收和 Swap 回收**，实际上都是基于 LRU 算法，也就是优先回收不常访问的内存。LRU 回收算法，实际上维护着 active 和 inactive 两个双向链表，
+    active 记录活跃的内存页；
+    inactive 记录非活跃的内存页。
+越接近链表尾部，就表示内存页越不常访问。
 
+```
+# grep 表示只保留包含 active 的指标（忽略大小写）
+# sort 表示按照字母顺序排序
+$ cat /proc/meminfo | grep -i active | sort
+Active(anon): 167976 kB
+Active(file): 971488 kB
+Active: 1139464 kB
+
+```
+
+    第三种方式，OOM 机制按照 oom_score 给进程排序。oom_score 越大，进程就越容易被系统杀死。
+    OOM 触发的时机基于虚拟内存。换句话说，进程在申请内存时，如果申请的虚拟内存加上服务器实际已用的内存之和，比总的物理内存还大，就会触发 OOM。
+OOM 发生时，你可以在 dmesg 中看到 Out of memory 的信息，从而知道是哪些进程被 OOM 杀死了。比如，你可以执行下面的命令，查询 OOM 日志：
+
+```
+$ dmesg | grep -i "Out of memory"
+```
+
+##### 4.6 内存分配
+    系统调用内存分配请求后，并不会立刻为其分配物理内存，而是在请求首次访问时，通过缺页异常来分配。缺页异常又分为下面两种场景：
+        可以直接从物理内存中分配时，被称为次缺页异常。
+        需要磁盘 I/O 介入（比如 Swap）时，被称为主缺页异常。
+
+![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16245816702213.png) 
+
+ ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16245817045477.png) 
+
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16245817207878.png) 
+
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16245817521386.png) 

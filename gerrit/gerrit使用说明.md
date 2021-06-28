@@ -1,4 +1,10 @@
-Gerrit 登录地址
+### gerrit使用
+
+#### 1.gerrit配置
+
+项目MCS-horizon
+
+##### 1.1Gerrit 登录地址
 
 http://192.168.202.24/gerrit/c/MCS-horizon
 
@@ -6,13 +12,9 @@ http://192.168.202.24/gerrit/c/MCS-horizon
 
 初始密码: comleader@123
 
-
-
 **点设置**
 
-用户第一次登录请设置邮箱，验证邮箱
-
-
+##### 1.2 用户第一次登录请设置邮箱，验证邮箱
 
 **设置公钥(新生成或者查看)**
 
@@ -32,22 +34,29 @@ ssh-keygen -t tsa
 
 **在命令行执行下面的命令**，就可以把MCS-horizon工程给clone下来了
 
+修改 <span style='color:red'>**your_name**</span>为自己的名字全拼
+
 ```
 $ git clone "ssh://your_name@192.168.202.24:29418/MCS-horizon" && scp -p -P 29418 your_name@192.168.202.24:hooks/commit-msg "MCS-horizon/.git/hooks/"
+
+
+
+git clone "ssh://songjunhui@192.168.202.24:29418/MCS-alarm" && scp -p -P 29418 songjunhui@192.168.202.24:hooks/commit-msg "MCS-alarm/.git/hooks/"
 ```
 
 
 
-
-
-## 提交
+#### 2.提交方式
 
 首先我们通过下面两个命令首先commit到本地仓库：
 
+ <span style='color:red'>**每次提交都需要之前都需要pull一下，并且看是否pull成功**</span>
+
 ```
-$ git add .  # 提交所有变更
-$ git commit -m '本地提交信息'
-$ git push origin HEAD:refs/for/master
+$ git pull
+$ git add .  # 提交所有变更到暂存区 git add target_file，只提交target_file
+$ git commit -m '本地提交信息'  # 提交到本地代码库
+$ git push origin HEAD:refs/for/master   # 提交到gerrit库，等待审核
 ```
 
 可能会提示配置，设置全局变量
@@ -59,7 +68,7 @@ $ git config user.email your_name@comleader.com.cn
 
 
 
-合并master提示
+##### 2.1合并master提示
 
 ```
  git push origin HEAD:refs/for/master
@@ -85,9 +94,7 @@ submit提交到gerrit服务器，服务器会自动同步到gitlab
 
 
 
-
-
-## 合并到develop分支流程
+##### 2.1合并develop提示
 
 本地分支dev_yjz
 
@@ -97,9 +104,9 @@ submit提交到gerrit服务器，服务器会自动同步到gitlab
 
 切换到本地develop分支
 
-#### 两种方式：
+###### 两种方式：
 
-#### 方式一：**(优先用这种)**
+###### 方式一：**(优先用这种)**
 
 合并时在develop生成新的commit信息
 
@@ -110,7 +117,7 @@ git push origin HEAD:refs/for/develop
 
  --no-ff：不使用fast-forward方式合并，合并的时候会创建一个新的commit用于合并。
 
-#### 方式二：
+###### 方式二：
 
 先合并，合并后amend到该分支上次提交的信息中
 
@@ -153,15 +160,7 @@ git push origin HEAD:refs/for/master
 
 
 
-
-
-
-
-
-
-
-
-### 问题1
+#### 问题1
 
 遇到如下问题：
 
@@ -313,6 +312,40 @@ r aagffsd I am commit message4
 
 
 
+## 5、提交成功但在Gerrit上查看显示在merge conflict状态
+
+
+
+### 5.1、出现merge conflict的原因
+
+由于有 code review 的存在，有可能出现这种情况：同时有多个人的代码被 review，如果有一个人改了与你相同地方的代码，并且他的代码先通过 review 并被合进了远程代码库。当你的代码通过 review 并进行合并，此时会产生冲突，你的提交也就会显示为 merge conflict 状态。在 Gerrit 网页上的 CHANGES -> open 上就可以看到该冲突提交，该提交无法 submit 到远程仓库上。如果你不解决掉该冲突提交的话，你在本地的之后的提交也无法合并到远程仓库上，因为你本地的提交都是基于前面的那次有冲突的提交的。
+
+
+
+### 5.2、解决方法
+
+1）先在 Gerrit 的 CHANGES -> open 上找到该提交，然后点击 ‘ABANDON' 按钮将该提交取消掉。
+
+2）在本地找到该提交的上一个提交版本的 commit id，注意，是比这个出现冲突的版本更早提交的版本，一般来说，这个版本已经提交到了Gerrit上的
+
+3）使用 git reset 的混合模式（git reset --mixed commitId）或者是软模式（git reset --soft commitId）回退至上面记录的 commit id 的版本，使用这两种模式不会丢失你本地的修改，所以大可以放心。
+
+4）使用 git stash 命令将本地修改储存起来，然后再拉取最新代码，拉取完毕后应用储存 git stash pop，如果有冲突就解决冲突即可。然后就可以将版本提交至Gerrit上了。
+
+综上所述，其实出现这种状态主要就是因为你的代码和别人的代码产生了冲突，并且别人的代码先一步通过了 review 而且合并到了仓库当中，而你的代码通过 review 但是无法合并到仓库中，因为两人的修改产生了冲突，此时就要解决冲突。
+
+你只需回退一下版本，然后拉取远程代码，在本地解决冲突，然后就可以将本地版本提交至 Gerrit 上了。
+
+ 
+
+参考链接：https://www.cnblogs.com/wenxuehai/p/12357898.html
+
+
+
+
+
+
+
 
 
 ### 注意
@@ -405,3 +438,8 @@ git rebase --abort
 5.输入wq保存并推出, 再次输入git log查看 commit 历史信息，你会发现这两个 commit 已经合并了
 
 参考链接：https://segmentfault.com/a/1190000007748862
+
+
+
+
+
