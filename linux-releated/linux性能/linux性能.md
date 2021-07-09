@@ -779,9 +779,7 @@ r_await+w_await ，就是响应时间。
 
 
 
-介绍一个新工具， filetop
-
-
+介绍一个新工具， filetop，基于 Linux 内核的eBPF（extended Berkeley Packet Filters）机制，主要跟踪内核中文件的读写情况，并输出线程 ID（TID）、读写大小、读写类型以及文件名称。
 
 ```
 #
@@ -796,7 +794,7 @@ $ ./filetop -C
 你会看到，filetop 输出了 8 列内容，分别是线程 ID、线程命令行、读写次数、读写的大小（单位 KB）、文件类型以及读写的文件名称。
 ```
 
-
+filetop 只给出了文件名称，却没有文件路径。
 
 我再介绍一个好用的工具，opensnoop 。它同属于 bcc 软件包，可以动态跟踪内核中的open 系统调用。这样，我们就可以找出这些 txt 文件的路径。
 
@@ -815,33 +813,167 @@ $ ./filetop -C
 ，MySQL 是一个多线程的数据库应用，为了不漏掉这些线程的数据读取情况，你要
 记得在执行 stace 命令时，加上 -f 参数：
 
-
+无非就是，先用 strace 确认它是不是在写文件，再用 lsof 找出文件描述符对应的文件即可。
 
 ```
 # -t表示显示线程
 ，-a表示显示命令行参数
 
 $ pstree -t -a -p 27458
+
+
+
+$ lsof -p 27458
+COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+...
+mysqld 27458 999 38u REG 8,1 512440000 2601895 /var/lib/mysql/test/products
+
 ```
 
 
 
-
+从输出中可以看到， mysqld 进程确实打开了大量文件，而根据文件描述符（FD）的编号，我们知道，描述符为 38 的是一个路径为/var/lib/mysql/test/products.MYD 的文件。
 
 到，那就是在 MySQL 命令行界面中，执行 show processlist 命令，
 来查看当前正在执行的 SQL 语句。
 
 
 
+##### 5.3 案例分析
+
+```
+# -f 表示跟踪子进程和子线程，-T 表示显示系统调用的时长，-tt 表示显示跟踪时间
+$ strace -f -T -tt -p 9085
+
+
+你还可以用 strace ，观察这个系统调用的执行情况。
+比如通过 -e 选项指定fdatasync
+$ strace -f -p 9085 -T -tt -e fdatasync
+
+从这里你可以看到，每隔 10ms 左右，就会有一次 fdatasync 调用，并且每次调用本身也要消耗 7~8ms。
+```
+
+
+
+```
+#
+下面的命令用到的 nsenter 工具，可以进入容器命名空间。
+app
+由于这两个容器共享同一个网络命名空间，所以我们只需要进入\的网络命名空间即可
+$ PID=$(docker inspect --format {{.State.Pid}} app)
+# -i 表示显示网络套接字信息
+$ nsenter --target $PID --net -- lsof -i
+
+```
+
+
+
+![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257905929796.png) 
 
 
 
 
 
+第一，在文件系统的原理中，我介绍了查看文件系统容量的工具 df。它既可以查看文件系统数据的空间容量，也可以查看索引节点的容量。至于文件系统缓存，我们通过
+/proc/meminfo、/proc/slabinfo 以及 slabtop 等各种来源，观察页缓存、目录项缓
+存、索引节点缓存以及具体文件系统的缓存情况。
+
+第二，在磁盘 I/O 的原理中，我们分别用 iostat 和 pidstat 观察了磁盘和进程的 I/O 情况。它们都是最常用的 I/O 性能分析工具。通过 iostat ，我们可以得到磁盘的 I/O 使用率、吞吐量、响应时间以及 IOPS 等性能指标；而通过 pidstat ，则可以观察到进程的 I/O吞吐量以及块设备 I/O 的延迟等。
+
+第三，在狂打日志的案例中，我们先用 top 查看系统的 CPU 使用情况，发现 iowait 比较高；然后，又用 iostat 发现了磁盘的 I/O 使用率瓶颈，并用 pidstat 找出了大量 I/O 的进程；最后，通过 strace 和 lsof，我们找出了问题进程正在读写的文件，并最终锁定性能问题的来源——原来是进程在狂打日志。
+
+第四，在磁盘 I/O 延迟的单词热度案例中，我们同样先用 top、iostat ，发现磁盘有 I/O瓶颈，并用 pidstat 找出了大量 I/O 的进程。可接下来，想要照搬上次操作的我们失败了。在随后的 strace 命令中，我们居然没看到 write 系统调用。于是，我们换了一个思路，用新工具 filetop 和 opensnoop ，从内核中跟踪系统调用，最终找出瓶颈的来源。
+
+最后，在 MySQL 和 Redis 的案例中，同样的思路，我们先用 top、iostat 以及 idstat
+，确定并找出 I/O 性能问题的瓶颈来源，它们正是 mysqld 和 redis-server。随后，我们又用 strace+lsof 找出了它们正在读写的文件
+
+
+
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257907709794.png) 
+
+
+
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257908083610.png) 
+
+
+
+**分析思路**
+
+1. 先用 iostat 发现磁盘 I/O 性能瓶颈；
+2. 再借助 pidstat ，定位出导致瓶颈的进程；
+3. 随后分析进程的 I/O 行为；
+4. 最后，结合应用程序的原理，分析这些 I/O 的来源。
+
+
+
+ ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257908709466.png) 
 
 
 
 
+
+##### 5.4 磁盘I/O性能测试
+
+fio（Flexible I/O Tester）正是最常用的文件系统和磁盘 I/O 性能基准测试工具。它提供了大量的可定制化选项，可以用来测试，裸盘或者文件系统在各种场景下的 I/O 性能，包括了不同块大小、不同 I/O 引擎以及是否使用缓存等场景。
+
+```
+
+# 随机读
+fio -name=randread -direct=1 -iodepth=64 -rw=randread -ioengine=libaio -bs=4k -size=1G -
+# 随机写
+fio -name=randwrite -direct=1 -iodepth=64 -rw=randwrite -ioengine=libaio -bs=4k -size=1G
+# 顺序读
+fio -name=read -direct=1 -iodepth=64 -rw=read -ioengine=libaio -bs=4k -size=1G -numjobs=
+# 顺序写
+fio -name=write -direct=1 -iodepth=64 -rw=write -ioengine=libaio -bs=4k -size=1G -numjob
+
+```
+
+
+
+在这其中，有几个参数需要你重点关注一下。
+
+direct，表示是否跳过系统缓存。上面示例中，我设置的 1 ，就表示跳过系统缓存。
+iodepth，表示使用异步 I/O（asynchronous I/O，简称 AIO）时，同时发出的 I/O 请
+求上限。在上面的示例中，我设置的是 64。
+rw，表示 I/O 模式。我的示例中， read/write 分别表示顺序读 / 写，而
+randread/randwrite 则分别表示随机读 / 写。
+ioengine，表示 I/O 引擎，它支持同步（sync）、异步（libaio）、内存映射
+（mmap）、网络（net）等各种 I/O 引擎。上面示例中，我设置的 libaio 表示使用异步 I/O。
+bs，表示 I/O 的大小。示例中，我设置成了 4K（这也是默认值）。
+filename，表示文件路径，当然，它可以是磁盘路径（测试磁盘性能），也可以是文件路径（测试文件系统性能）。示例中，我把它设置成了磁盘 /dev/sdb。不过注意，用磁盘路径测试写，会破坏这个磁盘中的文件系统，所以在使用前，你一定要事先做好数据备份。
+
+
+
+
+
+fio 支持 I/O 的重放。
+
+```
+# 使用blktrace跟踪磁盘I/O，注意指定应用程序正在操作的磁盘
+$ blktrace /dev/sdb
+#查看blktrace记录的结果
+# ls
+sdb.blktrace.0
+sdb.blktrace.1
+#
+将结果转化为二进制文件
+$ blkparse sdb -d sdb.bin
+#使用fio重放日志
+$ fio --name=replay --filename=/dev/sdb --direct=1 --read_iolog=sdb.bin
+```
+
+
+
+这样，我们就通过 blktrace+fio 的组合使用，得到了应用程序 I/O 模式的基准测试报告。
+
+i/o性能优化
+
+应用程序优化
+
+文件系统优化
+
+磁盘优化
 
 
 
