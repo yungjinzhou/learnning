@@ -73,3 +73,4 @@ gid=xxx
 procname-prefix-spaced=xxx
 # 指定工作进程名称的前缀
 
+thunder-lock = true  # 避免惊群效应
