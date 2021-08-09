@@ -318,16 +318,16 @@ $ sar -n DEV 1
 
 
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16244955228161.png) 
+
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16244955228161.png) 
 
 
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_1624495488667.png)  
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_1624495488667.png)  
 
 
 
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16244954676633.png) 
-
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16244954676633.png) 
 #### 二、 内存
 
 ##### 1.1 内存概念
@@ -338,10 +338,7 @@ $ sar -n DEV 1
 
 2. 虚拟内存空间分布
 
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16238465767688.png) 
-
-
-
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16238465767688.png) 
      虚拟内存分内核空间和用户空间，其中用户空间又分为下面5部分：
      只读段，包括代码和常量等。
      数据段，包括全局变量等。
@@ -526,7 +523,8 @@ addr = 7f8f704752c0 size = 8192
 
    除了直接内存回收，还有一个专门的内核线程用来定期回收内存，也就是kswapd0。为了衡量内存的使用情况，kswapd0 定义了三个内存阈值（watermark，也称为水位），分别是页最小阈值（pages_min）、页低阈值（pages_low）和页高阈值（pages_high）。剩余内存，则使用 pages_free 表示。
 
-    ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_1624580713665.png) 
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_1624580713665.png) 
+
 
 ```
 可以通过内核选项 /proc/sys/vm/min_free_kbytes 来间接设置。min_free_kbytes 设置
@@ -601,15 +599,13 @@ $ dmesg | grep -i "Out of memory"
         可以直接从物理内存中分配时，被称为次缺页异常。
         需要磁盘 I/O 介入（比如 Swap）时，被称为主缺页异常。
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16245816702213.png) 
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245816702213.png) 
 
- ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16245817045477.png) 
+ 
 
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16245817207878.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245817207878.png) 
 
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16245817521386.png) 
-
-
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245817521386.png) 
 
 
 
@@ -626,13 +622,9 @@ Linux 文件系统为每个文件都分配两个数据结构，索引节点（in
 
 目录项，简称为 dentry，用来记录文件的名字、索引节点指针以及与其他目录项的关联关系。多个关联的目录项，就构成了文件系统的目录结构。目录项是由内核维护的一个内存数据结构，所以通常也被叫做目录项缓存。
 
-
-
 文件系统又把连续的扇区组成了逻辑块，然后每次都以逻辑块为最小单元，来管理数据。常见的逻辑块大小为 4KB，也就是由连续的 8 个扇区组成。
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16254875676017.png) 
-
-
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16254875676017.png) 
 
 磁盘在执行文件系统格式化时，会被分成三个存储区域，超级块、索引节点区和数
 据块区。其中，
@@ -666,32 +658,22 @@ SMB、iSCSI 等。
 
 非缓冲 I/O，是指直接通过系统调用来访问文件，不再经过标准库缓存。
 
-
-
 第二，根据是否利用操作系统的页缓存，可以把文件 I/O 分为直接 I/O 与非直接 I/O。
 
 直接 I/O，是指跳过操作系统的页缓存，直接跟文件系统交互来访问文件。
 
 非直接 I/O 正好相反，文件读写时，先要经过系统的页缓存，然后再由内核或额外的系统调用，真正写入磁盘。
 
-
-
 跳过文件系统读写磁盘的情况，也就是我们通常所说的裸 I/O。
-
-
 
 索引节点的容量，（也就是 Inode 个数）是在格式化磁盘时设定好的，一般由格式化工具自动生成。当你发现索引节点空间不足，但磁盘空间充足时，很可能就是过多小文件导致的。
 
 在实际性能分析中，我们更常使用 slabtop ，来找到占用内存最多的缓存类型。
 
-
-
 ##### 1.2 磁盘i/o工作原理
 
 目录项是一个内存缓存；而超级块、索引节点和逻辑块，都是存储在磁盘中的持久
 化数据。
-
-
 
 常见磁盘可以分为两类：机械磁盘和固态磁盘。
 
@@ -703,58 +685,32 @@ SMB、iSCSI 等。
 
 ，是按照接口来分类，比如可以把硬盘分为 IDE（Integrated Drive Electronics）、SCSI（Small Computer SystemInterface） 、SAS（Serial Attached SCSI） 、SATA（Serial ATA） 、FC（FibreChannel） 等。
 
-
-
-
-
 IDE 设备会分配一个 hd 前缀的设备名，SCSI 和 SATA 设备会分配一个 sd 前缀的设备名。
 
 这些磁盘，往往还会根据需要，划分为不同的逻辑分区，每个分区再用数字编号。
 
-
-
 通用块层，其实是处在文件系统和磁盘驱动中间的一个块设备抽象层
 
-
-
 向上，为文件系统和应用程序，提供访问块设备的标准接口；向下，把各种异构的磁盘设备抽象为统一的块设备，并提供统一框架来管理这些设备的驱动程序。
-
-
 
 ，通用块层还会给文件系统和应用程序发来的 I/O 请求排队，并通过重新排
 序、请求合并等方式，提高磁盘读写的效率。
 
-对 I/O 请求排序的过程，也就是我们熟悉的 I/O 调度
-
-
-
-，Linux 内核支持四种 I/O 调度算法，分别是 NONE、NOOP、CFQ 以及 DeadLine。
-
-
+对 I/O 请求排序的过程，也就是我们熟悉的 I/O 调度，Linux 内核支持四种 I/O 调度算法，分别是 NONE、NOOP、CFQ 以及 DeadLine。
 
 第一种 NONE ，更确切来说，并不能算 I/O 调度算法。因为它完全不使用任何 I/O 调度器，对文件系统和应用程序的 I/O 其实不做任何处理，常用在虚拟机中（此时磁盘 I/O 调度完全由物理机负责）。
 
 第二种 NOOP ，是最简单的一种 I/O 调度算法。它实际上是一个先入先出的队列，只做一些最基本的请求合并，常用于 SSD 磁盘。
 
-
-
-第三种 CFQ（Completely Fair Scheduler），也被称为完全公平调度器，是现在很多发行版的默认 I/O 调度器，它为每个进程维护了一个 I/O 调度队列，并按照时间片来均匀分布每个进程的 I/O 请求。
-
-，CFQ 还支持进程 I/O 的优先级调度，所以它适用于运行大量进程的系统，像是桌面环境、多媒体应用等。
-
-
+第三种 CFQ（Completely Fair Scheduler），也被称为完全公平调度器，是现在很多发行版的默认 I/O 调度器，它为每个进程维护了一个 I/O 调度队列，并按照时间片来均匀分布每个进程的 I/O 请求。CFQ 还支持进程 I/O 的优先级调度，所以它适用于运行大量进程的系统，像是桌面环境、多媒体应用等。
 
 最后一种 DeadLine 调度算法，分别为读、写请求创建了不同的 I/O 队列，可以提高机械
 磁盘的吞吐量，并确保达到最终期限（deadline）的请求被优先处理。DeadLine 调度算
 法，多用在 I/O 压力比较重的场景，比如数据库等。
 
-
-
 通用块层，包括块设备 I/O 队列和 I/O 调度器。
 
 设备层，包括存储设备和相应的驱动程序，负责最终物理设备的 I/O 操作。
-
-
 
 使用率，是指磁盘处理 I/O 的时间百分比。
 
@@ -771,33 +727,21 @@ IOPS（Input/Output Per Second），是指每秒的 I/O 请求数。
 用性能测试工具 fio ，来测试磁盘的 IOPS、吞吐量以及响应时间等核心
 指标。
 
-
-
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16254883048336.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16254883048336.png) 
 
 %util ，就是我们前面提到的磁盘 I/O 使用率；
 r/s+ w/s ，就是 IOPS；
 rkB/s+wkB/s ，就是吞吐量；
 r_await+w_await ，就是响应时间。
 
-
-
 我推荐另一个工具， iotop。它是一个类似于 top 的工具，你可以按照 I/O
 大小对进程排序，然后找到 I/O 较大的那些进程。
 
-
-
-
-
 你可以用 iostat ，确认是否有 I/O 性能瓶颈。再用 strace 和 lsof ，来定位应用程序以及它正在写入的日志文件路径。最后通过应用程序的接口调整日志级别，完美解决 I/O 问题。
-
-
 
 通过 df 我们知道，系统还有足够多的磁盘空间。
 
 ，我们可以先用 top 来观察 CPU 和内存的使用情况，然后再用 iostat 来观察磁盘的 I/O 情况。
-
-
 
 介绍一个新工具， filetop，基于 Linux 内核的eBPF（extended Berkeley Packet Filters）机制，主要跟踪内核中文件的读写情况，并输出线程 ID（TID）、读写大小、读写类型以及文件名称。
 
@@ -818,20 +762,11 @@ filetop 只给出了文件名称，却没有文件路径。
 
 我再介绍一个好用的工具，opensnoop 。它同属于 bcc 软件包，可以动态跟踪内核中的open 系统调用。这样，我们就可以找出这些 txt 文件的路径。
 
-
-
-
-
 观察 top 的输出，我们发现，两个 CPU 的 iowait 都比较高，特别是 CPU0，iowait 已经超过 60%。而具体到各个进程， CPU 使用率并不高，最高的也只有 1.7%。
-
-
 
 然后，执行下面的 iostat 命令，看看有没有 I/O 性能问题：
 
-
-
-，MySQL 是一个多线程的数据库应用，为了不漏掉这些线程的数据读取情况，你要
-记得在执行 stace 命令时，加上 -f 参数：
+，MySQL 是个多线程的数据库应用，为了不漏掉这些线程的数据读取情况，你要记得在执行 stace 命令时，加上 -f 参数：
 
 无非就是，先用 strace 确认它是不是在写文件，再用 lsof 找出文件描述符对应的文件即可。
 
@@ -888,11 +823,7 @@ $ nsenter --target $PID --net -- lsof -i
 
 
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16257905929796.png) 
-
-
-
-
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257905929796.png) 
 
 第一，在文件系统的原理中，我介绍了查看文件系统容量的工具 df。它既可以查看文件系统数据的空间容量，也可以查看索引节点的容量。至于文件系统缓存，我们通过
 /proc/meminfo、/proc/slabinfo 以及 slabtop 等各种来源，观察页缓存、目录项缓
@@ -907,15 +838,11 @@ $ nsenter --target $PID --net -- lsof -i
 最后，在 MySQL 和 Redis 的案例中，同样的思路，我们先用 top、iostat 以及 idstat
 ，确定并找出 I/O 性能问题的瓶颈来源，它们正是 mysqld 和 redis-server。随后，我们又用 strace+lsof 找出了它们正在读写的文件
 
-
-
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16257907709794.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257907709794.png) 
 
 
 
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16257908083610.png) 
-
-
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257908083610.png) 
 
 **分析思路**
 
@@ -924,14 +851,7 @@ $ nsenter --target $PID --net -- lsof -i
 3. 随后分析进程的 I/O 行为；
 4. 最后，结合应用程序的原理，分析这些 I/O 的来源。
 
-
-
- ![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16257908709466.png) 
-
-
-
-
-
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257908709466.png) 
 ##### 1.4 磁盘I/O性能测试
 
 fio（Flexible I/O Tester）正是最常用的文件系统和磁盘 I/O 性能基准测试工具。它提供了大量的可定制化选项，可以用来测试，裸盘或者文件系统在各种场景下的 I/O 性能，包括了不同块大小、不同 I/O 引擎以及是否使用缓存等场景。
@@ -965,8 +885,6 @@ filename，表示文件路径，当然，它可以是磁盘路径（测试磁盘
 
 
 
-
-
 fio 支持 I/O 的重放。
 
 ```
@@ -994,8 +912,6 @@ i/o性能优化
 文件系统优化
 
 磁盘优化
-
-
 
 
 
@@ -1047,9 +963,7 @@ i/o性能优化
 
 最后，应用程序就可以使用 Socket 接口，读取到新接收到的数据了。
 
-
-
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16269352384947.png)
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269352384947.png)
 
 
 
@@ -1278,13 +1192,13 @@ Nginx操作
 第一种机制，DPDK，是用户态网络的标准。它跳过内核协议栈，直接由用户态进程通过
 轮询的方式，来处理网络接收。
 
-![pr-3303](F:\code\learnning\linux-releated\linux性能\PR-3303.png)
+![pr-3303](E:\code\learnning\linux-releated\linux性能\PR-3303.png)
 
 
 
 第二种机制，XDP（eXpress Data Path），则是 Linux 内核提供的一种高性能网络数据路径。它允许网络包，在进入内核协议栈之前，就进行处理，也可以带来更高的性能。XDP 底层跟我们之前用到的 bcc-tools 一样，都是基于 Linux 内核的 eBPF 机制实现的。
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16269377726719.png)
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269377726719.png)
 
 你可以看到，XDP 对内核的要求比较高，需要的是 Linux 4.8 以上版本，并且它也不提供缓存队列。基于 XDP 的应用程序通常是专用的网络应用，常见的有 IDS（入侵检测系统）、DDoS 防御、 cilium 容器网络插件等。
 
@@ -1318,7 +1232,7 @@ TCP 接收的带宽（吞吐量）为 860 Mb/s
 
 而通常的四次挥手：服务器端收到客户端的 FIN 后，很可能还没发送完数据，所以就会先回复客户端一个 ACK 包。稍等一会儿，完成所有数据包的发送后，才会发送 FIN 包。这也就是四次挥手了。
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16269511374039.png)
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269511374039.png)
 
 ###### 6.1.1 **网络延时-tcp优化**
 
@@ -1458,7 +1372,7 @@ dig trace 的输出，主要包括四部分:
 	最后一部分，就是从 geekbang.org. 的 NS 服务器（dns10.hichina.com）查询最终主机 						ime.geekbang.org. 的 A 记录。
 ```
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16269398878226.png)
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269398878226.png)
 
 
 
@@ -1495,11 +1409,11 @@ dnsmasq 是最常用的 DNS 缓存服务之一，还经常作为 DHCP 服务来�
 
 ###### 7.5 tcpdump和wireshark使用
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16269414081609.png)
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269414081609.png)
 
 
 
-![img](F:\code\learnning\linux-releated\linux性能\企业微信截图_16269414832366.png)
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269414832366.png)
 
 
 
@@ -1534,7 +1448,7 @@ SYN Flood 正是互联网中最经典的 DDoS 攻击方式。它的原理：
 这种等待状态的 TCP 连接，通常也称为半开连接。由于连接表的大小有限，大量的半开连接就会导致连接表迅速占满，从而无法建立新的 TCP 连接。
 参考下面这张 TCP 状态图，你能看到，此时，服务器端的 TCP 连接，会处于SYN_RECEIVED 状态：
 
-![File:Tcp state diagram.png](F:\code\learnning\linux-releated\linux性能\Tcp_state_diagram.png)
+![File:Tcp state diagram.png](E:\code\learnning\linux-releated\linux性能\Tcp_state_diagram.png)
 
 
 
@@ -1618,7 +1532,7 @@ Linux 内核提供的 Netfilter 框架，允许对网络数据包进行修改（
 
 iptables 就是最常用的一种配置工具。要掌握 iptables 的原理和使用方法，最核心的就是弄清楚，网络数据包通过 Netfilter 时的工作流向，下面这张图就展示了这一过程。
 
-![img](F:\code\learnning\linux-releated\linux性能\1920px-Netfilter-packet-flow.svg.png)
+![img](E:\code\learnning\linux-releated\linux性能\1920px-Netfilter-packet-flow.svg.png)
 
 在这张图中，绿色背景的方框，表示表（table），用来管理链。Linux 支持 4 种表，包括filter（用于过滤）、nat（用于 NAT）、mangle（用于修改分组数据） 和 raw（用于原始数据包）等。
 
@@ -1723,13 +1637,11 @@ $ ulimit -n 65536
 
 ###### 10.1根据指标找工具 
 
-
-
-![img](C:\Users\ADMINI~1\AppData\Local\Temp\企业微信截图_16269506052959.png)
+![1628490809379](E:\code\learnning\linux-releated\linux性能\1628490809379.png)
 
 ###### 10.2 根据工具查指标
 
-![img](C:\Users\ADMINI~1\AppData\Local\Temp\企业微信截图_16269506521754.png)
+![1628490872970](E:\code\learnning\linux-releated\linux性能\1628490872970.png)
 
 ###### 10.3 套接字优化
 
@@ -1739,7 +1651,7 @@ $ ulimit -n 65536
 - 增大套接字接收缓冲区大小 net.core.rmem_max 和发送缓冲区大小net.core.wmem_max；
 - 增大 TCP 接收缓冲区大小 net.ipv4.tcp_rmem 和发送缓冲区大小net.ipv4.tcp_wmem。
 
-![img](C:\Users\ADMINI~1\AppData\Local\Temp\企业微信截图_16269507892693.png)
+![1628490940634](E:\code\learnning\linux-releated\linux性能\1628490940634.png)
 
 tcp_rmem 和 tcp_wmem 的三个数值分别是 min，default，max，系统会根据这些设置，自动调整 TCP 接收 / 发送缓冲区的大小。
 udp_mem 的三个数值分别是 min，pressure，max，系统会根据这些设置，自动调整UDP 发送缓冲区的大小。
@@ -1755,7 +1667,7 @@ udp_mem 的三个数值分别是 min，pressure，max，系统会根据这些设
 - 缩短发送 Keepalive 探测包的间隔时间 net.ipv4.tcp_keepalive_intvl；
 - 减少 Keepalive 探测失败后，一直到通知应用程序前的重试次数net.ipv4.tcp_keepalive_probes。
 
-![image-20210722202404063](F:\code\learnning\linux-releated\linux性能\image-20210722202404063.png)
+![image-20210722202404063](E:\code\learnning\linux-releated\linux性能\image-20210722202404063.png)
 
 
 
@@ -1786,10 +1698,6 @@ UDP 提供了面向数据报的网络协议，它不需要网络连接，也不�
 - 从 ICMP 的角度出发，为了避免 ICMP 主机探测、ICMP Flood 等各种网络问题，可以通过内核选项，来限制 ICMP 的行为。
   - 你可以禁止 ICMP 协议，即设置 net.ipv4.icmp_echo_ignore_all = 1。这样，外部主机就无法通过 ICMP 来探测主机。
   - 或者，你还可以禁止广播 ICMP，即设置net.ipv4.icmp_echo_ignore_broadcasts=1。
-
-
-
-
 
 
 
