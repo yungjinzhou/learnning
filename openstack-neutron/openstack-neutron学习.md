@@ -37,11 +37,11 @@ tun/tap驱动程序实现了虚拟网卡的功能，tun表示虚拟的是点对�
 
 ​       那么对于一个虚拟网络设备呢？首先它也归内核的网络设备管理子系统管理，对于**Linux内核网络设备管理模块**来说，虚拟设备和物理设备没有区别，都是网络设备，都能配置IP，从网络设备来的数据，都会转发给协议栈，协议栈过来的数据，也会交由网络设备发送出去，至于是怎么发送出去的，发到哪里去，那是设备驱动的事情，跟Linux内核就没关系了，所以说**虚拟网络设备的一端也是协议栈，而另一端是什么取决于虚拟网络设备的驱动实现。**
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16283899163640.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16283899163640.png)
 
 
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16283900005302.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16283900005302.png)
 
 #### 2.3 Namespace
 
@@ -53,7 +53,7 @@ Namespace类似传统网络里的VRF，与VRF不同的是：VRF做的是网络�
 
 veth pair不是一个设备，而是一对设备，以连接两个虚拟以太端口。操作vethpair，需要跟namespace一起配合，不然就没有意义。(<font color=red>**veth pair连接的是二层同网段的两个设备，tun是隧道，可以连接不同网段的设备**</font>)
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_1628390528266.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_1628390528266.png)
 
 #### 2.5 Bridge
 
@@ -61,7 +61,7 @@ veth pair不是一个设备，而是一对设备，以连接两个虚拟以太�
 
 如图：4个namespace，每个namespace都有一个tap，每个tap与网桥vb1的tap组成一对veth pair，这样，这4个namespace就可以**二层互通**了。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16283907317141.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16283907317141.png)
 
 #### 2.6 tun
 
@@ -70,14 +70,14 @@ tun是一个网络层(IP)的点对点设备，它启用了IP层隧道功能。Li
 NS1的tun1的ip 10.10.10.1与NS2的tun2的ip 10.10.20.2建立tun
 NS1的tun的ip是10.10.10.1，隧道的外层源ip是192.168.1.1，目的ip是192.168.2.1，是不是跟GRE很像。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16283912007141.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16283912007141.png)
 
 #### 2.7 Router
 
 Linux创建Router并没有像创建虚拟Bridge那样，有一个直接的命令brctl，而且它间接的命令也没有，不能创建虚拟路由器……因为它就是路由器（Router) !
 如图：我们需要在router(也就是我们的操作系统linux上增加去往各NS的路由)。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16283915711050.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16283915711050.png)
 
 #### 2.8 iptable
 
@@ -118,7 +118,7 @@ l  security 表（用于强制访问控制网络规则，例如：SELinux）
 1. 如果是外部访问的目的是本机，比如用户空间部署了WEB服务，外部来访问。数据包从外部进入网卡----->PREROUTING处理----->INPUT处理----->到达用户空间程序接口，程序处理完成后发出----->OUTPUT处理----->POSTROUTING处理。每个处理点都有对应的表，表的处理顺序按照raw-->mangle-->nat-->filter处理。
 2. 如果用户访问的目的不是本机，linux只是一个中转(转发)设备，此时需要开启ip forward功能，数据流就是进入网卡-----> PREROUTING处理-----> FORWARD处理-----> POSTROUTING处理。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16283916492793.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16283916492793.png)
 
 #### 2.9 NAT
 
@@ -171,7 +171,7 @@ Neutron当前支持的二层网络类型有Local、Flat、VLAN、GRE、VXLAN、G
 #### 4.1 qbr、br-int、br-thx、veth pair概念
 
 Neutron的VLAN实现模型，如下：
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16284120355076.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16284120355076.png)
 
 br-ethx、br-int、qbr-xxx、qbr-yyy都是Bridge，只不过实现方式不同。前两者选择的是OVS（Open vSwitch），后两者选择的是Linux Bridge。
 
@@ -208,13 +208,13 @@ vxlan、qbr、br-int知识参考：https://bbs.huaweicloud.com/blogs/116044
 
 两个Host内的4个VM，分别属于两个VLAN：VM1-1与VM2-1属于VLAN 100，VM1-2与VM2-2属于VLAN 200。br-ethx、br-int、qbr-xxx、qbr-yyy都是Bridge，只不过实现方式不同。前两者选择的是OVS（Open vSwitch），后两者选择的是Linux Bridge。这些Bridge构建了两个VLAN（VLAN ID分别为100、200）。不同的Bridge之间、Bridge与VM之间通过不同的接口进行对接。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16284801373425.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16284801373425.png)
 
 ##### 4.2.1 VM和VLAN ID
 
 对前面的实现模型的一个更加简化的模型：忽略掉那些各种各样的Bridge，各种各样的tap，veth pair等接口。简单理解，一个Host内有一个Bridge，Bridge连接着虚拟机。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16284805267764.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16284805267764.png)
 
 **内部视角**是在Host内部，4个VM的VLAN ID完全不是什么100、200，而是10、20、30、40。
 
@@ -226,9 +226,9 @@ vxlan、qbr、br-int知识参考：https://bbs.huaweicloud.com/blogs/116044
 
 VLAN类型网络，出报文的内外VLAN ID转换过程如图所示。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16284809136334.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16284809136334.png)
 
-![1628492796648](E:\code\learnning\openstack-neutron1\1628492796648.png)
+![1628492796648](E:\code\learnning\openstack-neutron\1628492796648.png)
 
 上图提到了VID，这是一种抽象的称呼，它的含义随着网络类型的不同而不同：对于VLAN网络而言，VID指的就是VLAN ID；对于VXLAN网络而言，VID指的就是VNI；对于GRE网络，VID指的就是GRE Key。
 
@@ -254,7 +254,7 @@ VLAN类型网络，出报文的内外VLAN ID转换过程如图所示。
 
 VLAN类型网络，入报文的内外VLAN ID转换过程，如图所示。
 
-![1628492846735](E:\code\learnning\openstack-neutron1\1628492846735.png)
+![1628492846735](E:\code\learnning\openstack-neutron\1628492846735.png)
 
 图中，我们以VM1-1为例，讲述内外VID的转换过程。报文从Host进入，从qbr-xxx进入VM1-1，这一路的VID转换如下：
 
@@ -274,7 +274,7 @@ VLAN类型网络，入报文的内外VLAN ID转换过程，如图所示。
 
  VXLAN的实现模型与VLAN的实现模型非常相像，如下图
 
-![img](E:\code\learnning\openstack-neutron1\7da0e98734369fb6090096f3a5a4eca1.png)
+![img](E:\code\learnning\openstack-neutron\7da0e98734369fb6090096f3a5a4eca1.png)
 
 从表面来看，VXLAN与VLAN的实现模型相比，仅仅一个差别：VLAN中对应的br-ethx，而VXLAN中对应的是br-tun（br-tun是一个混合单词的缩写：Bridge-Tunnel。此时的Tunnel是VXLAN Tunnel。）
 
@@ -284,13 +284,13 @@ VXLAN与VLAN一样也存在内外VID的转换。通过VXLAN，就可以明白Neu
 
 如下图所示
 
-![img](E:\code\learnning\openstack-neutron1\9e5ebc161c0159e1d7c423fdd4b6acb2.png)
+![img](E:\code\learnning\openstack-neutron\9e5ebc161c0159e1d7c423fdd4b6acb2.png)
 
 该图把br-tun一分为二，设想为两部分：上层是VTEP，对VXLAN隧道进行了终结；下层是一个普通的VLAN Bridge。所以，对于Host来说，它有两层网络，虚线以上是VXLAN网络，虚线以下是VLAN网络。如此一来，VXLAN内外VID的转换则变成了不得不做得工作，因为它不仅仅是表面上看起的那样是VID数值的转变，而且背后蕴含着网络类型的转变。
 
 VLAN类型的网络并不存在VXLAN这样的问题。当Host遇到VLAN时，它并不会变成两重网络，可为什么要做内外VID的转换呢？这主要是为了避免内部VLAN ID的冲突。**内部VLAN ID是体现在br-int上的**，而一个Host内装有1个br-int,也就是说**VLAN和VXLAN是共用一个br-int**。假如VLAN网络不做内外VID的转换，则很可能引发br-int上的内部VLAN ID冲突，如下表。
 
-![img](E:\code\learnning\openstack-neutron1\f486ad06947ed55be6761440dff9495e.png)
+![img](E:\code\learnning\openstack-neutron\f486ad06947ed55be6761440dff9495e.png)
 
 VXLAN做内外VID转换时，并不知道VLAN的外部VID是什么，所以它就根据自己的算法将内部VID转换为100，结果很不辛，与VLAN网络的外部VID相等。因为VLAN的内部VID没有做转换，仍然等于外部VID，所以两者在br-int上产生了冲突。正是这个原因，所以VLAN类型的网络，也要做内外VID的转换，而且所有的网络类型都需要做VID的转换。这样的话Neutron就能统一掌控，从而避免内部VID的冲突。
 
@@ -298,7 +298,7 @@ VXLAN的转换过程如下：
 
 1. 出报文的VID转换过程：
 
-![img](E:\code\learnning\openstack-neutron1\1b7258e0e0b4758a4a3f7bdfaa85778e.png)
+![img](E:\code\learnning\openstack-neutron\1b7258e0e0b4758a4a3f7bdfaa85778e.png)
 
 我们以VM1-3为例，讲述内外VID的转换过程（在VxLAN里VID表示VNI）。报文从VM1-3发出，从br-tun离开Host，这一路的VID转换如下：
 
@@ -318,7 +318,7 @@ VXLAN的转换过程如下：
 
 2. 入报文VID转换过程如下：
 
-![img](E:\code\learnning\openstack-neutron1\1702825e69a22413e8c4af509aa38734.png)
+![img](E:\code\learnning\openstack-neutron\1702825e69a22413e8c4af509aa38734.png)
 
 以VM1-3为例，讲述内外VID的转换过程。报文从Host进入，从qbr-xxx进入VM1-3，这一路的VID转换如下：
 
@@ -340,7 +340,7 @@ VXLAN的转换过程如下：
 
 GRE的实现模型与VXLAN的实现模型一模一样。所不同的是，VXLAN的br-tun构建的是VXLAN Tunnel，而GRE的br-tun构建的是GRE Tunnel。
 
-![img](E:\code\learnning\openstack-neutron1\企业微信截图_16284818482246.png)
+![img](E:\code\learnning\openstack-neutron\企业微信截图_16284818482246.png)
 
 
 
