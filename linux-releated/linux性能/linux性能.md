@@ -298,15 +298,15 @@ $ sar -n DEV 1
 
 
 
-![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16244955228161.png) 
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16244955228161.png) 
 
 
 
-![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_1624495488667.png)  
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_1624495488667.png)  
 
 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16244954676633.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16244954676633.png) 
 
 #### 4. 内存
 
@@ -318,7 +318,7 @@ $ sar -n DEV 1
 
 2. 虚拟内存空间分布
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16238465767688.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16238465767688.png) 
 
 
 
@@ -506,7 +506,7 @@ addr = 7f8f704752c0 size = 8192
 
    除了直接内存回收，还有一个专门的内核线程用来定期回收内存，也就是kswapd0。为了衡量内存的使用情况，kswapd0 定义了三个内存阈值（watermark，也称为水位），分别是页最小阈值（pages_min）、页低阈值（pages_low）和页高阈值（pages_high）。剩余内存，则使用 pages_free 表示。
 
-    ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_1624580713665.png) 
+    ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_1624580713665.png) 
 
 ```
 可以通过内核选项 /proc/sys/vm/min_free_kbytes 来间接设置。min_free_kbytes 设置
@@ -581,13 +581,13 @@ $ dmesg | grep -i "Out of memory"
         可以直接从物理内存中分配时，被称为次缺页异常。
         需要磁盘 I/O 介入（比如 Swap）时，被称为主缺页异常。
 
-![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16245816702213.png) 
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245816702213.png) 
 
  ![img](C:\Users\lenovo\AppData\Local\Temp\企业微信截图_16245817045477.png) 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16245817207878.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245817207878.png) 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16245817521386.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245817521386.png) 
 
 
 
@@ -610,7 +610,7 @@ Linux 文件系统为每个文件都分配两个数据结构，索引节点（in
 
 文件系统又把连续的扇区组成了逻辑块，然后每次都以逻辑块为最小单元，来管理数据。常见的逻辑块大小为 4KB，也就是由连续的 8 个扇区组成。
 
-![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16254875676017.png) 
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16254875676017.png) 
 
 
 
@@ -753,7 +753,7 @@ IOPS（Input/Output Per Second），是指每秒的 I/O 请求数。
 
 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16254883048336.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16254883048336.png) 
 
 %util ，就是我们前面提到的磁盘 I/O 使用率；
 r/s+ w/s ，就是 IOPS；
@@ -868,7 +868,7 @@ $ nsenter --target $PID --net -- lsof -i
 
 
 
-![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257905929796.png) 
+![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257905929796.png) 
 
 
 
@@ -889,11 +889,11 @@ $ nsenter --target $PID --net -- lsof -i
 
 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257907709794.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257907709794.png) 
 
 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257908083610.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257908083610.png) 
 
 
 
@@ -906,7 +906,7 @@ $ nsenter --target $PID --net -- lsof -i
 
 
 
- ![img](H:\code\learnning\linux-releated\linux性能\企业微信截图_16257908709466.png) 
+ ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257908709466.png) 
 
 
 
@@ -974,6 +974,14 @@ i/o性能优化
 文件系统优化
 
 磁盘优化
+
+
+
+
+
+
+
+#### 6. 网络
 
 
 
