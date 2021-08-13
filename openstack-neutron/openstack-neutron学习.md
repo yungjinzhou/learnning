@@ -37,11 +37,11 @@ tun/tap驱动程序实现了虚拟网卡的功能，tun表示虚拟的是点对�
 
 ​       那么对于一个虚拟网络设备呢？首先它也归内核的网络设备管理子系统管理，对于**Linux内核网络设备管理模块**来说，虚拟设备和物理设备没有区别，都是网络设备，都能配置IP，从网络设备来的数据，都会转发给协议栈，协议栈过来的数据，也会交由网络设备发送出去，至于是怎么发送出去的，发到哪里去，那是设备驱动的事情，跟Linux内核就没关系了，所以说**虚拟网络设备的一端也是协议栈，而另一端是什么取决于虚拟网络设备的驱动实现。**
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16283899163640.png)
+![img](.\企业微信截图_16283899163640.png)
 
 
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16283900005302.png)
+![img](.\企业微信截图_16283900005302.png)
 
 #### 2.3 Namespace
 
@@ -53,7 +53,7 @@ Namespace类似传统网络里的VRF，与VRF不同的是：VRF做的是网络�
 
 veth pair不是一个设备，而是一对设备，以连接两个虚拟以太端口。操作vethpair，需要跟namespace一起配合，不然就没有意义。(<font color=red>**veth pair连接的是二层同网段的两个设备，tun是隧道，可以连接不同网段的设备**</font>)
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_1628390528266.png)
+![img](.\企业微信截图_1628390528266.png)
 
 #### 2.5 Bridge
 
@@ -61,7 +61,7 @@ veth pair不是一个设备，而是一对设备，以连接两个虚拟以太�
 
 如图：4个namespace，每个namespace都有一个tap，每个tap与网桥vb1的tap组成一对veth pair，这样，这4个namespace就可以**二层互通**了。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16283907317141.png)
+![img](.\企业微信截图_16283907317141.png)
 
 #### 2.6 tun
 
@@ -70,14 +70,14 @@ tun是一个网络层(IP)的点对点设备，它启用了IP层隧道功能。Li
 NS1的tun1的ip 10.10.10.1与NS2的tun2的ip 10.10.20.2建立tun
 NS1的tun的ip是10.10.10.1，隧道的外层源ip是192.168.1.1，目的ip是192.168.2.1，是不是跟GRE很像。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16283912007141.png)
+![img](.\企业微信截图_16283912007141.png)
 
 #### 2.7 Router
 
 Linux创建Router并没有像创建虚拟Bridge那样，有一个直接的命令brctl，而且它间接的命令也没有，不能创建虚拟路由器……因为它就是路由器（Router) !
 如图：我们需要在router(也就是我们的操作系统linux上增加去往各NS的路由)。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16283915711050.png)
+![img](.\企业微信截图_16283915711050.png)
 
 #### 2.8 iptable
 
@@ -118,7 +118,7 @@ l  security 表（用于强制访问控制网络规则，例如：SELinux）
 1. 如果是外部访问的目的是本机，比如用户空间部署了WEB服务，外部来访问。数据包从外部进入网卡----->PREROUTING处理----->INPUT处理----->到达用户空间程序接口，程序处理完成后发出----->OUTPUT处理----->POSTROUTING处理。每个处理点都有对应的表，表的处理顺序按照raw-->mangle-->nat-->filter处理。
 2. 如果用户访问的目的不是本机，linux只是一个中转(转发)设备，此时需要开启ip forward功能，数据流就是进入网卡-----> PREROUTING处理-----> FORWARD处理-----> POSTROUTING处理。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16283916492793.png)
+![img](.\企业微信截图_16283916492793.png)
 
 #### 2.9 NAT
 
@@ -158,8 +158,126 @@ mangle表主要用于修改数据包的ToS(  Type of Service，服务类型）�
 
 ### 3. OpenVSwitch
 
+#### 31. 介绍
+
+**openvSwitch**是一个高质量的、多层**虚拟交换机**，使用开源Apache2.0许可协议，由 Nicira Networks开发，主要实现代码为可移植的C代码。它的目的是让大规模网络自动化可以通过编程扩展,同时仍然支持标准的管理接口和协议（例如NetFlow, sFlow, SPAN, RSPAN, CLI, LACP, 802.1ag）。此外,它被设计位支持跨越多个物理服务器的分布式环境，类似于VMware的vNetwork分布式vswitch或Cisco Nexus 1000 V。Open vSwitch支持多种linux 虚拟化技术，包括Xen/XenServer， KVM和VirtualBox。
+　　openvswitch是一个虚拟交换软件，主要用于虚拟机VM环境，作为一个虚拟交换机，支持Xen/XenServer，KVM以及virtualBox多种虚拟化技术。在这种虚拟化的环境中，一个虚拟交换机主要有两个作用：传递虚拟机之间的流量，以及实现虚拟机和外界网络的通信。
+　　内核模块实现了多个“数据路径”（类似于网桥），每个都可以有多个“vports”（类似于桥内的端口）。每个数据路径也通过关联一下流表（flow table）来设置操作，而这些流表中的流都是用户空间在报文头和元数据的基础上映射的关键信息，一般的操作都是将数据包转发到另一个vport。当一个数据包到达一个vport，内核模块所做的处理是提取其流的关键信息并在流表中查找这些关键信息。当有一个匹配的流时它执行对应的操作。如果没有匹配，它会将数据包送到用户空间的处理队列中（作为处理的一部分，用户空间可能会设置一个流用于以后碰到相同类型的数据包可以在内核中执行操作）。
+
+在基于Linux内核的系统上，应用最广泛的还是系统自带的虚拟交换机`Linux Bridge`，它是一个单纯的基于MAC地址学习的二层交换机，简单高效，但同时缺乏一些高级特性，比如OpenFlow,VLAN tag,QOS,ACL,Flow等，而且在隧道协议支持上，Linux Bridge只支持vxlan，OVS支持gre/vxlan/IPsec等，这也决定了OVS更适用于实现SDN技术。
 
 
+#### 3.2 OVS架构
+
+看下OVS整体架构，用户空间主要组件有数据库服务ovsdb-server和守护进程ovs-vswitchd。kernel中是datapath内核模块。最上面的Controller表示OpenFlow控制器，控制器与OVS是通过OpenFlow协议进行连接，控制器不一定位于OVS主机上，下面分别介绍图中各组件
+![1628772049407](.\1628772049407.png)
+
+##### 3.2.1 ovs-vswitchd
+
+`ovs-vswitchd`守护进程是OVS的核心部件，它和`datapath`内核模块一起实现OVS基于流的数据交换。作为核心组件，它使用openflow协议与上层OpenFlow控制器通信，使用OVSDB协议与`ovsdb-server`通信，使用`netlink`和`datapath`内核模块通信。`ovs-vswitchd`在启动时会读取`ovsdb-server`中配置信息，然后配置内核中的`datapaths`和所有OVS switches，当ovsdb中的配置信息改变时(例如使用ovs-vsctl工具)，`ovs-vswitchd`也会自动更新其配置以保持与数据库同步。
+在OVS中，`ovs-vswitchd`从OpenFlow控制器获取流表规则，然后把从`datapath`中收到的数据包在流表中进行匹配，找到匹配的flows并把所需应用的actions返回给`datapath`，同时作为处理的一部分，`ovs-vswitchd`会在`datapath`中设置一条datapath flows用于后续相同类型的数据包可以直接在内核中执行动作，此datapath flows相当于OpenFlow flows的缓存。
+
+##### 3.2.2 ovsdb-server
+
+`ovsdb-server`是OVS轻量级的数据库服务，用于整个OVS的配置信息，包括接口/交换内容/VLAN等，OVS主进程`ovs-vswitchd`根据数据库中的配置信息工作，下面是`ovsdb-server`进程详细信息
+
+```cpp
+ps -ef |grep ovsdb-server
+root     22166 22165  0 Jan17 ?        00:02:32 ovsdb-server /etc/openvswitch/conf.db -vconsole:emer -vsyslog:err -vfile:info --remote=punix:/var/run/openvswitch/db.sock --private-key=db:Open_vSwitch,SSL,private_key --certificate=db:Open_vSwitch,SSL,certificate --bootstrap-ca-cert=db:Open_vSwitch,SSL,ca_cert --no-chdir --log-file=/var/log/openvswitch/ovsdb-server.log --pidfile=/var/run/openvswitch/ovsdb-server.pid --detach --monitor
+```
+
+`/etc/openvswitch/conf.db`是数据库文件存放位置，文件形式存储保证了服务器重启不会影响其配置信息，`ovsdb-server`需要文件才能启动，可以使用`ovsdb-tool create`命令创建并初始化此数据库文件； `--remote=punix:/var/run/openvswitch/db.sock` 实现了一个Unix sockets连接，OVS主进程`ovs-vswitchd`或其它命令工具(ovsdb-client)通过此socket连接管理ovsdb
+ `/var/log/openvswitch/ovsdb-server.log`是日志记录。
+
+##### 3.2.3 OpenFlow
+
+OpenFlow是开源的用于管理交换机流表的协议，OpenFlow在OVS中的地位可以参考上面架构图，它是Controller和ovs-vswitched间的通信协议。需要注意的是，OpenFlow是一个独立的完整的流表协议，不依赖于OVS，OVS只是支持OpenFlow协议，有了支持，我们可以使用OpenFlow控制器来管理OVS中的流表，OpenFlow不仅仅支持虚拟交换机，某些硬件交换机也支持OpenFlow协议
+
+OVS常用作SDN交换机(OpenFlow交换机)，其中控制数据转发策略的就是OpenFlow flow。OpenStack Neutron中实现了一个OpenFlow控制器用于向OVS下发OpenFlow flows控制虚拟机间的访问或隔离。本文讨论的默认是作为SDN交换机场景下
+
+OpenFlow flow的流表项存放于用户空间主进程`ovs-vswitchd`中，OVS除了连接OpenFlow控制器获取这种flow，文章后面会提到的命令行工具`ovs-ofctl`工具也可以手动管理OVS中的OpenFlow flow，可以查看`man ovs-ofctl`了解
+
+在OVS中，OpenFlow flow是最重要的一种flow, 然而还有其它几种flows存在，文章下面OVS概念部分会提到。
+
+##### 3.2.4 Controller
+
+Controller指OpenFlow控制器。OpenFlow控制器可以通过OpenFlow协议连接到任何支持OpenFlow的交换机，比如OVS。控制器通过向交换机下发流表规则来控制数据流向。除了可以通过OpenFlow控制器配置OVS中flows，也可以使用OVS提供的`ovs-ofctl`命令通过OpenFlow协议去连接OVS，从而配置flows，命令也能够对OVS的运行状况进行动态监控。
+
+##### 3.2.5 Kernel Datapath
+
+datapath是一个Linux内核模块，它负责执行数据交换。关于datapath，[The Design and Implementation of Open vSwitch](https://link.jianshu.com?t=http%3A%2F%2Fbenpfaff.org%2Fpapers%2Fovs.pdf)中有描述
+
+> <small>The datapath module in the kernel receives the packets first, from a physical NIC or a VM’s virtual NIC. Either ovs-vswitchd has instructed the datapath how to handle packets of this type, or it has not. In the former case, the datapath module simply follows the instructions, called actions, given by ovs-vswitchd, which list physical ports or tunnels on which to transmit the packet. Actions may also specify packet modifications, packet sampling, or instructions to drop the packet. In the other case, where the datapath has not been told what to do with the packet, it delivers it to ovs-vswitchd. In userspace, ovs-vswitchd determines how the packet should be handled, then it passes the packet back to the datapath with the desired handling. Usually, ovs-vswitchd also tells the datapath to cache the actions, for handling similar future packets.</small>
+
+为了说明datapath，来看一张更详细的架构图
+
+![1628772456877](.\1628772456877.png)
+
+用户空间`ovs-vswitchd`和内核模块`datapath`决定了数据包的转发，首先，`datapath`内核模块收到进入数据包(物理网卡或虚拟网卡)，然后查找其缓存(datapath flows)，当有一个匹配的flow时它执行对应的操作，否则`datapath`会把该数据包送入用户空间由`ovs-vswitchd`负责在其OpenFlow flows中查询(图1中的First Packet)，`ovs-vswitchd`查询后把匹配的actions返回给`datapath`并设置一条datapath flows到`datapath`中，这样后续进入的同类型的数据包(图1中的Subsequent Packets)因为缓存匹配会被`datapath`直接处理，不用再次进入用户空间。
+
+`datapath`专注于数据交换，它不需要知道OpenFlow的存在。与OpenFlow打交道的是`ovs-vswitchd`，`ovs-vswitchd`存储所有Flow规则供`datapath`查询或缓存.
+
+虽然有`ovs-dpctl`管理工具的存在，但我们没必要去手动管理`datapath`，这是用户空间`ovs-vswitchd`的工作。
+
+#### 3.3 OVS 在neutron+vxlan模式下涉及组件的概念
+
+###### 1. Bridge
+
+Bridge代表一个以太网交换机(Switch)，一个主机中可以创建一个或者多个Bridge。Bridge的功能是根据一定规则，把从端口收到的数据包转发到另一个或多个端口，上面例子中有三个Bridge，`br-tun`，`br-int`，`br-ext`
+
+###### 2. Port
+
+端口Port与物理交换机的端口概念类似，Port是OVS Bridge上创建的一个虚拟端口，每个Port都隶属于一个Bridge。Port有以下几种类型:
+
+- **Normal**：可以把操作系统中已有的网卡(物理网卡em1/eth0,或虚拟机的虚拟网卡tapxxx)挂载到ovs上，ovs会生成一个同名Port处理这块网卡进出的数据包。此时端口类型为Normal。有一点要注意的是，挂载到OVS上的网卡设备不支持分配IP地址
+- **Internal**：Internal类型是OVS内部创建的虚拟网卡接口，每创建一个Port，OVS会自动创建一个同名接口(Interface)挂载到新创建的Port上。当ovs创建一个新网桥时，默认会创建一个与网桥同名的Internal Port。在OVS中，只有”internal”类型的设备才支持配置IP地址信息，
+- **Patch**：当主机中有多个ovs网桥时，可以使用Patch Port把两个网桥连起来。Patch Port总是成对出现，分别连接在两个网桥上，从一个Patch Port收到的数据包会被转发到另一个Patch Port，类似于Linux系统中的`veth`。使用Patch连接的两个网桥跟一个网桥没什么区别，OpenStack Neutron中使用到了Patch Port。
+- **Tunnel**：OVS中支持添加隧道(Tunnel)端口，常见隧道技术有两种`gre`或`vxlan`。隧道技术是在现有的物理网络之上构建一层虚拟网络，上层应用只与虚拟网络相关，以此实现的虚拟网络比物理网络配置更加灵活，并能够实现跨主机的L2通信以及必要的租户隔离。不同隧道技术其大体思路均是将以太网报文使用隧道协议封装，然后使用底层IP网络转发封装后的数据包，其差异性在于选择和构造隧道的协议不同。Tunnel在OpenStack中用作实现大二层网络以及租户隔离，以应对公有云大规模，多租户的复杂网络环境。
+
+上面Normal和INternal两种Port类型区别在于，Internal类型会自动创建接口(Interface)，而Normal类型是把主机中已有的网卡接口添加到OVS中
+
+###### 3. Interface
+
+Interface是连接到Port的网络接口设备，是OVS与外部交换数据包的组件，在通常情况下，Port和Interface是一对一的关系，只有在配置Port为 bond模式后，Port和Interface是一对多的关系。这个网络接口设备可能是创建`Internal`类型Port时OVS自动生成的虚拟网卡，也可能是系统的物理网卡或虚拟网卡(TUN/TAP)挂载在ovs上。 OVS中只有”Internal”类型的网卡接口才支持配置IP地址。`Interface`是一块网络接口设备，负责接收或发送数据包，Port是OVS网桥上建立的一个虚拟端口，`Interface`挂载在Port上。
+
+#### 3.4 OVS中的各种流(flows)
+
+flows是OVS进行数据转发策略控制的核心数据结构，区别于Linux Bridge是个单纯基于MAC地址学习的二层交换机，flows的存在使OVS作为一款SDN交换机成为云平台网络虚拟机化主要组件。
+OVS中有多种flows存在，用于不同目的，但最主要的还是OpenFlow flows这种，文中未明确说明的flows都是指OpenFlow flow。
+##### 3.4.1 OpenFlow flows
+OpenFlow是开源的用于管理交换机流表的协议，OpenFlow在OVS中的地位可以参考OVS架构的图，它是Controller和ovs-vswitched间的通信协议。需要注意的是，OpenFlow是一个独立的完整的流表协议，不依赖于OVS，OVS只是支持OpenFlow协议，有了支持，我们可以使用OpenFlow控制器来管理OVS中的流表，OpenFlow不仅仅支持虚拟交换机，某些硬件交换机也支持OpenFlow协议
+
+OVS常用作SDN交换机(OpenFlow交换机)，其中控制数据转发策略的就是OpenFlow flow。OpenStack Neutron中实现了一个OpenFlow控制器用于向OVS下发OpenFlow flows控制虚拟机间的访问或隔离。本文讨论的默认是作为SDN交换机场景下
+
+OpenFlow flow的流表项存放于用户空间主进程ovs-vswitchd中，OVS除了连接OpenFlow控制器获取这种flow，文章后面会提到的命令行工具ovs-ofctl工具也可以手动管理OVS中的OpenFlow flow，可以查看man ovs-ofctl了解。
+
+##### 3.4.2 “hidden” flows
+
+OVS在使用OpenFlow flow时，需要与OpenFlow控制器建立TCP连接，若此TCP连接不依赖OVS，即没有OVS依然可以建立连接，此时就是out-of-band control模式，这种模式下不需要”hidden” flows
+
+但是在in-band control模式下，TCP连接的建立依赖OVS控制的网络，但此时OVS依赖OpenFLow控制器下发的flows才能正常工作，没法建立TCP连接也就无法下发flows，这就产生矛盾了，因此需要存在一些”hidden” flows，这些”hidden” flows保证了TCP连接能够正常建立。关于in-band control详细介绍，参考OVS官方文档Design Decisions In Open vSwitch 中In-Band Control部分
+
+“hidden” flows优先级高于OpenFlow flows，它们不需要手动设置。可以使用ovs-appctl查看这些flows，下面命令输出内容包括OpenFlow flows,"hidden" flows
+
+```
+ovs-appctl bridge/dump-flows
+```
+
+##### 3.4.3 dataath flows
+
+datapath flows是`datapath`内核模块维护的flows，由内核模块维护意味着我们并不需要去修改管理它。与OpenFlow flows不同的是，它不支持优先级，并且只有一个表，这些特点使它非常适合做缓存。与OpenFlow一样的是它支持通配符，也支持指令集(多个action)
+
+datapath flows可以来自用户空间`ovs-vswitchd`缓存，也可以是datapath内核模块进行MAC地址学习到的flows，这取决与OVS是作为SDN交换机，还是像Linux Bridge那样只是一个简单基于MAC地址学习的二层交换机。
+
+
+
+#### 3.4 管理flows的命令行工具
+
+#### 3.5 ovs-*工具的使用及区别
+
+第三章参考链接
+
+https://www.jianshu.com/p/9b1fa7b1b705
 
 
 
@@ -171,7 +289,7 @@ Neutron当前支持的二层网络类型有Local、Flat、VLAN、GRE、VXLAN、G
 #### 4.1 qbr、br-int、br-thx、veth pair概念
 
 Neutron的VLAN实现模型，如下：
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16284120355076.png)
+![img](.\企业微信截图_16284120355076.png)
 
 br-ethx、br-int、qbr-xxx、qbr-yyy都是Bridge，只不过实现方式不同。前两者选择的是OVS（Open vSwitch），后两者选择的是Linux Bridge。
 
@@ -208,13 +326,13 @@ vxlan、qbr、br-int知识参考：https://bbs.huaweicloud.com/blogs/116044
 
 两个Host内的4个VM，分别属于两个VLAN：VM1-1与VM2-1属于VLAN 100，VM1-2与VM2-2属于VLAN 200。br-ethx、br-int、qbr-xxx、qbr-yyy都是Bridge，只不过实现方式不同。前两者选择的是OVS（Open vSwitch），后两者选择的是Linux Bridge。这些Bridge构建了两个VLAN（VLAN ID分别为100、200）。不同的Bridge之间、Bridge与VM之间通过不同的接口进行对接。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16284801373425.png)
+![img](.\企业微信截图_16284801373425.png)
 
 ##### 4.2.1 VM和VLAN ID
 
 对前面的实现模型的一个更加简化的模型：忽略掉那些各种各样的Bridge，各种各样的tap，veth pair等接口。简单理解，一个Host内有一个Bridge，Bridge连接着虚拟机。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16284805267764.png)
+![img](.\企业微信截图_16284805267764.png)
 
 **内部视角**是在Host内部，4个VM的VLAN ID完全不是什么100、200，而是10、20、30、40。
 
@@ -226,9 +344,9 @@ vxlan、qbr、br-int知识参考：https://bbs.huaweicloud.com/blogs/116044
 
 VLAN类型网络，出报文的内外VLAN ID转换过程如图所示。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16284809136334.png)
+![img](.\企业微信截图_16284809136334.png)
 
-![1628492796648](E:\code\learnning\openstack-neutron\1628492796648.png)
+![1628492796648](.\1628492796648.png)
 
 上图提到了VID，这是一种抽象的称呼，它的含义随着网络类型的不同而不同：对于VLAN网络而言，VID指的就是VLAN ID；对于VXLAN网络而言，VID指的就是VNI；对于GRE网络，VID指的就是GRE Key。
 
@@ -254,7 +372,7 @@ VLAN类型网络，出报文的内外VLAN ID转换过程如图所示。
 
 VLAN类型网络，入报文的内外VLAN ID转换过程，如图所示。
 
-![1628492846735](E:\code\learnning\openstack-neutron\1628492846735.png)
+![1628492846735](.\1628492846735.png)
 
 图中，我们以VM1-1为例，讲述内外VID的转换过程。报文从Host进入，从qbr-xxx进入VM1-1，这一路的VID转换如下：
 
@@ -274,7 +392,7 @@ VLAN类型网络，入报文的内外VLAN ID转换过程，如图所示。
 
  VXLAN的实现模型与VLAN的实现模型非常相像，如下图
 
-![img](E:\code\learnning\openstack-neutron\7da0e98734369fb6090096f3a5a4eca1.png)
+![img](.\7da0e98734369fb6090096f3a5a4eca1.png)
 
 从表面来看，VXLAN与VLAN的实现模型相比，仅仅一个差别：VLAN中对应的br-ethx，而VXLAN中对应的是br-tun（br-tun是一个混合单词的缩写：Bridge-Tunnel。此时的Tunnel是VXLAN Tunnel。）
 
@@ -284,13 +402,13 @@ VXLAN与VLAN一样也存在内外VID的转换。通过VXLAN，就可以明白Neu
 
 如下图所示
 
-![img](E:\code\learnning\openstack-neutron\9e5ebc161c0159e1d7c423fdd4b6acb2.png)
+![img](.\9e5ebc161c0159e1d7c423fdd4b6acb2.png)
 
 该图把br-tun一分为二，设想为两部分：上层是VTEP，对VXLAN隧道进行了终结；下层是一个普通的VLAN Bridge。所以，对于Host来说，它有两层网络，虚线以上是VXLAN网络，虚线以下是VLAN网络。如此一来，VXLAN内外VID的转换则变成了不得不做得工作，因为它不仅仅是表面上看起的那样是VID数值的转变，而且背后蕴含着网络类型的转变。
 
 VLAN类型的网络并不存在VXLAN这样的问题。当Host遇到VLAN时，它并不会变成两重网络，可为什么要做内外VID的转换呢？这主要是为了避免内部VLAN ID的冲突。**内部VLAN ID是体现在br-int上的**，而一个Host内装有1个br-int,也就是说**VLAN和VXLAN是共用一个br-int**。假如VLAN网络不做内外VID的转换，则很可能引发br-int上的内部VLAN ID冲突，如下表。
 
-![img](E:\code\learnning\openstack-neutron\f486ad06947ed55be6761440dff9495e.png)
+![img](.\f486ad06947ed55be6761440dff9495e.png)
 
 VXLAN做内外VID转换时，并不知道VLAN的外部VID是什么，所以它就根据自己的算法将内部VID转换为100，结果很不辛，与VLAN网络的外部VID相等。因为VLAN的内部VID没有做转换，仍然等于外部VID，所以两者在br-int上产生了冲突。正是这个原因，所以VLAN类型的网络，也要做内外VID的转换，而且所有的网络类型都需要做VID的转换。这样的话Neutron就能统一掌控，从而避免内部VID的冲突。
 
@@ -298,7 +416,7 @@ VXLAN的转换过程如下：
 
 1. 出报文的VID转换过程：
 
-![img](E:\code\learnning\openstack-neutron\1b7258e0e0b4758a4a3f7bdfaa85778e.png)
+![img](.\1b7258e0e0b4758a4a3f7bdfaa85778e.png)
 
 我们以VM1-3为例，讲述内外VID的转换过程（在VxLAN里VID表示VNI）。报文从VM1-3发出，从br-tun离开Host，这一路的VID转换如下：
 
@@ -318,7 +436,7 @@ VXLAN的转换过程如下：
 
 2. 入报文VID转换过程如下：
 
-![img](E:\code\learnning\openstack-neutron\1702825e69a22413e8c4af509aa38734.png)
+![img](.\1702825e69a22413e8c4af509aa38734.png)
 
 以VM1-3为例，讲述内外VID的转换过程。报文从Host进入，从qbr-xxx进入VM1-3，这一路的VID转换如下：
 
@@ -340,7 +458,7 @@ VXLAN的转换过程如下：
 
 GRE的实现模型与VXLAN的实现模型一模一样。所不同的是，VXLAN的br-tun构建的是VXLAN Tunnel，而GRE的br-tun构建的是GRE Tunnel。
 
-![img](E:\code\learnning\openstack-neutron\企业微信截图_16284818482246.png)
+![img](.\企业微信截图_16284818482246.png)
 
 
 
