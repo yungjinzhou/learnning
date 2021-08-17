@@ -68,3 +68,58 @@ BookController开始处理，查找有没有可用_default方法，加入notfoun
 
 第七步
 当是food时，_lookup没处理成功，发现notfound_handlers，还能pop出处理对象，就接着交给_default处理，所以页面显示“This is Book default”。
+
+pecan路由
+
+### expose
+
+pecan默认采用`expose`进行路由的绑定，将需要路由相应控制器类的方法都经过`expose`装饰器装饰，则pecan可以请http请求路径找到对应的处理方法。不同使用方法会有不同的效果：
+
+- `@expose()`, 被装饰的方法需要返回一个字符串，表示HTML响应的body
+- `@expose(html_template_name)`，被装饰的方法返回一个字典，字典的key可以在html模板中使用`${key}`的方式引用
+- `@expose(route='some-path')`，被装饰方法响应`/some-path`请求
+- `@expose(generic=True)`，实现一个请求路径，根据请求方法进行覆盖
+
+
+
+### pecan流程分析
+
+参考链接：https://blog.csdn.net/ARPOSPF/article/details/113618174
+
+
+
+
+
+```
+# get measures路径：/v1/metrics/sdfdsfsdfidsf/measures?...
+
+
+
+    def _handle_custom_action(self, method, remainder, request=None):
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_custom_action)
+
+        remainder = [r for r in remainder if r]
+        if remainder:
+            if method in ('put', 'delete'):
+                # For PUT and DELETE, additional arguments are supplied, e.g.,
+                # DELETE /foo/XYZ
+                method_name = remainder[0]
+                remainder = remainder[1:]
+            else:
+                method_name = remainder[-1]
+                remainder = remainder[:-1]
+            if method.upper() in self._custom_actions.get(method_name, []):
+                controller = self._find_controller(
+                    '%s_%s' % (method, method_name),
+                    method_name
+                )
+                if controller:
+                    return controller, remainder
+
+```
+
+
+
+
+

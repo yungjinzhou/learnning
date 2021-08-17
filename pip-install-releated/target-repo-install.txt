@@ -1,4 +1,4 @@
 pip install pillow -i http://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://pypi.python.org/simple --trusted-host mirrors.aliyun.com
 
 
-pip install pillow -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+pip install future -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com

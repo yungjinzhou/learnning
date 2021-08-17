@@ -1,0 +1,569 @@
+## stein版本gnocchi-4.3.2源码解析
+
+### 1. gnochi架构介绍
+
+#### 1.1 服务模块介绍
+
+Gnocchi：用于将采集数据进行计算合并和存储并提供rest api方式接收和查询监控数据
+
+![img](.\企业微信截图_16291872131546.png)
+
+
+
+从图可以看出Gnocchi的服务主要包含两大服务，API和Metricd服务。同时可以看到有三个存储，Measure Storage、Aggregate Storage和Index。
+
+**Measure Storage**：是经过ceilometer-agent-notification服务处理后发送过来的数据，是实际的监控数据，但这些数据还需要经过gnocchi服务处理，处理后就会删除掉。比如这部分数据就可以保存到file中，当然也支持保存到ceph，但这属于临时数据，所以用file保存就可以了。
+
+**Aggregate Storage**：Aggreate是总数、合计的意思，gnocchi服务采用的是一种独特的时间序列存储方法，这个存储存放的是按照预定义的策略进行聚合计算后的数据，这样在获取监控数据展示时速度就会很快，因为已经计算过了。用户看到的是这层数据。后端存储包括file、swift、ceph，influxdb，默认使用file。可以保存到ceph中，这样可在任意一个节点上获取，但由于存储的都是大量小文件，大量的小文件对ceph来说并不友好。
+
+**Index**：通常是一个关系型数据库（比如MYSQL），是监控数据的元数据，用以索引取出resources和metrics，使得可以快速的从Measure Storage和Aggregate Storage中取出所需要的数据。
+
+**API**：gnocchi-api服务进程，可以托管到httpd服务一起启动，通过Indexer和Storage的driver，提供查询和操作ArchivePolicy，Resource，Metric，Measure的接口，并将新到来的Measure（也就是ceilometer-agent-notification发送到gnocchi-api服务的数据）存入Measure Storage。
+
+**Metricd**：gnocchi-metricd服务进程，根据Metric定义的ArchivePolicy规则周期性的从Measure Storage中获取未处理的Measure数据并进行处理，将处理结果保存到Aggregate Storage中，同时也对Aggregate Storage中的数据进行聚合计算和清理过期的数据。
+
+API和Metricd服务都是设计成了无状态的服务，可以横向拓展来加快数据的处理。
+
+#### 1.2 主要数据介绍
+
+Gnocchi中有三层数据，resources -> metric -> measure
+
+**Resource**：是gnocchi对openstack监控数据的一个大体的划分，比如虚拟机的磁盘的所有监控资源作为一个resource，可用命令gnocchi resource list查看
+
+**Metric**：是gnocchi对openstack监控数据的第二层划分，归属于resource，代表一个较具体的资源，比如cpu值，可用命令gnocchi metric list查看
+
+**Measure**：是gnocchi对openstack监控数据的第三层划分，归属于metric，表示在某个时间戳对应资源的值，可用命令gnocchi measures show metric_id
+
+
+
+### 2. gnocchi-api启动流程
+
+telemetry项目主要使用的pecan框架，如gnocchi采用的是**paste.deploy+pecan**实现。
+
+#### 2.1 初始代码加载
+
+systemctl start gnochi-api.service中，实际执行的/usr/bin/gnocchi-api
+
+```
+# /usr/bin/gnocchi-api执行内容如下：
+
+from gnocchi.cli import api
+
+if __name__ == '__main__':
+    sys.exit(api.api())
+else:
+    application = api.wsgi()
+
+```
+
+
+
+而gnocchi/rest/wsgi.py中
+
+```
+from gnocchi.cli import api
+from gnocchi.rest import app
+application = app.load_app(api.prepare_service())
+```
+
+
+
+先看api.prepare_service()
+
+```
+# gnocchi/cli/api.py
+
+
+def prepare_service(conf=None):
+    if conf is None:
+        conf = cfg.ConfigOpts()
+
+    opts.set_defaults()
+    policy_opts.set_defaults(conf)
+    conf = service.prepare_service(conf=conf)
+    cfg_path = conf.oslo_policy.policy_file
+    if not os.path.isabs(cfg_path):
+        cfg_path = conf.find_file(cfg_path)
+    if cfg_path is None or not os.path.exists(cfg_path):
+        cfg_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                   '..', 'rest', 'policy.json'))
+    conf.set_default('policy_file', cfg_path, group='oslo_policy')
+    return conf
+  
+  
+  
+  
+ # conf具体值如下，就是加载了gnocchi.conf下的配置，实例化，还有其他配置
+ 
+  {
+	'_namespace': _Namespace(_conf = < oslo_config.cfg.ConfigOpts object at 0x7f13088b3ad0 > , _config_dirs = [], _emitted_deprecations = set([]), _files_not_found = [], _files_permission_denied = [], _normalized = [{
+		'statsd': {},
+		'incoming': {
+			'redis_url': ['redis://controller:6379?db=5']
+		},
+		'metricd': {
+			'metric_reporting_delay': ['120'],
+			'metric_processing_delay': ['60'],
+			......
+		},
+		'DEFAULT': {
+			'debug': ['true'],
+			'parallel_operations': ['200'],
+			......
+		},
+		'keystone_authtoken': {
+			'auth_type': ['password'],
+			......
+		},
+		'oslo_policy': {}
+	}, ....
+	}], _parsed = [{
+		'statsd': {},
+		'incoming': {
+			'redis_url': ['redis://controller:6379?db=5']
+		},
+		'metricd': {
+			'metric_reporting_delay': ['120'],
+			......
+		},
+		....
+	}], _sections_to_file = {
+		'statsd': '/etc/gnocchi/gnocchi.conf',
+		'incoming': '/etc/gnocchi/gnocchi.conf',
+			......
+	}, config_dir = None, config_file = None, debug = 'true', log_dir = '/var/log/gnocchi', log_file = '/var/log/gnocchi/test-api.log', verbose = 'true'),
+	'_oparser': _CachedArgumentParser(prog = 'uwsgi', usage = None, description = None, version = None, formatter_class = < class 'argparse.HelpFormatter' > , conflict_handler = 'error', add_help = True),
+	'_mutable_ns': None,
+	'_ConfigOpts__cache': {},
+	'default_config_files': ['/usr/share/gnocchi/gnocchi-dist.conf', '/etc/gnocchi/gnocchi.conf'],
+	'_env_driver': < oslo_config.sources._environment.EnvironmentConfigurationSource object at 0x7f13088b3b10 > ,
+	'_use_env': True,
+	'_ConfigOpts__drivers_cache': {},
+	'_sources': [],
+	'_opts': {
+		'config_file': {
+			'opt': < oslo_config.cfg._ConfigFileOpt object at 0x7f13088c2d50 > ,
+			'cli': True
+		},
+	},
+	'_args': ['--log-file', '/var/log/gnocchi/test-api.log'],
+	'version': '4.3.2',
+	'_mutate_hooks': set([]),
+	'usage': None,
+	'_groups': {
+		'statsd': < oslo_config.cfg.OptGroup object at 0x7f13088c2b10 > ,
+		'incoming': < oslo_config.cfg.OptGroup object at 0x7f13088c2ad0 > ,
+		......
+	},
+	'_config_opts': [ < oslo_config.cfg._ConfigFileOpt object at 0x7f13088c2d50 > , < oslo_config.cfg._ConfigDirOpt object at 0x7f13088c2c90 > ],
+	'prog': 'uwsgi',
+	'default_config_dirs': [],
+	'_cli_opts': deque([{
+		'opt': < oslo_config.cfg._ConfigDirOpt object at 0x7f13088c2c90 > ,
+		'group': None
+	}, ]),
+	'_validate_default_values': True,
+	'_ext_mgr': None,
+	'project': 'gnocchi',
+	'_deprecated_opts': {
+		'DEFAULT': {
+			'refresh_timeout': {
+				'opt': < oslo_config.cfg.IntOpt object at 0x7f13088c2510 > ,
+				'group': < oslo_config.cfg.OptGroup object at 0x7f13088c2a50 >
+			},
+			......
+		},
+		'database': {
+			'idle_timeout': {
+				'opt': < oslo_config.cfg.IntOpt object at 0x7f13088aec50 > ,
+				'group': < oslo_config.cfg.OptGroup object at 0x7f13088b3c50 >
+			}
+		}
+		}
+	}
+})
+  
+```
+
+
+
+再看下app.load_app的代码
+
+```
+# gnocchi/rest/app.py
+
+def load_app(conf, not_implemented_middleware=True):
+    global APPCONFIGS
+
+    # Build the WSGI app
+    cfg_path = conf.api.paste_config
+    # cfg_path:  api-paste.ini
+    if not os.path.isabs(cfg_path):
+        cfg_path = conf.find_file(cfg_path)
+
+    if cfg_path is None or not os.path.exists(cfg_path):
+        LOG.debug("No api-paste configuration file found! Using default.")
+        cfg_path = os.path.abspath(pkg_resources.resource_filename(
+            __name__, "api-paste.ini"))
+
+    config = dict(conf=conf,
+                  not_implemented_middleware=not_implemented_middleware)
+    configkey = str(uuid.uuid4())
+    APPCONFIGS[configkey] = config
+
+    LOG.info("WSGI config used: %s", cfg_path)
+
+    appname = "gnocchi+" + conf.api.auth_mode
+    app = deploy.loadapp("config:" + cfg_path, name=appname,
+                         global_conf={'configkey': configkey})
+    return cors.CORS(app, conf=conf)
+
+```
+
+
+
+#### 2.2 pastedeploy加载uwsgi 不同的app
+
+加载配置文件api-paste.ini，启动方式是deploy.loadapp，涉及到pastedeploy用法，简单介绍下
+
+- PasteDeploy用来发现和配置WSGI应用的一套系统。WSGI的使用者，提供了一个单一简单的函数(loadapp)用于通过配置文件或python egg中加载WSGI。对于WSGI提供者，仅仅要求提供一个单一的简单的应用入口。 无需应用者展示应用的具体实现。
+
+  **PasteDeploy配置文件**
+   PasteDeploy定义了以下几个部件：
+
+  - app：callable object，WSGI服务
+  - filter： 过滤器，主要用于预处理的一些工作，如身份验证等。执行完毕之后直接返回或是交给下一个filter/app继续处理。filter是一个callable object,参数是app，对app进行封装后返回，
+  - pipeline：由若干个filter和1个APP服务
+  - composite：实现对不同app的分发。如根据url的参数分发给不同的app。
+
+具体可以参考：
+
+https://www.jianshu.com/p/ed07aa2c9578
+
+https://www.cnblogs.com/Security-Darren/p/4087587.html
+
+
+
+```
+# api-paste.ini文件
+
+[composite:gnocchi+basic]
+use = egg:Paste#urlmap
+/ = gnocchiversions_pipeline
+/v1 = gnocchiv1+noauth
+/healthcheck = healthcheck
+
+[composite:gnocchi+keystone]
+use = egg:Paste#urlmap
+/ = gnocchiversions_pipeline
+/v1 = gnocchiv1+keystone
+/healthcheck = healthcheck
+
+[composite:gnocchi+remoteuser]
+use = egg:Paste#urlmap
+/ = gnocchiversions_pipeline
+/v1 = gnocchiv1+noauth
+/healthcheck = healthcheck
+
+[pipeline:gnocchiv1+noauth]
+pipeline = http_proxy_to_wsgi gnocchiv1
+
+[pipeline:gnocchiv1+keystone]
+pipeline = http_proxy_to_wsgi keystone_authtoken gnocchiv1
+
+[pipeline:gnocchiversions_pipeline]
+pipeline = http_proxy_to_wsgi gnocchiversions
+
+[app:gnocchiversions]
+paste.app_factory = gnocchi.rest.app:app_factory
+root = gnocchi.rest.api.VersionsController
+
+[app:gnocchiv1]
+paste.app_factory = gnocchi.rest.app:app_factory
+root = gnocchi.rest.api.V1Controller
+
+[filter:keystone_authtoken]
+use = egg:keystonemiddleware#auth_token
+oslo_config_project = gnocchi
+
+[filter:http_proxy_to_wsgi]
+use = egg:oslo.middleware#http_proxy_to_wsgi
+oslo_config_project = gnocchi
+
+[app:healthcheck]
+use = egg:oslo.middleware#healthcheck
+oslo_config_project = gnocchi
+
+```
+
+本用例app加载流程是：
+
+1. 根据配置文件，找到 [composite:gnocchi+keystone]，表示分发请求至不同的应用；
+
+2. use = egg:Paste#urlmap表示：使用Paste Package中的urlmap应用。urlmap主要用于根据路径前缀将请求映射至不同的应用；
+
+3. 根据请求是v1开头，找到/v1 = gnocchiv1+keystone，由于gnocchiv1+keystone的app找不到，寻找对应 [pipeline:gnocchiv1+keystone]
+
+4. pipeline也是app，pipeline = http_proxy_to_wsgi keystone_authtoken gnocchiv1
+   其中:
+
+   - http_proxy_to_wsgi是一個过滤器：
+     [filter:http_proxy_to_wsgi]
+     use = egg:oslo.middleware#http_proxy_to_wsgi
+     oslo_config_project = gnocchi
+
+   - keystone_authtoken也是一个过滤器:
+     [filter:keystone_authtoken]
+     use = egg:keystonemiddleware#auth_token
+     oslo_config_project = gnocchi
+
+   - **gnocchiv1**是一个app：
+     [app:gnocchiv1]
+     paste.app_factory = gnocchi.rest.app:app_factory
+     root = gnocchi.rest.api.V1Controller
+
+5. 加载:app_factory，根据app名称加载对应的app
+
+   ```
+   # gnocchi/rest/app.py
+   
+   def app_factory(global_config, **local_conf):
+       global APPCONFIGS
+       appconfig = APPCONFIGS.get(global_config.get('configkey'))
+       return _setup_app(root=local_conf.get('root'), **appconfig)
+   ```
+
+
+
+#### 2.3 pecan app加载
+
+根据上一步，由pastedeploy加载app:gnocchiv1， 构建app，调用_setup_app
+
+并且代码开始位置在root = gnocchi.rest.api.V1Controller
+
+```
+# gnocchi/rest/app.py
+
+def _setup_app(root, conf, not_implemented_middleware):
+    app = pecan.make_app(
+        root,
+        hooks=(GnocchiHook(conf),),
+        guess_content_type_from_ext=False,
+        custom_renderers={"json": JsonRenderer}
+    )
+
+    if not_implemented_middleware:
+        app = webob.exc.HTTPExceptionMiddleware(NotImplementedMiddleware(app))
+
+    return app
+```
+
+
+
+V1Controller是请求的入口，根据url路径，转发给对应的SubController进行处理。
+
+简单介绍一下pecan路由：
+
+Pecan是一个**路由对象分发**的python web框架。本质上可以将url通过分割为每一部分，然后对每一部分查找对应处理该URL部分的处理类，处理后，继续交给后面部分的URL处理，直到所有URL部分都被处理后，调用最后分割的URL对应的处理函数处理。
+
+##### 2.3.1 pecan源码处理流程
+
+代码位于Pecan的core.py中。
+
+1. 当一个请求从wsgiserver转发过来，首先处理的是Pecan中的__call__方法。
+
+>  主要调用了find_controller和invoke_controller方法。find_controller根据对象分发机制找到url的处理方法，如果没找到，则抛出异常，由后面的except代码块处理，找到了就调用invoke_controller执行该处理方法，将处理结果保存到state中。
+
+2. find_controller方法中主要调用了route方法
+
+route方法中调用了lookup_controller方法对截取后的路径进行继续处理
+lookup_controller针对每一个controller对象，在其中查找对应的处理方法，如果没找到，则根据notfound_handlers队列里的方法顺序，采取后进先出的方式pop出来方法，加载比如 `default`、`_look_up`方法，直到找到对应的方法，或 为空抛出异常。
+
+3.  找到方法后调用invoke_controller 执行该方法。
+
+
+
+##### 2.3.2 分析根据metric_id获取measures的pecan流程
+
+请求路径：/v1/metric/{metric_id}/measures?granularity={granularity}&aggregation={aggregation}&start={start_time}&end={end_time}
+
+- 根据v1， gnocchi.rest.api.V1Controller；
+- 根据metric，找到subController---: MetricsController；
+- 根据MetricsController的__look_up方法，调用了MetricController方法
+- 根据measures及pecan的custom_actions用法，找到get_measures方法
+
+```
+# pecan/rest.py
+# custom_actions用法
+
+    def _handle_custom_action(self, method, remainder, request=None):
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_custom_action)
+
+        remainder = [r for r in remainder if r]
+        if remainder:
+            if method in ('put', 'delete'):
+                # For PUT and DELETE, additional arguments are supplied, e.g.,
+                # DELETE /foo/XYZ
+                method_name = remainder[0]
+                remainder = remainder[1:]
+            else:
+                method_name = remainder[-1]
+                remainder = remainder[:-1]
+            if method.upper() in self._custom_actions.get(method_name, []):
+                controller = self._find_controller(
+                    '%s_%s' % (method, method_name),
+                    method_name
+                )
+                if controller:
+                    return controller, remainder
+
+```
+
+
+
+参考链接：https://www.cnblogs.com/luohaixian/p/11145939.html
+
+
+
+
+
+### 3. gnocchi-api查询数据分析
+
+根据2.3.2例子，代码最终定位到MetricController的get_measures方法
+
+```
+# gnochi/rest/api.py
+
+    @pecan.expose('json')
+    def get_measures(self, start=None, stop=None, aggregation='mean',
+                     granularity=None, resample=None, refresh=False,
+                     **param):
+        self.enforce_metric("get measures")
+
+        if resample:
+            if not granularity:
+                abort(400, 'A granularity must be specified to resample')
+            try:
+                resample = (resample if calendar.GROUPINGS.get(resample) else
+                            utils.to_timespan(resample))
+            except ValueError as e:
+                abort(400, six.text_type(e))
+
+        if granularity is None:
+            granularity = [d.granularity
+                           for d in self.metric.archive_policy.definition]
+            start, stop, _, _, _ = validate_qs(
+                start=start, stop=stop)
+        else:
+            start, stop, granularity, _, _ = validate_qs(
+                start=start, stop=stop, granularity=granularity)
+
+        if aggregation not in self.metric.archive_policy.aggregation_methods:
+            abort(404, {
+                "cause": "Aggregation method does not exist for this metric",
+                "detail": {
+                    "metric": self.metric.id,
+                    "aggregation_method": aggregation,
+                },
+            })
+
+        aggregations = []
+        for g in sorted(granularity, reverse=True):
+            agg = self.metric.archive_policy.get_aggregation(
+                aggregation, g)
+            if agg is None:
+                abort(404, six.text_type(
+                    storage.AggregationDoesNotExist(
+                        self.metric, aggregation, g)
+                ))
+            aggregations.append(agg)
+
+        if (strtobool("refresh", refresh) and
+                pecan.request.incoming.has_unprocessed(self.metric.id)):
+            try:
+                pecan.request.chef.refresh_metrics(
+                    [self.metric],
+                    pecan.request.conf.api.operation_timeout)
+            except chef.SackAlreadyLocked:
+                abort(503, 'Unable to refresh metric: %s. Metric is locked. '
+                      'Please try again.' % self.metric.id)
+        try:
+            return pecan.request.storage.get_measures(
+                self.metric, aggregations, start, stop, resample)[aggregation]
+        except storage.AggregationDoesNotExist as e:
+            abort(404, six.text_type(e))
+        except storage.MetricDoesNotExist:
+            return []
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+# pecan/rest.py
+处理custom action ，比如 get_measures， method=get， method_name = measures
+
+
+
+
+	def _handle_custom_action(self, method, remainder, request=None):
+        if request is None:
+            self._raise_method_deprecation_warning(self._handle_custom_action)
+
+        remainder = [r for r in remainder if r]
+        if remainder:
+            if method in ('put', 'delete'):
+                # For PUT and DELETE, additional arguments are supplied, e.g.,
+                # DELETE /foo/XYZ
+                method_name = remainder[0]
+                remainder = remainder[1:]
+            else:
+                method_name = remainder[-1]
+                remainder = remainder[:-1]
+            if method.upper() in self._custom_actions.get(method_name, []):
+                controller = self._find_controller(
+                    '%s_%s' % (method, method_name),
+                    method_name
+                )
+                if controller:
+                    return controller, remainder
+```
+
+
+
+
