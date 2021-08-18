@@ -428,7 +428,7 @@ lookup_controller针对每一个controller对象，在其中查找对应的处�
 
 
 
-### 3. gnocchi-api查询数据分析
+#### 2.4 gnocchi-api查询数据分析（未完成）
 
 根据2.3.2例子，代码最终定位到MetricController的get_measures方法
 
@@ -502,6 +502,7 @@ lookup_controller针对每一个controller对象，在其中查找对应的处�
 
 
 
+### 3. gnocchi-metricd源码分析（未开始）
 
 
 
@@ -524,45 +525,6 @@ lookup_controller针对每一个controller对象，在其中查找对应的处�
 
 
 
-
-
-
-
-
-
-
-
-
-
-```
-# pecan/rest.py
-处理custom action ，比如 get_measures， method=get， method_name = measures
-
-
-
-
-	def _handle_custom_action(self, method, remainder, request=None):
-        if request is None:
-            self._raise_method_deprecation_warning(self._handle_custom_action)
-
-        remainder = [r for r in remainder if r]
-        if remainder:
-            if method in ('put', 'delete'):
-                # For PUT and DELETE, additional arguments are supplied, e.g.,
-                # DELETE /foo/XYZ
-                method_name = remainder[0]
-                remainder = remainder[1:]
-            else:
-                method_name = remainder[-1]
-                remainder = remainder[:-1]
-            if method.upper() in self._custom_actions.get(method_name, []):
-                controller = self._find_controller(
-                    '%s_%s' % (method, method_name),
-                    method_name
-                )
-                if controller:
-                    return controller, remainder
-```
 
 
 

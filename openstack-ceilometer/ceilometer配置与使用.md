@@ -1,0 +1,1871 @@
+# ceilometer-stein版配置与使用
+
+参考链接：https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0013.html
+
+#### 1. 环境配置
+
+在控制节点执行以下操作。
+
+1. 使用admin用户登录OpenStack 命令行。
+
+   **source /root/admin-openrc**
+
+   
+
+2. 创建服务凭据。
+
+   
+
+   1. 创建ceilometer用户,并为该用户设置密码。
+
+      **openstack user create --domain default --password-prompt ceilometer**
+
+   2. 将admin角色添加到ceilometer用户。
+
+      **openstack role add --project service --user ceilometer admin**
+
+   
+
+3. 在Keystone注册Gnocchi服务。
+
+   
+
+   1. 创建gnocchi用户，并设置密码。
+
+      **openstack user create --domain default --password-prompt gnocchi**
+
+   2. 创建gnocchi服务实体。
+
+      **openstack service create --name gnocchi --description "Metric Service" metric**
+
+   3. 将admin角色添加到gnocchi用户。
+
+      **openstack role add --project service --user gnocchi admin**
+
+   
+
+4. 创建度量服务API端点。
+
+   
+
+   **openstack endpoint create --region RegionOne metric public http://controller:8041**
+
+   **openstack endpoint create --region RegionOne metric internal http://controller:8041**
+
+   **openstack endpoint create --region RegionOne metric admin http://controller:8041**
+
+   ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0207719471.png)
+
+   
+
+#### 2. 安装配置Gnocchi
+
+在控制节点执行以下操作。
+
+1. 安装Gnocchi包。
+
+   
+
+   **yum -y install openstack-gnocchi-api openstack-gnocchi-metricd python-gnocchiclient**
+
+   
+
+2. 为Gnocchi服务创建数据库。
+
+   
+
+   ![img](https://res-img3.huaweicloud.com/content/dam/cloudbu-site/archive/china/zh-cn/support/resource/framework/v3/images/support-doc-new-note.svg)说明：
+
+   本文中将涉及的密码均设置为“<PASSWORD>”，请用户根据环境实际情况进行修改。
+
+   ```
+   mysql -u root -p
+   CREATE DATABASE gnocchi;
+   GRANT ALL PRIVILEGES ON gnocchi.* TO 'gnocchi'@'localhost' IDENTIFIED BY 'comleader@123';
+   GRANT ALL PRIVILEGES ON gnocchi.* TO 'gnocchi'@'%' IDENTIFIED BY 'comleader@123';
+   exit
+   ```
+
+   
+
+   ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0221749706.png)
+
+   
+
+3. 执行命令**vim /etc/gnocchi/gnocchi.conf**编辑配置文件**/etc/gnocchi/gnocchi.conf**，并且修改以下配置：
+
+    sed -i.default -e '/^#/d' -e '/^$/d'  /etc/gnocchi/gnocchi.conf
+
+   1. 配置Gnocchi功能参数，log地址以及对接redis url端口。
+
+      ```
+      [DEFAULT]
+      debug = true
+      verbose = true
+      log_dir = /var/log/gnocchi
+      parallel_operations = 4
+      coordination_url = redis://controller:6379
+      ```
+
+      
+
+   1. 配置Gnocchi工作端口信息,host为控制节点管理IP
+
+      ```
+      [api]
+      auth_mode = keystone
+      host = 192.168.21.1
+      port = 8041
+      uwsgi_mode = http-socket
+      max_limit = 1000
+      ```
+
+      
+
+   1. 配置元数据默认存储方式。
+
+      ```
+      [archive_policy]
+      default_aggregation_methods = mean,min,max,sum,std,count,rate:mean
+      ```
+
+      *注意增加的**rate:mean***
+
+   4. 配置允许的访问来源。
+
+      ```
+      [cors]
+      allowed_origin = http://controller:3000
+      ```
+
+      
+
+   5. 配置数据库检索。
+
+      ```
+      [indexer]
+      url = mysql+pymysql://gnocchi:<PASSWORD>@controller/gnocchi
+      ```
+
+      
+
+   6. 配置ceilometer测试指标。
+
+      ```
+      [metricd]
+      workers = 4
+      metric_processing_delay = 60
+      greedy = true
+      metric_reporting_delay = 120
+      metric_cleanup_delay = 300
+      ```
+
+      
+
+   7. 配置Gnocchi存储方式以及位置，在这种配置下将其存储到本地文件系统。
+
+      ```
+      [storage]
+      coordination_url = redis://controller:6379
+      file_basepath = /var/lib/gnocchi
+      driver = file
+      ```
+
+      
+
+   8. 配置Keystone认证信息，该模块需要另外添加。
+
+      ```
+      [keystone_authtoken]
+      region_name = RegionOne
+      www_authenticate_uri = http://controller:5000
+      auth_url = http://controller:5000/v3
+      memcached_servers = controller:11211
+      auth_type = password
+      project_domain_name = default
+      user_domain_name = default
+      project_name = service
+      username = gnocchi
+      password = <PASSWORD>
+      service_token_roles_required = true
+      ```
+
+      
+
+   
+
+#### 3. 安装配置redis
+
+在控制节点执行以下操作。
+
+1. 安装redis server。
+
+   
+
+   **# yum -y install redis**
+
+   ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0207719479.png)
+
+   
+
+2. 编辑配置文件“/etc/redis.conf”，修改以下配置：
+
+   
+
+   **vim /etc/redis.conf**
+
+   1. 配置redis可以在后台启动。
+
+      ```
+      daemonize yes
+      ```
+
+      
+
+   2. 配置redis关闭安全模式。
+
+      ```
+      protected-mode no
+      ```
+
+      
+
+   3. 配置redis绑定控制节点主机。
+
+      ```
+      bind 192.168.204.194
+      ```
+
+      
+
+   
+
+3. 以配置好的redis.conf启动redis server service。
+
+   
+
+   **# redis-server /etc/redis.conf**
+
+   ![img](https://res-img3.huaweicloud.com/content/dam/cloudbu-site/archive/china/zh-cn/support/resource/framework/v3/images/support-doc-new-note.svg)说明：
+
+   redis服务不会开机自启动，可以将上述命令放入开机启动项里，否则每次关机需要手动启动，方法如下：
+
+   1. 编辑配置文件“/etc/rc.d/rc.local”。
+
+      **vim /etc/rc.d/rc.local**
+
+      并新增以下内容：
+
+      ```
+      redis-server /etc/redis.conf
+      ```
+
+      
+
+   2. 保存退出后，赋予“/etc/rc.d/rc.local”文件执行权限。
+
+      **# chmod +x /etc/rc.d/rc.local**
+
+   
+
+#### 4. 安装uWSGI插件
+
+在控制节点执行以下操作。
+
+安装uWSGI插件。
+
+ yum -y install uwsgi-plugin-common uwsgi-plugin-python uwsgi**
+
+#### 5. 完成Gnocchi的安装
+
+在控制节点执行以下操作。
+
+##### 5.1. 初始化Gnocchi。
+
+```gnocchi-upgrade```
+
+##### 5.2. 赋予“/var/lib/gnocchi”文件可读写权限。
+
+```chmod -R 777 /var/lib/gnocchi```
+
+###### 5.3.  启动gnocchi
+```
+systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+```
+###### 5.4. 为gnocchi创建聚合策略
+   ```
+   gnocchi archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m mean -m max -m min -m count -m sum -m std -m rate:mean horizon-mimic
+   ```
+   创建规则，如果已存在，先更新规则， 创建新规则，删除旧规则
+
+   ```gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+   gnocchi archive-policy-rule update default -n default-origin
+   gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+   gnocchi archive-policy-rule delete default-origin
+   ```
+
+   策略规则与策略需要配合使用，
+
+###### 5.5. 完成Gnocchi的安装
+
+###### 5.6.  查看Gnocchi服务状态。
+```
+systemctl status openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+```
+      ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0207719480.png)
+    
+      ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0207719481.png)
+
+###### 5.7.  **修改源码，或者强制安装最新的修复该版本的源码，然后重新启动。**
+
+```
+rpm -ivh dm-gnocchi.rpm --force
+
+systemctl restart openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+```
+
+#### 6. 安装和配置Ceilometer（控制节点）
+
+在控制节点执行以下操作。
+##### 6.1. 安装Ceilometer包。
+   **# yum -y install openstack-ceilometer-notification openstack-ceilometer-central openstack-ceilometer-compute**
+
+   
+
+##### 6.2.  编辑配置文件“/etc/ceilometer/pipeline.yaml--polling.yaml---gnocchi_resource.yaml”并完成以下部分：具体见配置详情项
+
+控制节点：pipeline.yaml
+
+<font color=red>1.0.6新增</font>
+
+```
+---
+sources:
+    - name: hardware_meter
+      meters:
+        - hardware.cpu.util
+        - hardware.cpu.user
+        - hardware.cpu.nice
+        - hardware.cpu.system
+        - hardware.cpu.idle
+        - hardware.cpu.wait
+        - hardware.cpu.kernel
+        - hardware.cpu.interrupt
+        - hardware.disk.size.total
+        - hardware.disk.size.used
+        - hardware.disk.read.bytes
+        - hardware.disk.write.bytes
+        - hardware.disk.read.requests
+        - hardware.disk.write.requests
+        - hardware.memory.used
+        - hardware.memory.total
+        - hardware.memory.buffer
+        - hardware.memory.cached
+        - hardware.memory.swap.avail
+        - hardware.memory.swap.total
+        - hardware.network.incoming.bytes
+        - hardware.network.incoming.drop
+        - hardware.network.incoming.errors
+        - hardware.network.incoming.packets
+        - hardware.network.outgoing.bytes
+        - hardware.network.outgoing.drop
+        - hardware.network.outgoing.errors
+        - hardware.network.outgoing.packets
+        - hardware.network.ip.incoming.datagrams
+        - hardware.network.ip.outgoing.datagrams
+      resources:
+          - snmp://30.90.2.27
+          - snmp://30.90.2.18
+          - snmp://30.90.2.20
+          - snmp://30.90.2.19
+      sinks:
+          - meter_snmp_sink
+
+    - name: some_pollsters
+      meters:
+        - cpu
+        - vcpus
+        - cpu_util
+        - memory
+        - memory.usage
+        - memory.resident
+        - memory.swap.in
+        - memory.swap.out
+        - network.incoming.bytes
+        - network.incoming.packets
+        - network.outgoing.bytes
+        - network.outgoing.packets
+        - network.incoming.packets.drop
+        - network.incoming.packets.error
+        - network.outgoing.packets.drop
+        - network.outgoing.packets.error
+        - disk.device.read.bytes
+        - disk.device.read.requests
+        - disk.device.write.bytes
+        - disk.device.write.requests
+        - disk.device.usage
+        - disk.device.capacity
+        - disk.device.allocation
+        - disk.root.size
+      sinks:
+        - instance_sink
+    
+    - name: user_defined 
+      meters:
+        - custom.hardware.cpu.user.percentage
+        - custom.hardware.cpu.nice.percentage
+        - custom.hardware.cpu.wait.percentage
+        - custom.hardware.cpu.system.percentage
+        - custom.hardware.cpu.idle.percentage
+        - custom.hardware.cpu.steal.percentage
+        - custom.hardware.cpu.softinterrupt.percentage
+        - custom.hardware.cpu.interrupt.percentage
+        - custom.hardware.disk.utilization
+        - custom.hardware.memory.utilization
+        - custom.hardware.swap.utilization
+        - custom.hardware.network.interface.status
+        # 1.0.6 新增
+        - custom.hardware.cpu.util.percentage
+        - custom.hardware.disk.read.bytes
+        - custom.hardware.disk.write.bytes
+        - custom.hardware.disk.read.requests
+        - custom.hardware.disk.write.requests
+      resources:
+        - snmp://30.90.2.27
+      sinks:
+          - user_defined_sink
+
+sinks:
+    - name: meter_snmp_sink
+      transformers:
+      publishers:
+        - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+    - name: instance_sink
+      transformers:
+      publishers:
+        - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+    - name: meter_sink
+      transformers:
+      publishers:
+        - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+    - name: user_defined_sink
+      transformers:
+      publishers:
+          - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+
+```
+
+
+
+控制节点：polling.yaml
+
+​      <font color=red>修改策略，只采集本机的metric</font>
+
+```
+---
+sources:
+    - name: some_pollsters
+      interval: 60
+      meters:
+        - cpu
+        - vcpus
+        - cpu_util
+        - memory
+        - memory.usage
+        - memory.resident
+        - memory.swap.in
+        - memory.swap.out
+        - network.incoming.bytes
+        - network.incoming.packets
+        - network.outgoing.bytes
+        - network.outgoing.packets
+        - network.incoming.packets.drop
+        - network.incoming.packets.error
+        - network.outgoing.packets.drop
+        - network.outgoing.packets.error
+        - disk.device.read.bytes
+        - disk.device.read.requests
+        - disk.device.write.bytes
+        - disk.device.write.requests
+        - disk.device.usage
+        - disk.device.capacity
+        - disk.device.allocation
+    - name: hardware_snmp
+      interval: 60
+      resources:
+      # 1.0.6改动策略
+          - snmp://30.90.2.27
+      meters:
+        - hardware.cpu.util
+        - hardware.cpu.user
+        - hardware.cpu.nice
+        - hardware.cpu.system
+        - hardware.cpu.idle
+        - hardware.cpu.wait
+        - hardware.cpu.kernel
+        - hardware.cpu.interrupt
+        - hardware.disk.size.total
+        - hardware.disk.size.used
+        - hardware.disk.read.bytes
+        - hardware.disk.write.bytes
+        - hardware.disk.read.requests
+        - hardware.disk.write.requests
+        - hardware.memory.used
+        - hardware.memory.total
+        - hardware.memory.buffer
+        - hardware.memory.cached
+        - hardware.memory.swap.avail
+        - hardware.memory.swap.total
+        - hardware.network.incoming.bytes
+        - hardware.network.incoming.errors
+        - hardware.network.incoming.drop
+        - hardware.network.incoming.packets
+        - hardware.network.outgoing.bytes
+        - hardware.network.outgoing.errors
+        - hardware.network.outgoing.drop
+        - hardware.network.outgoing.packets
+        - hardware.network.ip.incoming.datagrams
+        - hardware.network.ip.outgoing.datagrams
+
+    - name: user_defined  # 每个节点配置resources时配置各自的ip，其他一样
+      meters:
+        - custom.hardware.cpu.user.percentage
+        - custom.hardware.cpu.nice.percentage
+        - custom.hardware.cpu.wait.percentage
+        - custom.hardware.cpu.system.percentage
+        - custom.hardware.cpu.idle.percentage
+        - custom.hardware.cpu.steal.percentage
+        - custom.hardware.cpu.softinterrupt.percentage
+        - custom.hardware.cpu.interrupt.percentage
+        - custom.hardware.disk.utilization
+        - custom.hardware.memory.utilization
+        - custom.hardware.swap.utilization
+        # 1.0.6新增
+        - custom.hardware.cpu.util.percentage
+        - custom.hardware.network.interface.status
+        - custom.hardware.disk.read.bytes
+        - custom.hardware.disk.write.bytes
+        - custom.hardware.disk.read.requests
+        - custom.hardware.disk.write.requests
+      resources:
+        - snmp://30.90.2.27
+      interval: 60
+
+
+```
+
+
+
+控制节点：gnocchi_resource.yaml
+
+<font color=red>1.0.6新增 disk读写</font>
+
+```
+---
+archive_policy_default: horizon-mimic
+archive_policies:
+  # NOTE(sileht): We keep "mean" for now to not break all gating that
+  # use the current tempest scenario.
+  - name: ceilometer-low
+    aggregation_methods:
+      - mean
+    back_window: 0
+    definition:
+      - granularity: 5 minutes
+        timespan: 30 days
+  - name: ceilometer-low-rate
+    aggregation_methods:
+      - mean
+      - rate:mean
+    back_window: 0
+    definition:
+      - granularity: 5 minutes
+        timespan: 30 days
+  - name: ceilometer-high
+    aggregation_methods:
+      - mean
+    back_window: 0
+    definition:
+      - granularity: 1 second
+        timespan: 1 hour
+      - granularity: 1 minute
+        timespan: 1 day
+      - granularity: 1 hour
+        timespan: 365 days
+  - name: ceilometer-high-rate
+    aggregation_methods:
+      - mean
+      - rate:mean
+    back_window: 0
+    definition:
+      - granularity: 1 second
+        timespan: 1 hour
+      - granularity: 1 minute
+        timespan: 1 day
+      - granularity: 1 hour
+        timespan: 365 days
+
+resources:
+  - resource_type: identity
+    metrics:
+      identity.authenticate.success:
+      identity.authenticate.pending:
+      identity.authenticate.failure:
+      identity.user.created:
+      identity.user.deleted:
+      identity.user.updated:
+      identity.group.created:
+      identity.group.deleted:
+      identity.group.updated:
+      identity.role.created:
+      identity.role.deleted:
+      identity.role.updated:
+      identity.project.created:
+      identity.project.deleted:
+      identity.project.updated:
+      identity.trust.created:
+      identity.trust.deleted:
+      identity.role_assignment.created:
+      identity.role_assignment.deleted:
+
+  - resource_type: instance
+    metrics:
+      memory:
+      memory.usage:
+      memory.resident:
+      memory.swap.in:
+      memory.swap.out:
+      memory.bandwidth.total:
+      memory.bandwidth.local:
+      network.incoming.bytes:
+      network.incoming.packets:
+      network.outgoing.bytes:
+      network.outgoing.packets:
+      network.incoming.packets.drop:
+      network.incoming.packets.error:
+      network.outgoing.packets.drop:
+      network.outgoing.packets.error:
+      vcpus:
+      cpu_util:
+      cpu:
+      cpu_l3_cache:
+      disk.root.size:
+      disk.ephemeral.size:
+      disk.latency:
+      disk.iops:
+      disk.capacity:
+      disk.allocation:
+      disk.usage:
+      disk.device.read.requests:
+      disk.device.write.requests:
+      disk.device.read.bytes:
+      disk.device.write.bytes:
+      disk.device.capacity:
+      disk.device.allocation:
+      disk.device.usage:
+      disk.root.size:
+      disk.usage:
+      compute.instance.booting.time:
+      perf.cpu.cycles:
+      perf.instructions:
+      perf.cache.references:
+      perf.cache.misses:
+    attributes:
+      host: resource_metadata.(instance_host|host)
+      image_ref: resource_metadata.image_ref
+      launched_at: resource_metadata.launched_at
+      created_at: resource_metadata.created_at
+      deleted_at: resource_metadata.deleted_at
+      display_name: resource_metadata.display_name
+      flavor_id: resource_metadata.(instance_flavor_id|(flavor.id)|flavor_id)
+      flavor_name: resource_metadata.(instance_type|(flavor.name)|flavor_name)
+      server_group: resource_metadata.user_metadata.server_group
+    event_delete: compute.instance.delete.start
+    event_attributes:
+      id: instance_id
+    event_associated_resources:
+      instance_network_interface: '{"=": {"instance_id": "%s"}}'
+      instance_disk: '{"=": {"instance_id": "%s"}}'
+
+  - resource_type: instance_network_interface
+    metrics:
+      network.outgoing.packets:
+      network.incoming.packets:
+      network.outgoing.packets.drop:
+      network.incoming.packets.drop:
+      network.outgoing.packets.error:
+      network.incoming.packets.error:
+      network.outgoing.bytes:
+      network.incoming.bytes:
+    attributes:
+      name: resource_metadata.vnic_name
+      instance_id: resource_metadata.instance_id
+
+  - resource_type: instance_disk
+    metrics:
+      disk.device.read.requests:
+      disk.device.write.requests:
+      disk.device.read.bytes:
+      disk.device.write.bytes:
+      disk.device.latency:
+      disk.device.read.latency:
+      disk.device.write.latency:
+      disk.device.iops:
+      disk.device.capacity:
+      disk.device.allocation:
+      disk.device.usage:
+    attributes:
+      name: resource_metadata.disk_name
+      instance_id: resource_metadata.instance_id
+
+
+  - resource_type: compute_host
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.utilization:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+    attributes:
+      host_name: resource_metadata.resource_url
+
+  - resource_type: host_disk
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+      # 1.0.6新增
+      custom.hardware.disk.read.bytes:
+      custom.hardware.disk.write.bytes:
+      custom.hardware.disk.read.requests:
+      custom.hardware.disk.write.requests:
+      
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.cpu.util.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+    attributes:
+      host_name: resource_metadata.resource_url
+      device_name: resource_metadata.device
+
+  - resource_type: host_network_interface
+    metrics:
+      hardware.network.ip.incoming.datagrams:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.incoming.bytes:
+      hardware.network.incoming.drop:
+      hardware.network.incoming.errors:
+      hardware.network.incoming.packets:
+      hardware.network.outgoing.bytes:
+      hardware.network.outgoing.drop:
+      hardware.network.outgoing.errors:
+      hardware.network.outgoing.packets:
+    attributes:
+      host_name: resource_metadata.resource_url
+      device_name: resource_metadata.name
+
+  - resource_type: host
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+      # 1.0.6新增
+      custom.hardware.disk.read.bytes:
+      custom.hardware.disk.write.bytes:
+      custom.hardware.disk.read.requests:
+      custom.hardware.disk.write.requests:
+      
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.util.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+    attributes:
+      host_name: resource_metadata.resource_url
+
+```
+
+
+
+计算节点：polling.yaml
+
+<font color=red>计算节点polling.yaml调整</font>
+
+```
+---
+sources:
+    - name: some_pollsters
+      interval: 60
+      meters:
+        - cpu
+        - vcpus
+        - memory
+        - memory.usage
+        - memory.resident
+        - memory.swap.in
+        - memory.swap.out
+      #  - memory.bandwidth.total
+      #  - memory.bandwidth.local
+        - network.incoming.bytes
+        - network.incoming.packets
+        - network.outgoing.bytes
+        - network.outgoing.packets
+        - network.incoming.packets.drop
+        - network.incoming.packets.error
+        - network.outgoing.packets.drop
+        - network.outgoing.packets.error
+        - disk.device.read.bytes
+        - disk.device.read.requests
+        - disk.device.write.bytes
+        - disk.device.write.requests
+        - disk.device.read.bytes.rate
+        - disk.device.read.requests.rate
+        - disk.device.write.bytes.rate
+        - disk.device.write.requests.rate
+        - disk.device.capacity
+        - disk.device.allocation
+        - disk.device.usage
+        - disk.root.size
+        - disk.usage
+    - name: hardware_snmp
+      interval: 60
+      resources:
+          - snmp://30.90.2.18
+      meters:
+        - hardware.cpu.util
+        - hardware.cpu.user
+        - hardware.cpu.nice
+        - hardware.cpu.system
+        - hardware.cpu.idle
+        - hardware.cpu.wait
+        - hardware.cpu.kernel
+        - hardware.cpu.interrupt
+        - hardware.disk.size.total
+        - hardware.disk.size.used
+        - hardware.disk.read.bytes
+        - hardware.disk.write.bytes
+        - hardware.disk.read.requests
+        - hardware.disk.write.requests
+        - hardware.memory.used
+        - hardware.memory.total
+        - hardware.memory.buffer
+        - hardware.memory.cached
+        - hardware.memory.swap.avail
+        - hardware.memory.swap.total
+        - hardware.network.incoming.bytes
+        - hardware.network.incoming.errors
+        - hardware.network.incoming.drop
+        - hardware.network.incoming.packets
+        - hardware.network.outgoing.bytes
+        - hardware.network.outgoing.errors
+        - hardware.network.outgoing.drop
+        - hardware.network.outgoing.packets
+        - hardware.network.ip.incoming.datagrams
+        - hardware.network.ip.outgoing.datagrams
+    - name: user_defined # 配置节点对应ip
+      meters:
+        - custom.hardware.cpu.user.percentage
+        - custom.hardware.cpu.nice.percentage
+        - custom.hardware.cpu.wait.percentage
+        - custom.hardware.cpu.system.percentage
+        - custom.hardware.cpu.idle.percentage
+        - custom.hardware.cpu.steal.percentage
+        - custom.hardware.cpu.softinterrupt.percentage
+        - custom.hardware.cpu.interrupt.percentage
+        - custom.hardware.disk.utilization
+        - custom.hardware.memory.utilization
+        - custom.hardware.swap.utilization
+        - custom.hardware.network.interface.status
+        - custom.hardware.disk.read.bytes
+        - custom.hardware.disk.write.bytes
+        - custom.hardware.disk.read.requests
+        - custom.hardware.disk.write.requests
+      resources:
+        - snmp://30.90.2.18
+      interval: 60
+
+```
+
+
+
+
+##### 6.3. 编辑配置文件“/etc/ceilometer/ceilometer.conf”并完成以下操作：
+
+    sed -i.default -e '/^#/d' -e '/^$/d'  /etc/ceilometer/ceilometer.conf
+
+   1. 配置身份认证方式以及消息列队访问。
+
+      ```
+      [DEFAULT]
+      debug = true
+      auth_strategy = keystone
+      transport_url = rabbit://openstack:<PASSWORD>@controller
+      pipeline_cfg_file = pipeline.yaml
+      
+      
+      [compute]
+      # 在计算节点配置此项收集实例信息，修改配置后需要重新启动服务
+      #instance_discovery_method = libvirt_metadata
+      instance_discovery_method = naive
+      ```
+
+      
+
+   1. 配置日志消息窗口。
+
+      ```
+      [notification]
+      store_events = true
+      messaging_urls = rabbit://openstack:<PASSWORD>@controller
+      ```
+
+      
+
+   1. 定义轮询配置文件。
+
+      ```
+      [polling]
+      cfg_file = polling.yaml
+      ```
+
+      
+
+   1. 配置服务凭据。
+
+      ```
+      [service_credentials]
+      auth_type = password
+      auth_url = http://controller:5000/v3
+      project_domain_id = default
+      user_domain_id = default
+      project_name = service
+      username = ceilometer
+      password = <PASSWORD>
+      interface = internalURL
+      region_name = RegionOne
+      ```
+
+      
+
+   
+
+##### 6.4. 在Gnocchi创建Ceilometer资源。
+
+   先启动ceilometer，执行下面命令
+
+   **# ceilometer-upgrade**
+
+   **![img](https://res-img2.huaweicloud.com/content/dam/cloudbu-site/archive/china/zh-cn/support/resource/framework/v3/images/support-doc-new-notice.svg)须知：**
+
+   Gnocchi必须在这个阶段状态为运行。
+
+##### 6.5. 更改ceilometer执行权限（每个安装ceilometer的节点都需要配置）
+vim /etc/sudoers
+增加一行：
+```
+ceilometer ALL = (root) NOPASSWD: ALL
+```
+
+##### 6.6.  完成Ceilometer安装，
+
+   
+
+   **systemctl enable openstack-ceilometer-notification.service  openstack-ceilometer-central.service**
+
+****
+
+   **systemctl start openstack-ceilometer-notification.service openstack-ceilometer-central.service**
+
+****
+
+##### 6.7.  **修改源码，或者强制安装最新的修复该版本的源码，重新启动**。
+
+rpm -ivh dm-mcs-dashboard-ceilometer-1.0.2-1.noarch.rpm --force
+
+systemctl restart openstack-ceilometer-notification.service openstack-ceilometer-central.service
+
+
+
+##### 6.8.  ***源码中增加了过滤物理机硬件信息的配置文件，/etc/ceilometer/monitor_hardware.yaml，如果要过滤硬件信息，此项在每个节点都需要配置***
+
+```
+host:
+  disk_name:
+    - /dev/sda
+  network_interface_name:
+    - ens192
+    - ens224
+    - ens256
+instance:
+  disk_name: []
+  network_interface_name: []
+```
+
+***如果不配置，则默认收集全部信息，如果配置，按照配置项进行收集***
+
+需要PyYAML==5.3.1以上的支持，验证方式
+
+```
+python2.7
+>>>import yaml
+>>> yaml.__version__
+查看版本
+```
+
+如果版本不支持，可以按照如下方式安装
+
+```
+pip install --ignore-installed PyYAML==5.3.1
+```
+
+
+
+##### 6.9.  查看Ceilometer服务状态。
+
+   
+
+   **systemctl status openstack-ceilometer-notification.service openstack-ceilometer-central.service**
+
+   ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0207719482.png)
+
+   
+
+#### 7. 安装和配置Ceilometer（计算节点）
+
+在计算节点执行以下操作**，计算节点需要启动compute服务和central服务**，polling.yaml配置详情见文档。**安装完成后更新自己的ceilometer包，注意修改sudoers的配置，和控制节点相同**
+
+##### 7.1.  安装软件，其中openstack-ceilometer-ipmi为可选安装项，不用安装。
+   **yum -y install openstack-ceilometer-compute  openstack-ceilometer-central** 
+##### 7.2.  编辑配置文件“/etc/ceilometer/ceilometer.conf”并完成以下操作。
+
+    sed -i.default -e '/^#/d' -e '/^$/d'  /etc/ceilometer/ceilometer.conf
+
+   1. 配置消息列队访问。
+
+      ```
+      [DEFAULT]
+      transport_url = rabbit://openstack:<PASSWORD>@controller
+      
+      
+      [compute]
+      # 配置此项收集实例信息，修改配置后需要重新启动服务
+      #instance_discovery_method = libvirt_metadata
+      instance_discovery_method = naive
+      
+      ```
+
+      *注意配置项的更改 **naive***
+
+   1. 配置度量服务凭据。
+
+      ```
+      [service_credentials]
+      auth_type = password
+      auth_url = http://controller:5000/v3
+      project_domain_id = default
+      user_domain_id = default
+      project_name = service
+      username = ceilometer
+      password = <PASSWORD>
+      interface = internalURL
+      region_name = RegionOne
+      ```
+
+      
+
+   
+
+##### 7.3.   配置nova
+
+在计算节点执行以下操作。
+
+1. 编辑“/etc/nova/nova.conf”文件并在以下[DEFAULT]部分配置消息通知：
+
+    sed -i.default -e '/^#/d' -e '/^$/d'  /etc/nova/nova.conf
+
+   1. 
+   
+   ```
+   [DEFAULT]
+   instance_usage_audit = True
+   instance_usage_audit_period = hour
+   
+   [notifications]
+   notify_on_state_change = vm_and_task_state
+   
+   [oslo_messaging_notifications]
+   driver = messagingv2
+   ```
+
+##### 7.4.  完成安装
+
+在计算节点执行以下操作。
+
+1. 启动代理并将其配置为在系统引导时启动。
+
+   
+
+   **# systemctl enable openstack-ceilometer-compute.service openstack-ceilometer-central.service**
+
+   **# systemctl start openstack-ceilometer-compute.service openstack-ceilometer-central.service**
+
+##### 7.5. 执行替换
+
+rpm -ivh dm-mcs-dashboard-ceilometer-1.0.2-1.noarch.rpm --force
+
+##### 7.6.  ***源码中增加了过滤物理机硬件信息的配置文件，/etc/ceilometer/monitor_hardware.yaml，如果要过滤硬件信息，此项在每个节点都需要配置***
+
+```
+host:
+  disk_name:
+    - /dev/sda
+  network_interface_name:
+    - ens192
+    - ens224
+    - ens256
+instance:
+  disk_name: []
+  network_interface_name: []
+```
+
+***如果不配置，则默认收集全部信息，如果配置，按照配置项进行收集***
+
+需要PyYAML==5.3.1以上的支持，验证方式
+
+```
+python2.7
+>>>import yaml
+>>> yaml.__version__
+查看版本
+```
+
+如果版本不支持，可以按照如下方式安装
+
+```
+pip install --ignore-installed PyYAML==5.3.1
+```
+
+
+
+systemctl restart openstack-ceilometer-compute.service openstack-ceilometer-central.service
+
+
+
+##### 7.5.   重新启动Compute服务。
+   **# systemctl restart openstack-nova-compute.service openstack-ceilometer-central.service**
+
+   
+
+
+
+
+
+
+#### 源码修改
+
+在控制节点执行以下操作。
+
+1. OpenStack源码脚本有一处报错，在使用Ceilometer之前需要进行修改。
+
+   
+
+   **vim /usr/lib/python2.7/site-packages/gnocchiclient/shell.py**
+
+   将130行内容修改为：
+
+   os.environ["OS_AUTH_TYPE"] = "password"
+
+   修改前：
+
+   ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0214513727.png)
+
+   修改后：
+
+   ![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0214513728.png)
+
+   
+
+2. **openstack**源码中通过snmp收集物理机信息时有报错，需要修改，**强制更新代码后忽略此条修改**。
+
+   **vim /usr/lib/python2.7/site-packages/ceilometer/hardware/inspector/snmp.py**
+
+```
+
+修改之前
+
+    def prepare_params(self, param):
+        processed = {}
+        processed['matching_type'] = param['matching_type']
+        processed['metric_oid'] = (param['oid'], eval(param['type']))
+        processed['post_op'] = param.get('post_op', None)
+        processed['metadata'] = {}
+        for k, v in six.iteritems(param.get('metadata', {})):
+            processed['metadata'][k] = (v['oid'], eval(v['type']))
+        return processed
+
+
+
+修改之后
+    def prepare_params(self, param):
+        processed = {}
+        processed['matching_type'] = param['matching_type']
+        processed['metric_oid'] = (param['oid'], eval(param['type']))
+        processed['post_op'] = param.get('post_op', None)
+        processed['metadata'] = {}
+        for k, v in six.iteritems(param.get('metadata', {})):
+            if 'type' not in v:
+                continue
+            processed['metadata'][k] = (v['oid'], eval(v['type']))
+        return processed
+```
+
+
+
+
+
+
+
+### 收集物理机信息
+
+#### 1. 物理服务器配置
+
+#### 1.1安装（控制节点和计算节点）
+
+```
+#yum install -y net-snmp net-snmp-utils
+```
+
+#### 1.2   配置
+
+sed -i.default -e '/^#/d' -e '/^$/d'  /etc/snmp/snmpd.conf
+
+复制snmpd.conf文件到/etc/snmp/目录下。（原有的重命名，保存）
+
+```
+# 下面是增加的配置
+agentAddress udp:161
+com2sec notConfigUser  default       public
+
+view    all    included   .1
+
+# snmp收集disk磁盘信息-增加，可以不加
+includeAllDisks for all partitions and disks
+```
+
+ **man snmpd.conf 可以查看具体配置项信息**
+
+#### 1. 3 启动snmpd服务
+
+systemctl start snmpd
+
+查看状态systemctl status snmpd
+
+可以用snmpwalk测试snmpd运行是否正常
+
+snmpwalk -v 2c -c public 192.168.204.194 oid
+
+
+
+**snmp重启失败，不收集物理机数据时**
+**重启libvirtd.service 然后重启snmpd服务**
+
+
+
+对应snmp项在ceilometer中的配置，见控制节点pipeline.yaml     polling.yaml配置
+
+#### 1.4 关闭selinux和防火墙
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+```
+#setenforce 0
+
+#vi /etc/sysconfig/selinux
+
+ 修改为：SELINUX=disabled
+
+#service snmpd start
+
+#chkconfig snmpd on
+```
+
+[![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
+
+
+
+**上面执行过的就不用执行，**如果没有，创建规则
+
+```gnocchi archive-policy-rule create -a low -m "*" default
+gnocchi archive-policy-rule create -a low -m "*" default
+```
+
+**上面执行过的就不用执行，**为gnocchi创建聚合策略
+
+```
+openstack metric archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m mean -m max -m min -m count -m sum -m std -m rate:mean horizon-mimic
+```
+
+**上面执行过的就不用执行，**创建规则，如果已存在，先更新规则， 创建新规则，删除旧规则
+
+```gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+gnocchi archive-policy-rule update default -n default-origin
+gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+gnocchi archive-policy-rule delete default-origin
+```
+
+策略规则与策略需要配合使用，策略配置好后，需要查看策略规则是否过滤掉需要收集的metric项
+
+
+
+**计算节点需要启动central服务**
+
+### 2.2重启ceilometer
+
+```
+#systemctl restart openstack-ceilometer-central.service
+```
+
+### 2.3 获取meter
+
+```
+#ceilometer meter-list | grep hardware
+
+#ceilometer sample-list -m hardware.memory.total
+```
+
+
+
+
+
+
+
+
+
+
+
+## 注意事项
+
+#### 1. 关于配置yaml文件
+
+controller节点
+polling.yaml--接受snmp提供的物理机监控数据，需要同步与gnocchi_resource对应metric项一致
+pipeline.yaml     将接受的sample转换成对象发送到gnocchi
+gnocchi_resource.yaml   聚合监控数据并保存到gnocchi
+
+compute 节点
+polling.yaml--指定实例要获取的metric项，与gnocchi_resource对应metric项一致
+
+
+
+#### 2. 关于获取cpu_util
+
+由于stein版本ceilometer取消了获取cpu_util项
+
+需要创建有rate:mean聚合方法的策略
+
+```
+1.创建 rate:mean的策略的聚合方法
+2.修改pipeline中vcpus  cpus策略
+3.修改gnocchi_resources.yaml文件中策略和对应cpu  vcpus策略
+4.修改archive-policy-rule中的策略与正则匹配cpu
+4.重启服务(systemctl restart openstack-cei*       systemctl restart gno*     systemctl restart openstack-nova*)
+5.创建新的实例
+6.查询创建
+gnocchi measures show --resource-id 847ab913-b149-4daa-b263-3d7d228a3bcf --aggregation rate:mean cpu --granularity 60
+7. 得到的value是cpu时间，需要转换，参考链接
+```
+
+参考链接：https://berndbausch.medium.com/how-i-learned-to-stop-worrying-and-love-gnocchi-aggregation-c98dfa2e20fe
+
+
+
+#### 3. 创建策略相关
+
+创建规则
+
+```gnocchi archive-policy-rule create -a low -m "*" default
+gnocchi archive-policy-rule create -a low -m "*" default
+```
+
+
+为gnocchi创建聚合策略
+
+```
+openstack metric archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m  -m mean -m max -m min -m count -m sum -m std horizon-mimic
+```
+
+
+创建规则，如果已存在，先创建新规则，删除旧规则，更新新规则
+
+```gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+gnocchi archive-policy-rule update default -n default-origin
+gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+gnocchi archive-policy-rule delete default-origin
+```
+
+策略规则与策略需要配合使用，策略配置好后，需要查看策略规则是否过滤掉需要收集的metric项
+
+
+
+
+
+#### 4. 收集不到云主机信息
+看nova配置是否修改
+看计算节点polling.yaml是否有收集项
+看控制节点gnocchi_resources.yaml中是对应instance, instance_disk, instance_network_interface中对应metric是否正确
+看实例是在计算节点还是控制节点，最好都在计算节点部署
+修改完对应配置后，重启相关服务，重建虚拟机进行验证
+
+
+
+
+
+
+
+
+
+```
+---
+archive_policy_default: horizon-mimic
+archive_policies:
+
+
+resources:
+
+  - resource_type: instance
+    metrics:
+      memory:
+      memory.usage:
+      memory.util:
+      memory.resident:
+      memory.swap.in:
+      memory.swap.out:
+      memory.bandwidth.total:
+      memory.bandwidth.local:
+      network.incoming.bytes:
+      network.incoming.packets:
+      network.outgoing.bytes:
+      network.outgoing.packets:
+      network.incoming.packets.drop:
+      network.incoming.packets.error:
+      network.outgoing.packets.drop:
+      network.outgoing.packets.error:
+      vcpus:
+      cpu_util:
+      cpu:
+      cpu_l3_cache:
+      disk.root.size:
+      disk.ephemeral.size:
+      disk.latency:
+      disk.iops:
+      disk.capacity:
+      disk.allocation:
+      disk.usage:
+      disk.device.read.requests:
+      disk.device.write.requests:
+      disk.device.read.bytes:
+      disk.device.write.bytes:
+      disk.device.capacity:
+      disk.device.allocation:
+      disk.device.usage:
+      disk.root.size:
+      disk.usage:
+      compute.instance.booting.time:
+      perf.cpu.cycles:
+      perf.instructions:
+      perf.cache.references:
+      perf.cache.misses:
+    attributes:
+      host: resource_metadata.(instance_host|host)
+      image_ref: resource_metadata.image_ref
+      launched_at: resource_metadata.launched_at
+      created_at: resource_metadata.created_at
+      deleted_at: resource_metadata.deleted_at
+      display_name: resource_metadata.display_name
+      flavor_id: resource_metadata.(instance_flavor_id|(flavor.id)|flavor_id)
+      flavor_name: resource_metadata.(instance_type|(flavor.name)|flavor_name)
+      server_group: resource_metadata.user_metadata.server_group
+    event_delete: compute.instance.delete.start
+    event_attributes:
+      id: instance_id
+    event_associated_resources:
+      instance_network_interface: '{"=": {"instance_id": "%s"}}'
+      instance_disk: '{"=": {"instance_id": "%s"}}'
+
+  - resource_type: instance_network_interface
+    metrics:
+      network.outgoing.packets:
+      network.incoming.packets:
+      network.outgoing.packets.drop:
+      network.incoming.packets.drop:
+      network.outgoing.packets.error:
+      network.incoming.packets.error:
+      network.outgoing.bytes:
+      network.incoming.bytes:
+    attributes:
+      name: resource_metadata.vnic_name
+      instance_id: resource_metadata.instance_id
+
+  - resource_type: instance_disk
+    metrics:
+      disk.device.read.requests:
+      disk.device.write.requests:
+      disk.device.read.bytes:
+      disk.device.write.bytes:
+      disk.device.latency:
+      disk.device.read.latency:
+      disk.device.write.latency:
+      disk.device.iops:
+      disk.device.capacity:
+      disk.device.allocation:
+      disk.device.usage:
+    attributes:
+      name: resource_metadata.disk_name
+      instance_id: resource_metadata.instance_id
+
+  - resource_type: image
+    metrics:
+      image.size:
+      image.download:
+      image.serve:
+    attributes:
+      name: resource_metadata.name
+      container_format: resource_metadata.container_format
+      disk_format: resource_metadata.disk_format
+    event_delete: image.delete
+    event_attributes:
+      id: resource_id
+  
+  - resource_type: network
+    metrics:
+      bandwidth:
+      ip.floating:
+    event_delete: floatingip.delete.end
+    event_attributes:
+      id: resource_id
+
+  - resource_type: stack
+    metrics:
+      stack.create:
+      stack.update:
+      stack.delete:
+      stack.resume:
+      stack.suspend:
+
+  - resource_type: compute_host
+    metrics:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+    attributes:
+      host_name: resource_metadata.resource_url
+
+  - resource_type: host_disk
+    metrics:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+    attributes:
+      host_name: resource_metadata.resource_url
+      device_name: resource_metadata.device
+
+  - resource_type: host_network_interface
+    metrics:
+      hardware.network.ip.incoming.datagrams:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.incoming.bytes:
+      hardware.network.incoming.drop:
+      hardware.network.incoming.errors:
+      hardware.network.incoming.packets:
+      hardware.network.outgoing.bytes:
+      hardware.network.outgoing.drop:
+      hardware.network.outgoing.errors:
+      hardware.network.outgoing.packets:
+    attributes:
+      host_name: resource_metadata.resource_url
+      device_name: resource_metadata.name
+
+  - resource_type: host
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+      hardware.memory.total:
+      hardware.memory.used:
+    #  hardware.memory.utilization:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+    attributes:
+      host_name: resource_metadata.resource_url
+      #device_name: resource_metadata.name
+
+#  - resource_type: nova_compute
+#    metrics:
+#      compute.node.cpu.frequency:
+#      compute.node.cpu.idle.percent:
+#      compute.node.cpu.idle.time:
+#      compute.node.cpu.iowait.percent:
+#      compute.node.cpu.iowait.time:
+#      compute.node.cpu.kernel.percent:
+#      compute.node.cpu.kernel.time:
+#      compute.node.cpu.percent:
+#      compute.node.cpu.user.percent:
+#      compute.node.cpu.user.time:
+#      compute.node.disk.write.bytes:
+#      compute.node.disk.read.bytes:
+#      compute.node.disk.read.bytes.rate:
+#      compute.node.disk.write.bytes.rate:
+#      compute.node.network.incoming.bytes:
+#      compute.node.network.outcoming.bytes:
+#    attributes:
+#      #host_name: resource_metadata.resource_url
+#      host_name: resource_metadata.host
+
+  - resource_type: manila_share
+    metrics:
+      manila.share.size:
+    attributes:
+      name: resource_metadata.name
+      host: resource_metadata.host
+      status: resource_metadata.status
+      availability_zone: resource_metadata.availability_zone
+      protocol: resource_metadata.protocol
+
+  - resource_type: switch
+    metrics:
+      switch:
+      switch.ports:
+    attributes:
+      controller: resource_metadata.controller
+
+  - resource_type: switch_port
+    metrics:
+      switch.port:
+      switch.port.uptime:
+      switch.port.receive.packets:
+      switch.port.transmit.packets:
+      switch.port.receive.bytes:
+      switch.port.transmit.bytes:
+      switch.port.receive.drops:
+      switch.port.transmit.drops:
+      switch.port.receive.errors:
+      switch.port.transmit.errors:
+      switch.port.receive.frame_error:
+      switch.port.receive.overrun_error:
+      switch.port.receive.crc_error:
+      switch.port.collision.count:
+    attributes:
+      switch: resource_metadata.switch
+      port_number_on_switch: resource_metadata.port_number_on_switch
+      neutron_port_id: resource_metadata.neutron_port_id
+      controller: resource_metadata.controller
+
+  - resource_type: port
+    metrics:
+      port:
+      port.uptime:
+      port.receive.packets:
+      port.transmit.packets:
+      port.receive.bytes:
+      port.transmit.bytes:
+      port.receive.drops:
+      port.receive.errors:
+    attributes:
+      controller: resource_metadata.controller
+
+  - resource_type: switch_table
+    metrics:
+      switch.table.active.entries:
+    attributes:
+      controller: resource_metadata.controller
+      switch: resource_metadata.switch
+
+  - resource_type: loadbalancer
+    metrics:
+      network.services.lb.outgoing.bytes:
+      network.services.lb.incoming.bytes:
+      network.services.lb.pool:
+      network.services.lb.listener:
+      network.services.lb.member:
+      network.services.lb.health_monitor:
+      network.services.lb.loadbalancer:
+      network.services.lb.total.connections:
+      network.services.lb.active.connections:
+
+```
+
+
+
