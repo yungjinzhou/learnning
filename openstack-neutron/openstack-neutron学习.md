@@ -484,13 +484,231 @@ Bridge层是对VM层的一个屏蔽。从VM发出的Untag报文，被Bridge层�
 
 
 
+### 5. neutron配置文件
+
+#### 5.1 neutron+vxlan+linuxbridge模式
+
+##### 5.1.1控制节点/etc/neutron配置
+
+###### 5.1.1.1 dhcp_agent.ini
+
+```
+[DEFAULT]
+interface_driver = linuxbridge
+dhcp_driver = neutron.agent.linux.dhcp.Dnsmasq
+enable_isolated_metadata = true
+
+```
+
+###### 5.1.1.2 l3_agent.ini
+
+```
+[DEFAULT]
+interface_driver = linuxbridge
+external_network_bridge = 
+[AGENT]
+extensions = fwaas_v2,vpnaas
+[vpnagent]
+vpn_device_driver = neutron_vpnaas.services.vpn.device_drivers.libreswan_ipsec.LibreSwanDriver
+
+```
+
+###### 5.1.1.3 metadata_agent.ini
+
+```
+[DEFAULT]
+nova_metadata_host = controller
+metadata_proxy_shared_secret = metadata_secret
+[cache]
+```
+
+###### 5.1.1.4 neutron.conf
+
+```
+[DEFAULT]
+core_plugin = ml2
+service_plugins = router
+allow_overlapping_ips = true
+transport_url = rabbit://openstack:openstack@controller
+auth_strategy = keystone
+notify_nova_on_port_status_changes = true
+notify_nova_on_port_data_changes = true
+[cors]
+[database]
+connection = mysql+pymysql://neutron:comleader@123@controller/neutron
+[keystone_authtoken]
+www_authenticate_uri = http://controller:5000
+auth_url = http://controller:5000
+memcached_servers =controller:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = neutron
+password = comleader@123
+[oslo_concurrency]
+lock_path = /var/lib/neutron/tmp
+[oslo_messaging_amqp]
+[oslo_messaging_kafka]
+[oslo_messaging_notifications]
+[oslo_messaging_rabbit]
+[oslo_middleware]
+[oslo_policy]
+[privsep]
+[ssl]
+[nova]
+auth_url = http://controller:5000
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+region_name = RegionOne
+project_name = service
+username = nova
+password = comleader@123
+
+```
+
+###### 5.1.1.5 plugin.ini
+
+```
+[DEFAULT]
+[ml2]
+type_drivers = flat,vlan,vxlan
+tenant_network_types = vxlan
+mechanism_drivers = linuxbridge,l2population
+extension_drivers = port_security
+
+[ml2_type_flat]
+flat_networks = provider
+
+[ml2_type_vxlan]
+vni_ranges = 1:1000
+
+[securitygroup]
+enable_ipset = true
+```
+
+###### 5.1.1.6 ml2_conf.ini
+
+/etc/neutron/plugins/ml2
+
+```
+[DEFAULT]
+[ml2]
+type_drivers = flat,vlan,vxlan
+tenant_network_types = vxlan
+mechanism_drivers = linuxbridge,l2population
+extension_drivers = port_security
+
+[ml2_type_flat]
+flat_networks = provider
+
+[ml2_type_vxlan]
+vni_ranges = 1:1000
+
+[securitygroup]
+enable_ipset = true
+
+```
+
+
+
+###### 5.1.1.7 linuxbridge_agent.ini
+
+/etc/neutron/plugins/ml2
+
+```
+[DEFAULT]
+[linux_bridge]
+#physical_interface_mappings = provider:eth0
+physical_interface_mappings = provider:ens32
+
+[vxlan]
+enable_vxlan = true
+local_ip = 192.168.204.173
+l2_population = true
+
+[securitygroup]
+enable_security_group = true
+firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
+```
+
+
+
+##### 5.1.2 计算节点/etc/neutron配置
+
+###### 5.1.2.1 neutron.conf配置
+
+```
+[DEFAULT]
+transport_url = rabbit://openstack:openstack@controller
+auth_strategy = keystone
+[cors]
+[database]
+[keystone_authtoken]
+www_authenticate_uri = http://controller:5000
+auth_url = http://controller:5000
+memcached_servers =controller:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = neutron
+password = comleader@123
+[oslo_concurrency]
+lock_path = /var/lib/neutron/tmp
+[oslo_messaging_amqp]
+[oslo_messaging_kafka]
+[oslo_messaging_notifications]
+[oslo_messaging_rabbit]
+[oslo_middleware]
+[oslo_policy]
+[privsep]
+[ssl]
+
+
+```
+
+###### 5.1.2.2  linuxbridge_agent.ini配置
+
+/etc/neutron/plugins/ml2/linuxbridge_agent.ini
+
+```
+[DEFAULT]
+[linux_bridge]
+physical_interface_mappings = provider:ens32
+
+[vxlan]
+enable_vxlan = true
+local_ip = 192.168.204.174
+l2_population = true
+
+[securitygroup]
+enable_security_group = true
+firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
+
+```
 
 
 
 
 
+### 6. neutron服务
 
+在配置正确的情况下，确定服务启动正常，各个服务日志正常
 
+#### 6.1 neutron+vxlan+linuxbridge模式
+
+##### 6.1.1 控制节点部署服务
+
+- neutron-dhcp-agent.service
+- neutron-l3-agent.service
+- neutron-metadata-agent.service
+- neutron-server.service
+
+##### 6.1.2 计算节点部署服务
+
+- neutron-linuxbridge-agent.service
 
 
 
