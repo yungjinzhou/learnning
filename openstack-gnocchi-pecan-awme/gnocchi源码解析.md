@@ -498,15 +498,196 @@ lookup_controller针对每一个controller对象，在其中查找对应的处�
 
 ```
 
+上面代码逻辑，验证，最终调用存储driver的get_measures方法获取数据
+
+```
+# gnocchi/storage/__init__.py
+
+
+    def get_measures(self, metric, aggregations,
+                     from_timestamp=None, to_timestamp=None,
+                     resample=None):
+        """Get aggregated measures from a metric.
+
+        Deprecated. Use `get_aggregated_measures` instead.
+
+        :param metric: The metric measured.
+        :param aggregations: The aggregations to retrieve.
+        :param from timestamp: The timestamp to get the measure from.
+        :param to timestamp: The timestamp to get the measure to.
+        :param resample: The granularity to resample to.
+        """
+        timeseries = self.get_aggregated_measures(
+            {metric: aggregations}, from_timestamp, to_timestamp)[metric]
+
+        if resample:
+            for agg, ts in six.iteritems(timeseries):
+                timeseries[agg] = ts.resample(resample)
+
+        return {
+            aggmethod: list(itertools.chain(
+                *[[(timestamp, timeseries[agg].aggregation.granularity, value)
+                   for timestamp, value
+                   in timeseries[agg].fetch(from_timestamp, to_timestamp)]
+                  for agg in sorted(aggs,
+                                    key=ATTRGETTER_GRANULARITY,
+                                    reverse=True)]))
+            for aggmethod, aggs in itertools.groupby(timeseries.keys(),
+                                                     ATTRGETTER_METHOD)
+        }
+
+
+
+    def get_aggregated_measures(self, metrics_and_aggregations,
+                                from_timestamp=None, to_timestamp=None):
+        """Get aggregated measures from a metric.
+
+        :param metrics_and_aggregations: The metrics and aggregations to
+                                         retrieve in format
+                                         {metric: [aggregation, …]}.
+        :param from timestamp: The timestamp to get the measure from.
+        :param to timestamp: The timestamp to get the measure to.
+        """
+        metrics_aggs_keys = self._list_split_keys(metrics_and_aggregations)
+
+        for metric, aggregations_keys in six.iteritems(metrics_aggs_keys):
+            for aggregation, keys in six.iteritems(aggregations_keys):
+                start = (
+                    carbonara.SplitKey.from_timestamp_and_sampling(
+                        from_timestamp, aggregation.granularity)
+                ) if from_timestamp else None
+
+                stop = (
+                    carbonara.SplitKey.from_timestamp_and_sampling(
+                        to_timestamp, aggregation.granularity)
+                ) if to_timestamp else None
+
+                # Replace keys with filtered version
+                metrics_aggs_keys[metric][aggregation] = [
+                    key for key in sorted(keys)
+                    if ((not start or key >= start)
+                        and (not stop or key <= stop))
+                ]
+
+        metrics_aggregations_splits = self._get_splits_and_unserialize(
+            metrics_aggs_keys)
+
+        results = collections.defaultdict(dict)
+        for metric, aggregations in six.iteritems(metrics_and_aggregations):
+            for aggregation in aggregations:
+                ts = carbonara.AggregatedTimeSerie.from_timeseries(
+                    metrics_aggregations_splits[metric][aggregation],
+                    aggregation)
+                # We need to truncate because:
+                # - If the driver is not in WRITE_FULL mode, then it might read
+                # too much data that will be deleted once the split is
+                # rewritten. Just truncate so we don't return it.
+                # - If the driver is in WRITE_FULL but the archive policy has
+                # been resized, we might still have too much points stored,
+                # which will be deleted at a later point when new points will
+                # be processed. Truncate to be sure we don't return them.
+                if aggregation.timespan is not None:
+                    ts.truncate(aggregation.timespan)
+                results[metric][aggregation] = ts.fetch(
+                    from_timestamp, to_timestamp)
+
+        return results
+
+```
+
+
+
+
+
 
 
 
 
 ### 3. gnocchi-metricd源码分析（未开始）
 
+#### 3.1 初始代码加载
+
+服务启动依赖脚本/usr/bin/gnocchi-metricd
+
+```
+#!/usr/bin/python2
+# EASY-INSTALL-ENTRY-SCRIPT: 'gnocchi==4.3.2','console_scripts','gnocchi-metricd'
+__requires__ = 'gnocchi==4.3.2'
+import re
+import sys
+from pkg_resources import load_entry_point
+
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw?|\.exe)?$', '', sys.argv[0])
+    sys.exit(
+        load_entry_point('gnocchi==4.3.2', 'console_scripts', 'gnocchi-metricd')()
+
+```
+
+/usr/lib/python2.7/site-packages/gnocchi-4.3.2-py2.7.egg-info/entry_points.txt 
+
+```
+gnocchi-metricd = gnocchi.cli.metricd:metricd
+```
+
+启动的gnocchi/cli/metricd.py下的metricd
+
+```
+def metricd():
+    conf = cfg.ConfigOpts()
+    conf.register_cli_opts([
+        cfg.IntOpt("stop-after-processing-metrics",
+                   default=0,
+                   min=0,
+                   help="Number of metrics to process without workers, "
+                   "for testing purpose"),
+    ])
+    conf = service.prepare_service(conf=conf)
+
+    if conf.stop_after_processing_metrics:
+        metricd_tester(conf)
+    else:
+        MetricdServiceManager(conf).run()
+```
+
+看下  MetricdServiceManager都做了什么
+
+```
+
+
+class MetricdServiceManager(cotyledon.ServiceManager):
+    def __init__(self, conf):
+        super(MetricdServiceManager, self).__init__()
+        oslo_config_glue.setup(self, conf)
+
+        self.conf = conf
+        self.metric_processor_id = self.add(
+            MetricProcessor, args=(self.conf,),
+            workers=conf.metricd.workers)
+        if self.conf.metricd.metric_reporting_delay >= 0:
+            self.add(MetricReporting, args=(self.conf,))
+        self.add(MetricJanitor, args=(self.conf,))
+
+        self.register_hooks(on_reload=self.on_reload)
+
+    def on_reload(self):
+        # NOTE(sileht): We do not implement reload() in Workers so all workers
+        # will received SIGHUP and exit gracefully, then their will be
+        # restarted with the new number of workers. This is important because
+        # we use the number of worker to declare the capability in tooz and
+        # to select the block of metrics to proceed.
+        self.reconfigure(self.metric_processor_id,
+                         workers=self.conf.metricd.workers)
+
+
+```
 
 
 
+分析:
+MetricReporting服务每隔2分钟统计并以日志形式输出未处理的监控项个数和未处理的measure数目
+MetricJanitor每隔已定时间清理已经删除的metric数据
+以及最重要的监控数据聚合处理服务MetricProcessor，它从MetricScheduler服务存放在多进程队列中获取需要处理的监控数据进行最终的聚合运算。
 
 
 
