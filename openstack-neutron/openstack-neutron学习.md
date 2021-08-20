@@ -13,7 +13,45 @@
 
 二层网络仅仅通过MAC寻址即可实现通讯，但仅仅是同一个冲突域内；三层网络则需要通过IP路由实现跨网段的通讯，可以跨多个冲突域。
 
+#### 1.4 Neutron几个重要概念
 
+##### 1.4.1  **Router**
+
+实现不同网段间的互相通信，为租户提供路由、NAT等服务。
+
+##### 1.4.2  **Network**
+
+虚拟网络中的L2 domain。对应于一个真实物理网络中的二层局域网（VLAN），从租户的的角度而言，是租户私有的。
+
+##### 1.4.3  **Subnet**
+
+为网络中的三层概念，指定一段IPV4或IPV6地址并描述其相关的配置信息。它附加在一个二层Network上，指明属于这个network的虚拟机可使用的IP地址范围。
+
+##### 1.4.4  **Port**
+
+是一个逻辑的概念，虚拟网络中网卡对应的端口。
+
+##### 1.4.5  **Neutron Security Group 实现** 
+
+Security group通过Linux IPtables来实现，为此，在Compute节点上引入了qbr*这样的Linux传统bridge（iptables规则目前无法加载到直接挂在到ovs的tap设备上）。iptables只是一个用户空间的程序，真正干活的其实是Linux内核netfilter，通过iptables创建新规则，其实就是在netfilter中插入一个hook，从而实现修改数据包、控制数据包流向等。
+
+##### 1.4.6 **Neutron Security Group 行为流程**
+
+  ![1629447169549](.\1629447169549.png)
+
+##### 1.4.7 DHCP
+
+DHCP作用是分配IP地址，配置主机（默认网关，DNS等），管理主机地址和配置。
+
+DHCP工作流程，采用UDP封装报文，端口67，68。
+
+![img](.\企业微信截图_16294475302914.png)
+
+DHCP Agent管理dnsmasq。每一个Network对应一个到多个dnsmasq进程，每个dnsmasq对应一个DHCP Server。
+
+##### 1.4.8 Neutron DHCP实现
+
+![img](.\企业微信截图_16294476175231.png)
 
 
 
@@ -695,9 +733,76 @@ firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
 
 ### 6. neutron服务
 
-在配置正确的情况下，确定服务启动正常，各个服务日志正常
+#### 6.1 neutron架构
+
+![img](.\企业微信截图_162945139528.png)
+
+- Neutron 通过 plugin 和 agent 提供的网络服务。
+
+- plugin 位于 Neutron server，包括 core plugin 和 service plugin。
+
+- agent 位于各个节点，负责实现网络服务。
+
+- core plugin 提供 L2 功能，ML2 是推荐的 plugin。
+
+- 使用最广泛的 L2 agent 是 linux bridage 和 open vswitch。
+
+- service plugin 和 agent 提供扩展功能，包括 dhcp, routing, load balance, firewall, vpn 等。
+  
+
+
+
+#### 6.2 服务简介
+
+##### 6.2.1 neutron-server
+
+可以理解为类似于nova-api那样的一个组件，一个专门用来接收neutron REST API调用的服务器。负责将不同的rest api发送到不同的neutron-plugin。接受和路由API请求到网络plug-in。一般部署在控制节点（controller），负责通过Neutron-server响应的API请求；
+
+##### 6.2.2 neutron-plugin
+
+可以理解为不同网络功能（例如创建端口（ports）、网络（Networks）、子网（Subnets）等）实现的入口，现在大部分都是软件定义网络，各个厂商都开发自己的plugin(插件)。neutron-plugin接收netron-server发过来的rest api，向neutron database完成一些信息注册（比如用户要建端口）。然后将具体要执行的业务操作和参数通知给自身对应的neutron-agent。Openstack的plugins一般支持Open vSwitch、Linux Bridging、思科物理/虚拟交换机等等。一般Core plugin 和service plugin已经集成到neutron-server中，不需要运行独立的plugin服务。
+
+- plugin 解决的是 What 的问题，即网络要配置成什么样子？而至于如何配置 How 的工作则交由 agent 完成。
+- plugin，agent 和 network provider 是配套使用的，如果network provider用的linux bridge则使用对应的plugin和agent，若是使用的OVS则使用OVS的plugin和agent；
+- plugin 的一个主要的职责是在数据库中维护 Neutron 网络的状态信息。通过ML2（Modular Layer 2）plugin，各种 network provider 无需开发自己的 plugin，只需要针对 ML2 开发相应的 driver 就可以了；
+- plugin 按照功能分为两类： core plugin 和 service plugin。core plugin 维护 Neutron 的 netowrk, subnet 和 port 相关资源的信息，与 core plugin 对应的 agent 包括 linux bridge, OVS 等； service plugin 提供 routing, firewall, load balance 等服务，也有相应的 agent。
+        
+
+##### 6.2.3 neutron-agent
+
+常见的agent包括L3、DHCP、plugin agent；一般网络节点需要部署Core Plugin的代理和service Plugin的代理，计算节点也需要部署Core Plugin的代理，通过该代理才能建立二层连接。
+
+- L3 agent (neutron-l3-agent)	提供L3/NAT转发，使租户内的虚机实例被外部网络访问
+
+- dhcp agent (neutron-dhcp-agent)	为租户网络提供dhcp功能
+
+- metering agent (neutron-metering-agent)	提供L3数据流量的监控、计算
+
+- metadata agent	是提供一个机制给用户，可以设定每一个instance 的参数
+
+- OpenvSwitch agent	使用Open vSwitch来实现VLAN， GRE，VxLAN来实现网络的隔离，还包括了网络流量的转发控制
+
+- plug-in agent ( neutron-*-agent )	在每个hypervisor上运行以执行本地vSwitch配置。 这个插件是否运行取决于使用的插件，有些插件不需要代理。
+  neutron-lbaas-agent	提供LB的服务
+  neutron-firewall-agent	提供防火墙服务
+
+##### 6.2.4  ML2 Core Plugin
+使用ML2 Core Plugin的需求是：（1）传统Core Plugin无法同时提供多种network provider；（2）开发工作量大。
+
+采用 ML2 plugin 后，可以在不同节点上分别部署 linux bridge agent, open vswitch agent, hyper-v agent 或其他第三方 agent。ML2 不但支持异构部署方案，同时能够与现有的 agent 无缝集成：以前用的 agent 不需要变，只需要将 Neutron server 上的传统 core plugin 替换为 ML2。
+
+ML2 对二层网络进行抽象和建模，引入了 type driver 和 mechansim driver。type driver 负责维护网络类型的状态，执行验证，创建网络等，支持vlan、vxlan、gre、flat、local网络；mechanism driver 负责获取由 type driver 维护的网络状态，并确保在相应的网络设备（物理或虚拟）上正确实现这些状态。
+
+mechanism driver 有三种类型：（1）Agent-based：包括 linux bridge, open vswitch 等。（2）Controller-based：包括 OpenDaylight, VMWare NSX 等。（3）基于物理交换机；此外，涉及L2 population driver，其作用是优化和限制 overlay 网络中的广播流量。
+![img](.\企业微信截图_16294512209414.png)
+
+
+
+
 
 #### 6.1 neutron+vxlan+linuxbridge模式
+
+在配置正确的情况下，确定服务启动正常，各个服务日志正常
 
 ##### 6.1.1 控制节点部署服务
 

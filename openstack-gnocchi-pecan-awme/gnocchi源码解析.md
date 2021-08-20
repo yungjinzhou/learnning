@@ -687,13 +687,320 @@ class MetricdServiceManager(cotyledon.ServiceManager):
 分析:
 MetricReporting服务每隔2分钟统计并以日志形式输出未处理的监控项个数和未处理的measure数目
 MetricJanitor每隔已定时间清理已经删除的metric数据
-以及最重要的监控数据聚合处理服务MetricProcessor，它从MetricScheduler服务存放在多进程队列中获取需要处理的监控数据进行最终的聚合运算。
+以及最重要的监控数据聚合处理服务**MetricProcessor**，它从MetricScheduler服务存放在多进程队列中获取需要处理的监控数据进行最终的聚合运算。
+
+```
+# gnocchi/cli/metricd.py
+
+class MetricProcessor(MetricProcessBase):
+    name = "processing"
+    GROUP_ID = b"gnocchi-processing"
+
+    def __init__(self, worker_id, conf):
+        super(MetricProcessor, self).__init__(
+            worker_id, conf, conf.metricd.metric_processing_delay)
+        self._tasks = []
+        self.group_state = None
+        self.sacks_with_measures_to_process = set()
+        # This stores the last time the processor did a scan on all the sack it
+        # is responsible for
+        self._last_full_sack_scan = utils.StopWatch().start()
+        # Only update the list of sacks to process every
+        # metric_processing_delay
+        self._get_sacks_to_process = cachetools.func.ttl_cache(
+            ttl=conf.metricd.metric_processing_delay
+        )(self._get_sacks_to_process)
+
+    @tenacity.retry(
+        wait=utils.wait_exponential,
+        # Never retry except when explicitly asked by raising TryAgain
+        retry=tenacity.retry_never)
+    def _configure(self):
+        super(MetricProcessor, self)._configure()
+
+        # create fallback in case paritioning fails or assigned no tasks
+        self.fallback_tasks = list(self.incoming.iter_sacks())
+        try:
+            self.partitioner = self.coord.join_partitioned_group(
+                self.GROUP_ID, partitions=200)
+            LOG.info('Joined coordination group: %s',
+                     self.GROUP_ID.decode())
+        except tooz.NotImplemented:
+            LOG.warning('Coordinator does not support partitioning. Worker '
+                        'will battle against other workers for jobs.')
+        except tooz.ToozError as e:
+            LOG.error('Unexpected error configuring coordinator for '
+                      'partitioning. Retrying: %s', e)
+            raise tenacity.TryAgain(e)
+
+        if self.conf.metricd.greedy:
+            filler = threading.Thread(target=self._fill_sacks_to_process)
+            filler.daemon = True
+            filler.start()
+
+    @utils.retry_on_exception.wraps
+    def _fill_sacks_to_process(self):
+        try:
+            for sack in self.incoming.iter_on_sacks_to_process():
+                if sack in self._get_sacks_to_process():
+                    LOG.debug(
+                        "Got notification for sack %s, waking up processing",
+                        sack)
+                    self.sacks_with_measures_to_process.add(sack)
+                    self.wakeup()
+        except exceptions.NotImplementedError:
+            LOG.info("Incoming driver does not support notification")
+        except Exception as e:
+            LOG.error(
+                "Error while listening for new measures notification, "
+                "retrying",
+                exc_info=True)
+            raise tenacity.TryAgain(e)
+
+    def _get_sacks_to_process(self):
+        try:
+            self.coord.run_watchers()
+            if (not self._tasks or
+                    self.group_state != self.partitioner.ring.nodes):
+                self.group_state = self.partitioner.ring.nodes.copy()
+                self._tasks = [
+                    sack for sack in self.incoming.iter_sacks()
+                    if self.partitioner.belongs_to_self(
+                        sack, replicas=self.conf.metricd.processing_replicas)]
+        except tooz.NotImplemented:
+            # Do not log anything. If `run_watchers` is not implemented, it's
+            # likely that partitioning is not implemented either, so it already
+            # has been logged at startup with a warning.
+            pass
+        except Exception as e:
+            LOG.error('Unexpected error updating the task partitioner: %s', e)
+        finally:
+            return self._tasks or self.fallback_tasks
+
+    def _run_job(self):
+        m_count = 0
+        s_count = 0
+        # We are going to process the sacks we got notified for, and if we got
+        # no notification, then we'll just try to process them all, just to be
+        # sure we don't miss anything. In case we did not do a full scan for
+        # more than `metric_processing_delay`, we do that instead.
+        if self._last_full_sack_scan.elapsed() >= self.interval_delay:
+            sacks = self._get_sacks_to_process()
+        else:
+            sacks = (self.sacks_with_measures_to_process.copy()
+                     or self._get_sacks_to_process())
+        for s in sacks:
+            try:
+                try:
+                    # Chef是一个配置管理自动化工具
+                    m_count += self.chef.process_new_measures_for_sack(s)
+                except chef.SackAlreadyLocked:
+                    continue
+                s_count += 1
+                self.incoming.finish_sack_processing(s)
+                self.sacks_with_measures_to_process.discard(s)
+            except Exception:
+                LOG.error("Unexpected error processing assigned job",
+                          exc_info=True)
+        LOG.debug("%d metrics processed from %d sacks", m_count, s_count)
+        try:
+            # Update statistics
+            self.coord.update_capabilities(self.GROUP_ID,
+                                           self.store.statistics)
+        except tooz.NotImplemented:
+            pass
+        if sacks == self._get_sacks_to_process():
+            # We just did a full scan of all sacks, reset the timer
+            self._last_full_sack_scan.reset()
+            LOG.debug("Full scan of sacks has been done")
+
+    def close_services(self):
+        self.coord.stop()
+
+```
+
+重点看run_job中process_new_measures_for_sack函数
+
+```
+ # gnocchi/chef.py   
+    
+    def process_new_measures_for_sack(self, sack, blocking=False, sync=False):
+        """Process added measures in background.
+
+        Lock a sack and try to process measures from it. If the sack cannot be
+        locked, the method will raise `SackAlreadyLocked`.
+
+        :param sack: The sack to process new measures for.
+        :param blocking: Block to be sure the sack is processed or raise
+                         `SackAlreadyLocked` otherwise.
+        :param sync: If True, raise any issue immediately otherwise just log it
+        :return: The number of metrics processed.
+
+        """
+        lock = self.get_sack_lock(sack)
+        if not lock.acquire(blocking=blocking):
+            raise SackAlreadyLocked(sack)
+        LOG.debug("Processing measures for sack %s", sack)
+        try:
+            with self.incoming.process_measures_for_sack(sack) as measures:
+                # process only active metrics. deleted metrics with unprocessed
+                # measures will be skipped until cleaned by janitor.
+                if not measures:
+                    return 0
+
+                metrics = self.index.list_metrics(
+                    attribute_filter={
+                        "in": {"id": measures.keys()}
+                    })
+                self.storage.add_measures_to_metrics({
+                    metric: measures[metric.id]
+                    for metric in metrics
+                })
+                LOG.debug("Measures for %d metrics processed",
+                          len(metrics))
+                return len(measures)
+        except Exception:
+            if sync:
+                raise
+            LOG.error("Error processing new measures", exc_info=True)
+            return 0
+        finally:
+            lock.release()
+
+```
 
 
 
+处理后的sacks保存到storage      self.storage.add_measures_to_metrics({
 
+```
+# gnocchi/storage/__init__.py    
+    
+    def add_measures_to_metrics(self, metrics_and_measures):
+        """Update a metric with a new measures, computing new aggregations.
 
+        :param metrics_and_measures: A dict there keys are `storage.Metric`
+                                     objects and values are timeseries array of
+                                     the new measures.
+        """
+        with self.statistics.time("raw measures fetch"):
+            raw_measures = self._get_or_create_unaggregated_timeseries(
+                metrics_and_measures.keys())
+        self.statistics["raw measures fetch"] += len(metrics_and_measures)
+        self.statistics["processed measures"] += sum(
+            map(len, metrics_and_measures.values()))
 
+        new_boundts = []
+        splits_to_delete = {}
+        splits_to_update = {}
+
+        for metric, measures in six.iteritems(metrics_and_measures):
+            measures = numpy.sort(measures, order='timestamps')
+
+            agg_methods = list(metric.archive_policy.aggregation_methods)
+            block_size = metric.archive_policy.max_block_size
+            back_window = metric.archive_policy.back_window
+            # NOTE(sileht): We keep one more blocks to calculate rate of change
+            # correctly
+            if any(filter(lambda x: x.startswith("rate:"), agg_methods)):
+                back_window += 1
+
+            if raw_measures[metric] is None:
+                ts = None
+            else:
+                try:
+                    ts = carbonara.BoundTimeSerie.unserialize(
+                        raw_measures[metric], block_size, back_window)
+                except carbonara.InvalidData:
+                    LOG.error("Data corruption detected for %s "
+                              "unaggregated timeserie, creating a new one",
+                              metric.id)
+                    ts = None
+
+            if ts is None:
+                # This is the first time we treat measures for this
+                # metric, or data are corrupted, create a new one
+                ts = carbonara.BoundTimeSerie(block_size=block_size,
+                                              back_window=back_window)
+                current_first_block_timestamp = None
+            else:
+                current_first_block_timestamp = ts.first_block_timestamp()
+
+            # NOTE(jd) This is Python where you need such
+            # hack to pass a variable around a closure,
+            # sorry.
+            computed_points = {"number": 0}
+
+            def _map_compute_splits_operations(bound_timeserie):
+                # NOTE (gordc): bound_timeserie is entire set of
+                # unaggregated measures matching largest
+                # granularity. the following takes only the points
+                # affected by new measures for specific granularity
+                try:
+                    tstamp = max(bound_timeserie.first, measures['timestamps'][0])
+                except Exception as e:
+                    LOG.error('measures missing the key timestamps ,take bound_timeserie.first as timestamps')
+                    tstamp = bound_timeserie.first
+                new_first_block_timestamp = (
+                    bound_timeserie.first_block_timestamp()
+                )
+                computed_points['number'] = len(bound_timeserie)
+
+                aggregations = metric.archive_policy.aggregations
+
+                grouped_timeseries = {
+                    granularity: bound_timeserie.group_serie(
+                        granularity,
+                        carbonara.round_timestamp(tstamp, granularity))
+                    for granularity, aggregations
+                    # No need to sort the aggregation, they are already
+                    in itertools.groupby(aggregations, ATTRGETTER_GRANULARITY)
+                }
+
+                aggregations_and_timeseries = {
+                    aggregation:
+                    carbonara.AggregatedTimeSerie.from_grouped_serie(
+                        grouped_timeseries[aggregation.granularity],
+                        aggregation)
+                    for aggregation in aggregations
+                }
+
+                deleted_keys, keys_and_split_to_store = (
+                    self._compute_split_operations(
+                        metric, aggregations_and_timeseries,
+                        current_first_block_timestamp,
+                        new_first_block_timestamp)
+                )
+
+                return (new_first_block_timestamp,
+                        deleted_keys,
+                        keys_and_split_to_store)
+
+            with self.statistics.time("aggregated measures compute"):
+                (new_first_block_timestamp,
+                 deleted_keys,
+                 keys_and_splits_to_store) = ts.set_values(
+                     measures,
+                     before_truncate_callback=_map_compute_splits_operations,
+                )
+
+            splits_to_delete[metric] = deleted_keys
+            splits_to_update[metric] = (keys_and_splits_to_store,
+                                        new_first_block_timestamp)
+
+            new_boundts.append((metric, ts.serialize()))
+
+        with self.statistics.time("splits delete"):
+            self._delete_metric_splits(splits_to_delete)
+        self.statistics["splits delete"] += len(splits_to_delete)
+        with self.statistics.time("splits update"):
+            self._update_metric_splits(splits_to_update)
+        self.statistics["splits update"] += len(splits_to_update)
+        with self.statistics.time("raw measures store"):
+            self._store_unaggregated_timeseries(new_boundts)
+        self.statistics["raw measures store"] += len(new_boundts)
+
+```
 
 
 
