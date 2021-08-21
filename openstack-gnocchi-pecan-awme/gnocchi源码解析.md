@@ -34,6 +34,12 @@ Gnocchi中有三层数据，resources -> metric -> measure
 
 **Measure**：是gnocchi对openstack监控数据的第三层划分，归属于metric，表示在某个时间戳对应资源的值，可用命令gnocchi measures show metric_id
 
+**sack**：为了更好的并行计算，发过来的measure数据，根据metric分到具体对应的sack里，每个sack可以被一个或多个gnocchi-metricd进程处理。
+
+> Measurement data pushed to Gnocchi is divided into “sacks” for better distribution. Incoming [metrics](https://gnocchi.xyz/glossary.html#term-Metric) are pushed to specific sacks and each sack is assigned to one or more gnocchi-metricd daemons for processing.
+
+
+
 
 
 ### 2. gnocchi-api启动流程
@@ -603,7 +609,7 @@ lookup_controller针对每一个controller对象，在其中查找对应的处�
 
 
 
-### 3. gnocchi-metricd源码分析（未开始）
+### 3. gnocchi-metricd源码分析
 
 #### 3.1 初始代码加载
 
