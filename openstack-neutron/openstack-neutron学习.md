@@ -55,6 +55,12 @@ DHCP Agent管理dnsmasq。每一个Network对应一个到多个dnsmasq进程，�
 
 
 
+##### 1.4.9 交换机与vlan 
+
+当交换机的某个vlan的port被占完后，比如交换机A的vlan10的port被占完了，需要用到第二个交换机B，也给B划分vlan10，然后将A和B连接起来，连接的端口设置为trunk port，这样从trunk port出去的数据会加上vlan tag的标志，只有vlan tag一样的才能收到。
+
+
+
 ### 2. Linux虚拟网络基础
 
 #### 2.1 tap与tun
@@ -100,6 +106,14 @@ veth pair不是一个设备，而是一对设备，以连接两个虚拟以太�
 如图：4个namespace，每个namespace都有一个tap，每个tap与网桥vb1的tap组成一对veth pair，这样，这4个namespace就可以**二层互通**了。
 
 ![img](.\企业微信截图_16283907317141.png)
+
+##### 2.5.1 br-int
+
+bridge-intergration，综合网桥，常用于表示实现主要内部网络功能的网桥。
+
+##### 2.5.2 br-ex
+
+bridge-external，外部网桥，通常表示负责跟外部网络通信的网桥。
 
 #### 2.6 tun
 
@@ -324,6 +338,14 @@ https://www.jianshu.com/p/9b1fa7b1b705
 
 Neutron当前支持的二层网络类型有Local、Flat、VLAN、GRE、VXLAN、Geneve 6种，每种类型的网络实现模型都有所不同。
 
+openstack的网络实现方式有flat，vlan，gre，vxlan
+*flat* :即所有的设备都连接到同一交换机上，可以互相通信。
+*vlan* :由于flat容易产生广播风暴，所以引入vlan，在二层进行vlan划分，隔离网络。
+*gre & vxlan* ：由于vlan的个数有限，只能有4094个，对公有云来说不够。所以引入gre，vxlan。
+gre和vxlan是三层的隧道技术。通过在三层重新封装数据包，在节点之间创建隧道，通过UDP进行传输。
+
+
+
 #### 4.1 qbr、br-int、br-thx、veth pair概念
 
 Neutron的VLAN实现模型，如下：
@@ -331,7 +353,7 @@ Neutron的VLAN实现模型，如下：
 
 br-ethx、br-int、qbr-xxx、qbr-yyy都是Bridge，只不过实现方式不同。前两者选择的是OVS（Open vSwitch），后两者选择的是Linux Bridge。
 
-##### 4.1.1 qbr及br-int
+##### 4.1.1 qbr及br-int、qvo、qvb
 
 qbr-xxx、qbr-yyy一般简称qbr。**qbr**这个缩写比较有意思，它是**Quantum Bridge的缩写**，而OpenStack网络组件的前一个商标名就是Quantum，只不过由于版权的原因，才改为Neutron。从这个称呼我们也能看到Neutron里面Quantum的影子。
 
@@ -340,6 +362,8 @@ br-int，表达的是**Integration Bridge（综合网桥）**的含义。至于�
 qbr与br-int都是Bridge。**qbr的实现载体是Linux Bridge，br-int的实现载体是OVS（Open vSwitch）**。需要强调的是，并不是绝对地说qbr一定就是Linux Bridge，br-int一定就是OVS，也可以用其他的实现方式来替换它们。只不过这样的实现方式是当前OpenStack解决方案的比较经典的方式而已。
 
 **qbr与br-int之间，通过veth pair连接，VM与qbr之间，通过tap连接。**其实VM与qbr之间只有1个tap，也就是说是1个tap分别挂接在VM和qbr之上。
+
+**qvo、qvb**：在 VM1 中，虚拟机的网卡实际上连接到了物理机的一个 TAP 设备（即 A，常见名称如 tap-XXX）上，A 则进一步通过VETH pair（A-B）连接到网桥 qbr-XXX 的端口 vnet0（端口 B）上，之后再通过 VETH pair（C-D）连到br-int网桥上。一般C的名字格式为 qvb-XXX（neutron veth，Linux Bridge-side），而 D 的名字格式为 qvo-XXX（neutron veth，OVS-side）。注意它们的名称除了前缀外，后面的 id 都是一样的，表示位于同一个虚拟机网络到物理机网络的连接上。
 
 ##### 4.1.2 两层bridge的原因
 
@@ -518,7 +542,7 @@ Bridge层是对VM层的一个屏蔽。从VM发出的Untag报文，被Bridge层�
 
 位于同一个Host的本地网络中的不同VM之间的通信，它们经过本地网络层（即经过br-int）即可完成，不需要再往外走到用户网络层
 
-
+推荐网址：https://hardocs.com/d/openstack-neutron/vlan_mode/
 
 
 

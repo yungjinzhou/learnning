@@ -607,8 +607,6 @@ lookup_controller针对每一个controller对象，在其中查找对应的处�
 
 
 
-
-
 ### 3. gnocchi-metricd源码分析
 
 #### 3.1 初始代码加载
