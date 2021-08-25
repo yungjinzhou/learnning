@@ -845,17 +845,32 @@ InstanceStats具体实现
 
 
 
-## 二、compute增加pollster
+
+
+
+
+## 三、增加pollster的方法
+
+#### 3.1 物理机增加metric方法
+
+- 修改/ceilometer/hardware/pollsters/data/snmp.yaml添加对应metric
+- ceilometer/polling/manager.py  ceilometer/polling/data_process.py做对应处理
+- 同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加对应metric
+- 重启openstack-ceilometer-central服务，gnocchi查询对应resource的对应metric，看是否新增，数据是否正常收集
+
+
+
+#### 3.2 虚拟机增加metric方法
 
 以驱动为libvirt为例修改三个地方
 
 
 
-### 2.1 修改inspector函数对应位置添加meter及转换方式
+##### 3.2.1 修改inspector函数对应位置添加meter及转换方式
 
 `ceilometer/compute/virt/libvirt/insector.py`
 
-<font color=red>增加memory.util</font>
+**<font color=red>增加memory.util为例</font>**
 
 ```
     @libvirt_utils.raise_nodata_if_unsupported
@@ -927,7 +942,7 @@ InstanceStats具体实现
 
 
 
-### 2.2 新加pollster代码
+##### 3.2.2 新加pollster类
 
 `ceilometer/compute/pollsters/instance_stats.py`
 
@@ -940,9 +955,7 @@ class MemoryUtilPollster(InstanceStatsPollster):
     sample_stats_key = 'memory_util'
 ```
 
-
-
-### 2.3 修改总入口，添加stats_key
+##### 3.2.3 修改总入口，添加stats_key
 
 ```
 # ceilometer/compute/virt/inspector.py 
@@ -980,7 +993,9 @@ class InstanceStats(object):
 
 
 
-### 2.4 修改entry_points.txt添加entry_points，让stevedore能够扫描到新加的pollster
+##### 3.2.4 修改entry_points.txt
+
+> 添加entry_points，让stevedore能够扫描到新加的pollster
 
 该位置加载代码中新添加的pollster
 
@@ -990,108 +1005,10 @@ vim /usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/entry_poin
 
 {'obj': <ceilometer.compute.pollsters.instance_stats.MemoryUtilPollster object at 0x7fb231486990>, 'entry_point': EntryPoint.parse('memory.util = ceilometer.compute.pollsters.instance_stats:MemoryUtilPollster'), 'name': 'memory.util', 'plugin': <class 'ceilometer.compute.pollsters.instance_stats.MemoryUtilPollster'>}
 
+##### 3.2.5  修改配置文件
 
-
-### 2.5 修改polling.yaml
-
-```
-
----
-sources:
-    - name: some_pollsters
-      interval: 60
-      meters:
-        - cpu
-        - vcpus
-      #  - cpu_util
-        - memory
-        - memory.util
-        - memory.usage
-        - memory.resident
-        - memory.swap.in
-        - memory.swap.out
-        - network.incoming.bytes
-        - network.incoming.packets
-        - network.outgoing.bytes
-        - network.outgoing.packets
-        - network.incoming.packets.drop
-        - network.incoming.packets.error
-        - network.outgoing.packets.drop
-        - network.outgoing.packets.error
-        - disk.device.read.bytes
-        - disk.device.read.requests
-        - disk.device.write.bytes
-        - disk.device.write.requests
-        - disk.device.read.bytes.rate
-        - disk.device.read.requests.rate
-        - disk.device.write.bytes.rate
-        - disk.device.write.requests.rate
-        - disk.device.capacity
-        - disk.device.allocation
-        - disk.device.usage
-        - disk.root.size
-        - disk.usage
-    - name: hardware_snmp
-      interval: 60
-      resources:
-          - snmp://30.90.2.18
-      meters:
-        - hardware.cpu.util
-        - hardware.cpu.user
-        - hardware.cpu.nice
-        - hardware.cpu.system
-        - hardware.cpu.idle
-        - hardware.cpu.wait
-        - hardware.cpu.kernel
-        - hardware.cpu.interrupt
-        - hardware.disk.size.total
-        - hardware.disk.size.used
-        - hardware.disk.read.bytes
-        - hardware.disk.write.bytes
-        - hardware.disk.read.requests
-        - hardware.disk.write.requests
-        - hardware.memory.used
-        - hardware.memory.total
-        - hardware.memory.buffer
-        - hardware.memory.cached
-        - hardware.memory.swap.avail
-        - hardware.memory.swap.total
-        - hardware.network.incoming.bytes
-        - hardware.network.incoming.errors
-        - hardware.network.incoming.drop
-        - hardware.network.incoming.packets
-        - hardware.network.outgoing.bytes
-        - hardware.network.outgoing.errors
-        - hardware.network.outgoing.drop
-        - hardware.network.outgoing.packets
-        - hardware.network.ip.incoming.datagrams
-        - hardware.network.ip.outgoing.datagrams
-    - name: user_defined # 配置节点对应ip
-      meters:
-        - custom.hardware.cpu.user.percentage
-        - custom.hardware.cpu.nice.percentage
-        - custom.hardware.cpu.wait.percentage
-        - custom.hardware.cpu.system.percentage
-        - custom.hardware.cpu.idle.percentage
-        - custom.hardware.cpu.steal.percentage
-        - custom.hardware.cpu.softinterrupt.percentage
-        - custom.hardware.cpu.interrupt.percentage
-        - custom.hardware.disk.utilization
-        - custom.hardware.memory.utilization
-        - custom.hardware.swap.utilization
-        - custom.hardware.network.interface.status
-        - custom.hardware.disk.read.bytes
-        - custom.hardware.disk.write.bytes
-        - custom.hardware.disk.read.requests
-        - custom.hardware.disk.write.requests
-      resources:
-        - snmp://30.90.2.18
-      interval: 60
-
-
-```
-
-
+- 同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加对应metric
+- 重启openstack-ceilometer-compute服务，gnocchi查询对应resource的对应metric，看是否新增，数据是否正常收集
 
 
 

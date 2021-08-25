@@ -1423,11 +1423,27 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
 
 新处理多块磁盘读写；优化收集程序，减少开销
 
-磁盘读写新增metric，需要同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加，重启服务
+- **磁盘读写新增metric，需要同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加，重启服务**
+- **每个节点都需要安装sysstat**
 
 ```
-# average配置代表所有磁盘平均读写速率
-# 没有average代表多个磁盘的读写，但是此情况需要在/etc/ceilometer/monitor_hardware.yaml中配置要监控的磁盘名称，如（/dev/sda）
+# xxxx.average配置代表所有磁盘平均读写速率
+# 没有xxx.average代表多个磁盘的读写，但是此情况需要在/etc/ceilometer/monitor_hardware.yaml中配置要监控的磁盘名称，如（/dev/sda）
+        - custom.hardware.cpu.kernel.percentage
+        - custom.hardware.cpu.guest.percentage
+        - custom.hardware.cpu.guestnice.percentage
+        - custom.hardware.cpu.util.percentage
+        - custom.hardware.disk.size.total
+        - custom.hardware.disk.size.used
+        - custom.hardware.memory.total
+        - custom.hardware.memory.used
+        - custom.hardware.memory.cache
+        - custom.hardware.memory.buffer
+        - custom.hardware.memory.utilization
+        - custom.hardware.swap.total
+        - custom.hardware.swap.available
+        - custom.hardware.swap.utilization
+        - custom.hardware.network.interface.status
         - custom.hardware.disk.read.bytes.average
         - custom.hardware.disk.write.bytes.average
         - custom.hardware.disk.read.requests.average
@@ -1461,7 +1477,164 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
 
 
 
-## 三、注意事项
+## 三、增加pollster的方法
+
+#### 3.1 物理机增加metric方法
+
+- 修改/ceilometer/hardware/pollsters/data/snmp.yaml添加对应metric
+- ceilometer/polling/manager.py  ceilometer/polling/data_process.py做对应处理
+- 同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加对应metric
+- 重启openstack-ceilometer-central服务，gnocchi查询对应resource的对应metric，看是否新增，数据是否正常收集
+
+
+
+#### 3.2 虚拟机增加metric方法
+
+以驱动为libvirt为例修改三个地方
+
+##### 3.2.1 修改inspector函数对应位置添加meter及转换方式
+
+`ceilometer/compute/virt/libvirt/insector.py`
+
+**<font color=red>增加memory.util为例</font>**
+
+```
+    @libvirt_utils.raise_nodata_if_unsupported
+    @libvirt_utils.retry_on_disconnect
+    def inspect_instance(self, instance, duration=None):
+        domain = self._get_domain_not_shut_off_or_raise(instance)
+
+        memory_used = memory_resident = None
+        memory_swap_in = memory_swap_out = None
+        memory_util = None
+        memory_stats = domain.memoryStats()
+        # Stat provided from libvirt is in KB, converting it to MB.
+        if 'usable' in memory_stats and 'available' in memory_stats:
+            memory_used = (memory_stats['available'] -
+                           memory_stats['usable']) / units.Ki
+            memory_util = round(float(memory_used) / (memory_stats['available'] / units.Ki), 2)
+        elif 'available' in memory_stats and 'unused' in memory_stats:
+            memory_used = (memory_stats['available'] -
+                           memory_stats['unused']) / units.Ki
+            memory_util = round(float(memory_used) / (memory_stats['available'] / units.Ki), 2)
+        if 'rss' in memory_stats:
+            memory_resident = memory_stats['rss'] / units.Ki
+        if 'swap_in' in memory_stats and 'swap_out' in memory_stats:
+            memory_swap_in = memory_stats['swap_in'] / units.Ki
+            memory_swap_out = memory_stats['swap_out'] / units.Ki
+
+        # TODO(sileht): stats also have the disk/vnic info
+        # we could use that instead of the old method for Queen
+        stats = self.connection.domainListGetStats([domain], 0)[0][1]
+        cpu_time = 0
+        current_cpus = stats.get('vcpu.current')
+        # Iterate over the maximum number of CPUs here, and count the
+        # actual number encountered, since the vcpu.x structure can
+        # have holes according to
+        # https://libvirt.org/git/?p=libvirt.git;a=blob;f=src/libvirt-domain.c
+        # virConnectGetAllDomainStats()
+        for vcpu in six.moves.range(stats.get('vcpu.maximum', 0)):
+            try:
+                cpu_time += (stats.get('vcpu.%s.time' % vcpu) +
+                             stats.get('vcpu.%s.wait' % vcpu))
+                current_cpus -= 1
+            except TypeError:
+                # pass here, if there are too many holes, the cpu count will
+                # not match, so don't need special error handling.
+                pass
+
+        if current_cpus:
+            # There wasn't enough data, so fall back
+            cpu_time = stats.get('cpu.time')
+
+        return virt_inspector.InstanceStats(
+            cpu_number=stats.get('vcpu.current'),
+            cpu_time=cpu_time / stats.get('vcpu.current'),
+            memory_usage=memory_used,
+            memory_util=memory_util,
+            memory_resident=memory_resident,
+            memory_swap_in=memory_swap_in,
+            memory_swap_out=memory_swap_out,
+            cpu_cycles=stats.get("perf.cpu_cycles"),
+            instructions=stats.get("perf.instructions"),
+            cache_references=stats.get("perf.cache_references"),
+            cache_misses=stats.get("perf.cache_misses"),
+            memory_bandwidth_total=stats.get("perf.mbmt"),
+            memory_bandwidth_local=stats.get("perf.mbml"),
+            cpu_l3_cache_usage=stats.get("perf.cmt"),
+        )
+
+```
+
+
+
+##### 3.2.2 新加pollster类
+
+`ceilometer/compute/pollsters/instance_stats.py`
+
+
+
+```
+class MemoryUtilPollster(InstanceStatsPollster):
+    sample_name = 'memory.util'
+    sample_unit = '%'
+    sample_stats_key = 'memory_util'
+```
+
+##### 3.2.3 修改总入口，添加stats_key
+
+```
+# ceilometer/compute/virt/inspector.py 
+
+class InstanceStats(object):
+    fields = [
+        'cpu_number',              # number: number of CPUs
+        'cpu_time',                # time: cumulative CPU time
+        'cpu_util',                # util: CPU utilization in percentage
+        'cpu_l3_cache_usage',      # cachesize: Amount of CPU L3 cache used
+        'memory_usage',            # usage: Amount of memory used
+        'memory_util',            # memory_util: memory utilization in percentage
+        'memory_resident',         #
+        'memory_swap_in',          # memory swap in
+        'memory_swap_out',         # memory swap out
+        'memory_bandwidth_total',  # total: total system bandwidth from one
+                                   #   level of cache
+        'memory_bandwidth_local',  # local: bandwidth of memory traffic for a
+                                   #   memory controller
+        'cpu_cycles',              # cpu_cycles: the number of cpu cycles one
+                                   #   instruction needs
+        'instructions',            # instructions: the count of instructions
+        'cache_references',        # cache_references: the count of cache hits
+        'cache_misses',            # cache_misses: the count of caches misses
+    ]
+
+    def __init__(self, **kwargs):
+        for k in self.fields:
+            setattr(self, k, kwargs.pop(k, None))
+        if kwargs:
+            raise AttributeError(
+                "'InstanceStats' object has no attributes '%s'" % kwargs)
+
+```
+
+
+
+##### 3.2.4 修改entry_points.txt添加entry_points，让stevedore能够扫描到新加的pollster
+
+该位置加载代码中新添加的pollster
+
+vim /usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/entry_points.txt 
+
+添加后可以从self.extension中获取
+
+{'obj': <ceilometer.compute.pollsters.instance_stats.MemoryUtilPollster object at 0x7fb231486990>, 'entry_point': EntryPoint.parse('memory.util = ceilometer.compute.pollsters.instance_stats:MemoryUtilPollster'), 'name': 'memory.util', 'plugin': <class 'ceilometer.compute.pollsters.instance_stats.MemoryUtilPollster'>}
+
+##### 3.2.5  修改配置文件
+
+- 同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加对应metric
+- 重启openstack-ceilometer-compute服务，gnocchi查询对应resource的对应metric，看是否新增，数据是否正常收集
+
+## 注意事项
 
 #### 3.1. 关于配置yaml文件
 
