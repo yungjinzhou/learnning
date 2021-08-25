@@ -2026,6 +2026,8 @@ resources:
 
 ##### 10.4 monitor_hardware.yaml(所有要监控的节点)
 
+**需要收集单个磁盘读写速率的需要配置此项，否则收集失败**
+
 ```
 host:
   disk_name:
