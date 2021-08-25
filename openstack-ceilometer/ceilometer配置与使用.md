@@ -1413,6 +1413,629 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
 
 
 
+#### 10.最新配置文件
+
+##### 10.1 polling.yaml (所有要监控的节点)
+
+```
+---
+sources:
+    - name: some_pollsters
+      interval: 60
+      meters:
+        - cpu
+        - vcpus
+      #  - cpu_util
+        - memory
+        - memory.util
+        - memory.usage
+        - memory.resident
+        - memory.swap.in
+        - memory.swap.out
+        - network.incoming.bytes
+        - network.incoming.packets
+        - network.outgoing.bytes
+        - network.outgoing.packets
+        - network.incoming.packets.drop
+        - network.incoming.packets.error
+        - network.outgoing.packets.drop
+        - network.outgoing.packets.error
+        - disk.device.read.bytes
+        - disk.device.read.requests
+        - disk.device.write.bytes
+        - disk.device.write.requests
+        - disk.device.read.bytes.rate
+        - disk.device.read.requests.rate
+        - disk.device.write.bytes.rate
+        - disk.device.write.requests.rate
+        - disk.device.capacity
+        - disk.device.allocation
+        - disk.device.usage
+        - disk.root.size
+        - disk.usage
+    - name: hardware_snmp
+      interval: 60
+      resources:
+          - snmp://192.168.204.174
+      meters:
+        - hardware.cpu.util
+        - hardware.cpu.user
+        - hardware.cpu.nice
+        - hardware.cpu.system
+        - hardware.cpu.idle
+        - hardware.cpu.wait
+        - hardware.cpu.kernel
+        - hardware.cpu.interrupt
+        - hardware.disk.size.total
+        - hardware.disk.size.used
+        - hardware.disk.read.bytes
+        - hardware.disk.write.bytes
+        - hardware.disk.read.requests
+        - hardware.disk.write.requests
+        - hardware.memory.used
+        - hardware.memory.total
+        - hardware.memory.buffer
+        - hardware.memory.cached
+        - hardware.memory.swap.avail
+        - hardware.memory.swap.total
+        - hardware.network.incoming.bytes
+        - hardware.network.incoming.errors
+        - hardware.network.incoming.drop
+        - hardware.network.incoming.packets
+        - hardware.network.outgoing.bytes
+        - hardware.network.outgoing.errors
+        - hardware.network.outgoing.drop
+        - hardware.network.outgoing.packets
+        - hardware.network.ip.incoming.datagrams
+        - hardware.network.ip.outgoing.datagrams
+    - name: user_defined # 配置节点对应ip
+      meters:
+        - custom.hardware.cpu.user.percentage
+        - custom.hardware.cpu.nice.percentage
+        - custom.hardware.cpu.wait.percentage
+        - custom.hardware.cpu.system.percentage
+        - custom.hardware.cpu.idle.percentage
+        - custom.hardware.cpu.steal.percentage
+        - custom.hardware.cpu.softinterrupt.percentage
+        - custom.hardware.cpu.interrupt.percentage
+        - custom.hardware.cpu.kernel.percentage
+        - custom.hardware.cpu.guest.percentage
+        - custom.hardware.cpu.guestnice.percentage
+        - custom.hardware.cpu.util.percentage
+        - custom.hardware.memory.total
+        - custom.hardware.memory.used
+        - custom.hardware.memory.cache
+        - custom.hardware.memory.buffer
+        - custom.hardware.memory.utilization
+        - custom.hardware.swap.total
+        - custom.hardware.swap.available
+        - custom.hardware.swap.utilization
+        - custom.hardware.network.interface.status
+        - custom.hardware.disk.utilization
+        - custom.hardware.disk.read.bytes.average
+        - custom.hardware.disk.write.bytes.average
+        - custom.hardware.disk.read.requests.average
+        - custom.hardware.disk.write.requests.average
+        - custom.hardware.disk.read.bytes
+        - custom.hardware.disk.write.bytes
+        - custom.hardware.disk.read.requests
+        - custom.hardware.disk.write.requests
+        - custom.hardware.disk.size.total
+        - custom.hardware.disk.size.used
+      resources:
+        - snmp://192.168.204.174
+      interval: 60
+
+```
+
+
+
+
+
+##### 10.2 pipeline.yaml(控制节点)
+
+```
+---
+sources:
+    - name: hardware_meter
+      meters:
+        - hardware.cpu.util
+        - hardware.cpu.user
+        - hardware.cpu.nice
+        - hardware.cpu.system
+        - hardware.cpu.idle
+        - hardware.cpu.wait
+        - hardware.cpu.kernel
+        - hardware.cpu.interrupt
+        - hardware.disk.size.total
+        - hardware.disk.size.used
+        - hardware.disk.read.bytes
+        - hardware.disk.write.bytes
+        - hardware.disk.read.requests
+        - hardware.disk.write.requests
+        - hardware.memory.used
+        - hardware.memory.total
+        - hardware.memory.buffer
+        - hardware.memory.cached
+        - hardware.memory.swap.avail
+        - hardware.memory.swap.total
+        - hardware.network.incoming.bytes
+        - hardware.network.incoming.drop
+        - hardware.network.incoming.errors
+        - hardware.network.incoming.packets
+        - hardware.network.outgoing.bytes
+        - hardware.network.outgoing.drop
+        - hardware.network.outgoing.errors
+        - hardware.network.outgoing.packets
+        - hardware.network.ip.incoming.datagrams
+        - hardware.network.ip.outgoing.datagrams
+      resources:
+          - snmp://30.90.2.27
+      sinks:
+          - meter_snmp_sink
+
+    - name: some_pollsters
+      meters:
+        - cpu
+        - vcpus
+        - cpu_util
+        - memory
+        - memory.util
+        - memory.usage
+        - memory.resident
+        - memory.swap.in
+        - memory.swap.out
+        - network.incoming.bytes
+        - network.incoming.packets
+        - network.outgoing.bytes
+        - network.outgoing.packets
+        - network.incoming.packets.drop
+        - network.incoming.packets.error
+        - network.outgoing.packets.drop
+        - network.outgoing.packets.error
+        - disk.device.read.bytes
+        - disk.device.read.requests
+        - disk.device.write.bytes
+        - disk.device.write.requests
+        - disk.device.usage
+        - disk.device.capacity
+        - disk.device.allocation
+        - disk.root.size
+      sinks:
+        - instance_sink
+    
+    - name: user_defined  # 每个节点配置resources时配置各自的ip，其他一样
+      meters:
+        - custom.hardware.cpu.user.percentage
+        - custom.hardware.cpu.nice.percentage
+        - custom.hardware.cpu.wait.percentage
+        - custom.hardware.cpu.system.percentage
+        - custom.hardware.cpu.idle.percentage
+        - custom.hardware.cpu.steal.percentage
+        - custom.hardware.cpu.softinterrupt.percentage
+        - custom.hardware.cpu.interrupt.percentage
+        - custom.hardware.cpu.kernel.percentage
+        - custom.hardware.cpu.guest.percentage
+        - custom.hardware.cpu.guestnice.percentage
+        - custom.hardware.cpu.util.percentage
+        - custom.hardware.disk.size.total
+        - custom.hardware.disk.size.used
+        - custom.hardware.disk.utilization
+        - custom.hardware.memory.used
+        - custom.hardware.memory.total
+        - custom.hardware.memory.cache
+        - custom.hardware.memory.buffer
+        - custom.hardware.memory.utilization
+        - custom.hardware.swap.available
+        - custom.hardware.swap.total
+        - custom.hardware.swap.utilization
+        - custom.hardware.network.interface.status
+        - custom.hardware.disk.read.bytes.average
+        - custom.hardware.disk.write.bytes.average
+        - custom.hardware.disk.read.requests.average
+        - custom.hardware.disk.write.requests.average
+        - custom.hardware.disk.read.bytes
+        - custom.hardware.disk.write.bytes
+        - custom.hardware.disk.read.requests
+        - custom.hardware.disk.write.requests
+      resources:
+        - snmp://30.90.2.27
+      sinks:
+          - user_defined_sink
+
+sinks:
+    - name: meter_snmp_sink
+      transformers:
+      publishers:
+        - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+    - name: instance_sink
+      transformers:
+      publishers:
+        - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+    - name: meter_sink
+      transformers:
+      publishers:
+        - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+    - name: user_defined_sink
+      transformers:
+      publishers:
+          - gnocchi://?filter_project=service&archive_policy=horizon-mimic
+
+
+```
+
+
+
+##### 10.3 gnocchi_resource.yaml(控制节点)
+
+```
+---
+archive_policy_default: horizon-mimic
+archive_policies:
+  # NOTE(sileht): We keep "mean" for now to not break all gating that
+  # use the current tempest scenario.
+  - name: ceilometer-low
+    aggregation_methods:
+      - mean
+    back_window: 0
+    definition:
+      - granularity: 5 minutes
+        timespan: 30 days
+  - name: ceilometer-low-rate
+    aggregation_methods:
+      - mean
+      - rate:mean
+    back_window: 0
+    definition:
+      - granularity: 5 minutes
+        timespan: 30 days
+  - name: ceilometer-high
+    aggregation_methods:
+      - mean
+    back_window: 0
+    definition:
+      - granularity: 1 second
+        timespan: 1 hour
+      - granularity: 1 minute
+        timespan: 1 day
+      - granularity: 1 hour
+        timespan: 365 days
+  - name: ceilometer-high-rate
+    aggregation_methods:
+      - mean
+      - rate:mean
+    back_window: 0
+    definition:
+      - granularity: 1 second
+        timespan: 1 hour
+      - granularity: 1 minute
+        timespan: 1 day
+      - granularity: 1 hour
+        timespan: 365 days
+
+resources:
+  - resource_type: identity
+    metrics:
+      identity.authenticate.success:
+      identity.authenticate.pending:
+      identity.authenticate.failure:
+      identity.user.created:
+      identity.user.deleted:
+      identity.user.updated:
+      identity.group.created:
+      identity.group.deleted:
+      identity.group.updated:
+      identity.role.created:
+      identity.role.deleted:
+      identity.role.updated:
+      identity.project.created:
+      identity.project.deleted:
+      identity.project.updated:
+      identity.trust.created:
+      identity.trust.deleted:
+      identity.role_assignment.created:
+      identity.role_assignment.deleted:
+
+  - resource_type: instance
+    metrics:
+      memory:
+      memory.usage:
+      memory.util:
+      memory.resident:
+      memory.swap.in:
+      memory.swap.out:
+      memory.bandwidth.total:
+      memory.bandwidth.local:
+      network.incoming.bytes:
+      network.incoming.packets:
+      network.outgoing.bytes:
+      network.outgoing.packets:
+      network.incoming.packets.drop:
+      network.incoming.packets.error:
+      network.outgoing.packets.drop:
+      network.outgoing.packets.error:
+      vcpus:
+      cpu_util:
+      cpu:
+      cpu_l3_cache:
+      disk.root.size:
+      disk.ephemeral.size:
+      disk.latency:
+      disk.iops:
+      disk.capacity:
+      disk.allocation:
+      disk.usage:
+      disk.device.read.requests:
+      disk.device.write.requests:
+      disk.device.read.bytes:
+      disk.device.write.bytes:
+      disk.device.capacity:
+      disk.device.allocation:
+      disk.device.usage:
+      disk.root.size:
+      disk.usage:
+      compute.instance.booting.time:
+      perf.cpu.cycles:
+      perf.instructions:
+      perf.cache.references:
+      perf.cache.misses:
+    attributes:
+      host: resource_metadata.(instance_host|host)
+      image_ref: resource_metadata.image_ref
+      launched_at: resource_metadata.launched_at
+      created_at: resource_metadata.created_at
+      deleted_at: resource_metadata.deleted_at
+      display_name: resource_metadata.display_name
+      flavor_id: resource_metadata.(instance_flavor_id|(flavor.id)|flavor_id)
+      flavor_name: resource_metadata.(instance_type|(flavor.name)|flavor_name)
+      server_group: resource_metadata.user_metadata.server_group
+    event_delete: compute.instance.delete.start
+    event_attributes:
+      id: instance_id
+    event_associated_resources:
+      instance_network_interface: '{"=": {"instance_id": "%s"}}'
+      instance_disk: '{"=": {"instance_id": "%s"}}'
+
+  - resource_type: instance_network_interface
+    metrics:
+      network.outgoing.packets:
+      network.incoming.packets:
+      network.outgoing.packets.drop:
+      network.incoming.packets.drop:
+      network.outgoing.packets.error:
+      network.incoming.packets.error:
+      network.outgoing.bytes:
+      network.incoming.bytes:
+    attributes:
+      name: resource_metadata.vnic_name
+      instance_id: resource_metadata.instance_id
+
+  - resource_type: instance_disk
+    metrics:
+      disk.device.read.requests:
+      disk.device.write.requests:
+      disk.device.read.bytes:
+      disk.device.write.bytes:
+      disk.device.latency:
+      disk.device.read.latency:
+      disk.device.write.latency:
+      disk.device.iops:
+      disk.device.capacity:
+      disk.device.allocation:
+      disk.device.usage:
+    attributes:
+      name: resource_metadata.disk_name
+      instance_id: resource_metadata.instance_id
+
+
+  - resource_type: compute_host
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.utilization:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+    attributes:
+      host_name: resource_metadata.resource_url
+
+  - resource_type: host_disk
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.cpu.util.percentage:
+      custom.hardware.cpu.kernel.percentage:
+      custom.hardware.cpu.guest.percentage:
+      custom.hardware.cpu.guestnice.percentage:
+      custom.hardware.disk.size.total:
+      custom.hardware.disk.size.used:
+      custom.hardware.disk.utilization:
+      custom.hardware.disk.read.bytes.average:
+      custom.hardware.disk.write.bytes.average:
+      custom.hardware.disk.read.requests.average:
+      custom.hardware.disk.write.requests.average:
+      custom.hardware.disk.read.bytes:
+      custom.hardware.disk.write.bytes:
+      custom.hardware.disk.read.requests:
+      custom.hardware.disk.write.requests:
+      custom.hardware.memory.total:
+      custom.hardware.memory.used:
+      custom.hardware.memory.cache:
+      custom.hardware.memory.buffer:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.total:
+      custom.hardware.swap.available:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+    attributes:
+      host_name: resource_metadata.resource_url
+      device_name: resource_metadata.device
+
+  - resource_type: host_network_interface
+    metrics:
+      hardware.network.ip.incoming.datagrams:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.incoming.bytes:
+      hardware.network.incoming.drop:
+      hardware.network.incoming.errors:
+      hardware.network.incoming.packets:
+      hardware.network.outgoing.bytes:
+      hardware.network.outgoing.drop:
+      hardware.network.outgoing.errors:
+      hardware.network.outgoing.packets:
+    attributes:
+      host_name: resource_metadata.resource_url
+      device_name: resource_metadata.name
+
+  - resource_type: host
+    metrics:
+      hardware.cpu.load.1min:
+      hardware.cpu.load.5min:
+      hardware.cpu.load.15min:
+      hardware.cpu.util:
+      hardware.cpu.user:
+      hardware.cpu.nice:
+      hardware.cpu.system:
+      hardware.cpu.idle:
+      hardware.cpu.wait:
+      hardware.cpu.kernel:
+      hardware.cpu.interrupt:
+      hardware.disk.size.total:
+      hardware.disk.size.used:
+      hardware.disk.read.bytes:
+      hardware.disk.write.bytes:
+      hardware.disk.read.requests:
+      hardware.disk.write.requests:
+      hardware.memory.total:
+      hardware.memory.used:
+      hardware.memory.swap.total:
+      hardware.memory.swap.avail:
+      hardware.memory.buffer:
+      hardware.memory.cached:
+      hardware.network.ip.outgoing.datagrams:
+      hardware.network.ip.incoming.datagrams:
+      hardware.system_stats.cpu.idle:
+      hardware.system_stats.io.outgoing.blocks:
+      hardware.system_stats.io.incoming.blocks:
+      custom.hardware.cpu.user.percentage:
+      custom.hardware.cpu.system.percentage:
+      custom.hardware.cpu.idle.percentage:
+      custom.hardware.cpu.nice.percentage:
+      custom.hardware.cpu.steal.percentage:
+      custom.hardware.cpu.util.percentage:
+      custom.hardware.cpu.wait.percentage:
+      custom.hardware.cpu.interrupt.percentage:
+      custom.hardware.cpu.softinterrupt.percentage:
+      custom.hardware.cpu.kernel.percentage:
+      custom.hardware.cpu.guest.percentage:
+      custom.hardware.cpu.guestnice.percentage:
+      custom.hardware.disk.utilization:
+      custom.hardware.disk.size.total:
+      custom.hardware.disk.size.used:
+      custom.hardware.disk.read.bytes.average:
+      custom.hardware.disk.write.bytes.average:
+      custom.hardware.disk.read.requests.average:
+      custom.hardware.disk.write.requests.average:
+      custom.hardware.disk.read.bytes:
+      custom.hardware.disk.write.bytes:
+      custom.hardware.disk.read.requests:
+      custom.hardware.disk.write.requests:
+      custom.hardware.memory.total:
+      custom.hardware.memory.used:
+      custom.hardware.memory.cache:
+      custom.hardware.memory.buffer:
+      custom.hardware.memory.utilization:
+      custom.hardware.swap.available:
+      custom.hardware.swap.total:
+      custom.hardware.swap.utilization:
+      custom.hardware.network.interface.status:
+    attributes:
+      host_name: resource_metadata.resource_url
+
+```
+
+
+
+##### 10.4 monitor_hardware.yaml(所有要监控的节点)
+
+```
+host:
+  disk_name:
+    - /dev/sda
+instance:
+  disk_name: []
+  network_interface_name: []
+
+```
+
 
 
 
@@ -1433,8 +2056,6 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
         - custom.hardware.cpu.guest.percentage
         - custom.hardware.cpu.guestnice.percentage
         - custom.hardware.cpu.util.percentage
-        - custom.hardware.disk.size.total
-        - custom.hardware.disk.size.used
         - custom.hardware.memory.total
         - custom.hardware.memory.used
         - custom.hardware.memory.cache
@@ -1444,6 +2065,8 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
         - custom.hardware.swap.available
         - custom.hardware.swap.utilization
         - custom.hardware.network.interface.status
+        - custom.hardware.disk.size.total
+        - custom.hardware.disk.size.used
         - custom.hardware.disk.read.bytes.average
         - custom.hardware.disk.write.bytes.average
         - custom.hardware.disk.read.requests.average
@@ -1472,6 +2095,8 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
         - custom.hardware.disk.read.requests
         - custom.hardware.disk.write.requests
 ```
+
+
 
 
 
