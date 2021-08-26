@@ -1350,6 +1350,7 @@ agentAddress udp:161
 com2sec notConfigUser  default       public
 
 view    all    included   .1
+view   systemview included .1
 
 # snmp收集disk磁盘信息-增加，可以不加
 includeAllDisks for all partitions and disks
