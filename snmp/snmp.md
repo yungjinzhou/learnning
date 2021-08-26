@@ -97,6 +97,10 @@ yum install -y mrtg
 
 #### 1.2.2 snmp配置文件
 
+sed -i.default -e '/^#/d' -e '/^$/d'  /etc/snmp/snmpd.conf
+
+复制snmpd.conf文件到/etc/snmp/目录下。（原有的重命名，保存）
+
 ```
 # 下面是所有配置项 5.7.2
 agentAddress udp:161
@@ -123,17 +127,40 @@ includeAllDisks for all partitions and disks
 - 要获取硬盘信息，需要在snmpd.conf中加入以下信息（假设硬盘只有一个根分区(/)）：
   Disk / 100000（也可以写所有     includeAllDisks for all partitions and disks）
 
-#### 1.2.3 测试
+ **man snmpd.conf 可以查看具体配置项信息**
 
-##### 1.2.3.1 查看扫描指标个数
+#### 1.2. 3 启动snmpd服务
+
+systemctl start snmpd
+
+查看状态systemctl status snmpd
+
+**snmp重启失败，不收集物理机数据时**
+**重启libvirtd.service 然后重启snmpd服务**
+
+##### 关闭selinux和防火墙
+
+```
+#setenforce 0
+
+#vi /etc/sysconfig/selinux
+
+ 修改为：SELINUX=disabled
+
+#service snmpd start
+
+#chkconfig snmpd on
+```
+
+#### 1.2.4 测试
+
+##### 1.2.4.1 查看扫描指标个数
 
 snmpwalk -v 2c -c public localhost:161 | wc -l
 
 如果获取的几十个指标，说明配置有问题，重新检查配置和服务
 
-
-
-##### 1.2.3.2 查看具体指标
+##### 1.2.4.2 查看类
 
 **正常获取**
 
@@ -168,7 +195,11 @@ UCD-SNMP-MIB::memSwapErrorMsg.0 = STRING:
 
 `UCD-SNMP-MIB::memory = No more variables left in this MIB View (It is past the end of the MIB tree)`
 
+##### 1.2.4.3 查看具体指标
 
+可以用snmpwalk测试snmpd运行是否正常
+
+snmpwalk -v 2c -c public 192.168.204.194 oid
 
 ### 1.3 snmpwalk使用
 
