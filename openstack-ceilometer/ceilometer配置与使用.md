@@ -1350,10 +1350,28 @@ agentAddress udp:161
 com2sec notConfigUser  default       public
 
 view    all    included   .1
-view   systemview included .1
+view   systemview included .1   # 当大部分没有时候添加这一行
 
 # snmp收集disk磁盘信息-增加，可以不加
 includeAllDisks for all partitions and disks
+
+
+# 下面是所有配置项
+agentAddress udp:161
+com2sec notConfigUser  default       public
+group   notConfigGroup v1           notConfigUser
+group   notConfigGroup v2c           notConfigUser
+view    all    included   .1
+view    systemview    included   .1
+view    systemview    included   .1.3.6.1.2.1.1
+view    systemview    included   .1.3.6.1.2.1.25.1.1
+access  notConfigGroup ""      any       noauth    exact  systemview none none
+syslocation Unknown (edit /etc/snmp/snmpd.conf)
+syscontact Root <root@localhost> (configure /etc/snmp/snmp.local.conf)
+dontLogTCPWrappersConnects yes
+
+
+
 ```
 
  **man snmpd.conf 可以查看具体配置项信息**
