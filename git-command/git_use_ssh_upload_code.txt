@@ -1,1 +1,13 @@
  git remote set-url origin git@github.com:yungjinzhou/django-myproject.git
+
+
+# 设置指定仓库代理，指定代理地址端口
+git config --local http.proxy http://127.0.0.1:50228
+git config --local https.proxy socks5:127.0.0.1:50027
+git config --local http.proxy socks5:127.0.0.1:50027
+
+# 取消代理
+git config --local --unset http.proxy
+git config --local --unset https.proxy
+
+
