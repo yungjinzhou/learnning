@@ -1,4 +1,4 @@
-# zun安装与配置
+## zun安装与配置
 
 环境：centos7
 
@@ -8,9 +8,9 @@ python2.7.5
 
 
 
-#### controller节点
+### controller节点
 
-创建数据库
+#### 创建数据库
 
 `mysql -uroot -pcomleader@123`
 
@@ -24,8 +24,7 @@ MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'%' IDENTIFIED BY 'coml
 
 
 
-创建openstack用户、服务、端点
-controller节点
+#### 创建openstack用户、服务、端点
 
 
 
@@ -50,7 +49,8 @@ openstack endpoint create --region RegionOne container admin http://controller:9
 
 
 
-3. 在controller节点上安装zun服务
+#### 安装、启动zun服务
+
 3.1 创建用户、组
 
 
@@ -58,8 +58,6 @@ openstack endpoint create --region RegionOne container admin http://controller:9
 ```
 groupadd --system zun
 useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g zun zun
-
-
 ```
 
 
@@ -81,7 +79,7 @@ chown zun:zun /etc/zun
 
 
 ```
-yum install python-pip -y
+yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
 cd /var/lib/zun
 git clone -b stable/stein https://git.openstack.org/openstack/zun.git
 chown -R zun:zun zun
@@ -168,7 +166,7 @@ lock_path = /var/lib/zun/tmp
 [oslo_messaging_amqp]
 [oslo_messaging_kafka]
 [oslo_messaging_notifications]
-driver = messagingv2
+driver = messaging
 [oslo_messaging_rabbit]
 [oslo_policy]
 [pci]
@@ -181,6 +179,7 @@ driver = messagingv2
 [websocket_proxy]
 wsproxy_host = 192.168.204.173
 wsproxy_port = 6784
+base_url = ws://controller:6784
 [zun_client]
 
 ```
@@ -192,7 +191,9 @@ wsproxy_port = 6784
 
 3.8 创建启动文件
 
-vim /usr/lib/systemd/system/zun-api.service
+vim /usr/lib/systemd/system/zun-api.service(暂时不用)
+
+vim /etc/systemd/system/zun-api.service
 
 ```
 [Unit]
@@ -207,9 +208,9 @@ User = zun
 WantedBy = multi-user.target
 ```
 
+vim /usr/lib/systemd/system/zun-wsproxy.service(暂时不用)
 
-
-vim /usr/lib/systemd/system/zun-wsproxy.service
+vim /etc/systemd/system/zun-wsproxy.service
 
 ```
 [Unit]
@@ -254,17 +255,69 @@ pip install websocket
 
 
 
-#### 计算节点
+#### etcd安装
+
+```
+yum install -y etcd
+```
+
+
+
+配置etcd
+
+```
+#[Member]
+ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+ETCD_LISTEN_PEER_URLS="http://192.168.204.173:2380"
+ETCD_LISTEN_CLIENT_URLS="http://192.168.204.173:2379"
+ETCD_NAME="controller"
+#[Clustering]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.204.173:2380"
+ETCD_ADVERTISE_CLIENT_URLS="http://192.168.204.173:2379"
+ETCD_INITIAL_CLUSTER="controller=http://192.168.204.173:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-01"
+ETCD_INITIAL_CLUSTER_STATE="new"
+```
+
+
+
+启动
+
+```
+# systemctl enable etcd
+# systemctl start etcd
+```
+
+
+
+
+
+
+
+### 计算节点
+
+
+
+> **在计算节点安装zun-compute服务前，需要在计算节点安装docker和kuryr-libnetwork**
+> **在控制节点安装etcd**
+
+
+
+#### docker安装
+
+
 
 卸载旧版本的docker
 
-> \# yum remove docker  docker-common  docker-selinux  docker-engine –y
+> ```
+> yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
+> ```
 
 ### 
 
 安装一点必备的依赖
 
-`yum install -y yum-utils device-mapper-persistent-data lvm2`
+`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel`
 配置仓库
 
 `yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo`
@@ -314,7 +367,9 @@ net.ipv4.ip_forward = 1
 
 
 
+#### 安装kuryr-libnetwork
 
+##### 控制节点
 
 5 在controller节点上添加kuryr-libnetwork用户
 5.1 创建kuryr用户
@@ -331,13 +386,7 @@ net.ipv4.ip_forward = 1
 
 
 
-
-
-
-
-
-
-
+##### 计算节点
 
 6 在compute节点安装kuryr-libnetwork
 6.1 创建用户
@@ -375,7 +424,7 @@ net.ipv4.ip_forward = 1
 
 
 ```
-#yum install python-pip -y
+#yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
 
 # cd /var/lib/kuryr
 
@@ -462,6 +511,7 @@ WantedBy = multi-user.target
 
 
 6.7 启动服务
+
 ```
 systemctl enable kuryr-libnetwork
 systemctl start kuryr-libnetwork
@@ -495,16 +545,14 @@ docker network create --driver kuryr --ipam-driver kuryr --subnet 10.10.0.0/16 -
 
 `docker run --net test_net cirros ifconfig`
 
-#### <font color=red>docker使用kuryr网络报错(先继续向下安装)</font>
 
-Status: Downloaded newer image for cirros:latest
-docker: Error response from daemon: failed to create endpoint great_colden on network test_net: NetworkDriver.CreateEndpoint: vif_type(binding_failed) is not supported. A binding script for this type can't be found.
 
+#### zun-compute服务安装与配置
 
 
 
 
-7 在compute节点安装zun服务
+
 7.1 创建用户
 
 ```
@@ -518,6 +566,16 @@ useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g z
 mkdir -p /etc/zun
 chown zun:zun /etc/zun
 ```
+
+
+
+安装依赖
+
+```
+yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
+```
+
+
 
 7.3 安装zun
 
@@ -552,16 +610,12 @@ python setup.py install
 
 
 
-
-
 7.5 配置zun用户
 
 ```
 echo "zun ALL=(root) NOPASSWD: /usr/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
 
 ```
-
-
 
 
 
@@ -615,52 +669,17 @@ lock_path = /var/lib/zun/tmp
 7.7 配置docker和kuryr
 7.7.1 创建docker配置文件夹
 
-`mkdir -p /usr/lib/systemd/system/docker.service.d`
+`mkdir -p /etc/systemd/system/docker.service.d`
 
 ###### 7.7.2 创建docker配置文件--报错
 
-vim /usr/lib/systemd/system/docker.service.d/docker.conf
+vim /etc/systemd/system/docker.service.d/docker.conf
 
 ```
 [Service]
-
 ExecStart=
-
 ExecStart=/usr/bin/dockerd --group zun -H tcp://compute:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
 ```
-
-
-
-需要在控制节点安装etcd
-
-直接安装
-
-`yum install -y etcd`
-
-编辑配置文件/etc/etcd/etcd.conf
-
-```
-#[Member]
-ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
-ETCD_LISTEN_PEER_URLS="http://192.168.1.104:2380"
-ETCD_LISTEN_CLIENT_URLS="http://192.168.1.104:2379"
-ETCD_NAME="controller"
-#[Clustering]
-ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.1.104:2380"
-ETCD_ADVERTISE_CLIENT_URLS="http://192.168.1.104:2379"
-ETCD_INITIAL_CLUSTER="controller=http://192.168.1.104:2380"
-ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-01"
-ETCD_INITIAL_CLUSTER_STATE="new"
-```
-
-启动服务，自启动
-
-```
-systemctl enable etcd
-systemctl start etcd
-```
-
-
 
 
 
@@ -681,6 +700,7 @@ vim  /etc/kuryr/kuryr.conf
 ```
 [DEFAULT]
 capability_scope = global
+process_external_connectivity = False
 ```
 
 
@@ -721,7 +741,70 @@ WantedBy = multi-user.target
 # systemctl status zun-compute
 ```
 
-启动报错
+
+
+
+
+
+
+
+
+
+
+##### 验证
+
+
+
+```
+ pip install python-zunclient==3.3.0
+ source /root/admin-openrc
+ openstack appcontainer service list
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 安装过程中遇到的问题及解决
+
+
+
+#### <font color=red>docker使用kuryr网络报错(先继续向下安装)</font>
+
+Status: Downloaded newer image for cirros:latest
+docker: Error response from daemon: failed to create endpoint great_colden on network test_net: NetworkDriver.CreateEndpoint: vif_type(binding_failed) is not supported. A binding script for this type can't be found.
+
+
+
+
+
+
+
+
+
+#### 启动zun-compute报错
 
 提示
 
@@ -742,6 +825,52 @@ WantedBy = multi-user.target
 ```
 2021-08-27 15:36:52.711 30425 ERROR oslo_service.periodic_task AttributeError: 'Query' object has no attribute 'with_lockmode'
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
