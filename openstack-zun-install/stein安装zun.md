@@ -946,9 +946,17 @@ systemctl status zun-compute
 
 
 
+zun-ui安装
 
 
 
+https://docs.openstack.org/zun-ui/latest/install/index.html
+
+
+
+horizon-dashboard安装配置
+
+https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.html
 
 
 
