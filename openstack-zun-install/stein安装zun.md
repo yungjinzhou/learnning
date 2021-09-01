@@ -17,9 +17,9 @@ python2.7.5
 ```
 MariaDB [（none）] CREATE DATABASE zun;
 
-MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'localhost' IDENTIFIED BY 'comleader@123';
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'localhost' IDENTIFIED BY 'comleader123';
 
-MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'%' IDENTIFIED BY 'comleader@123';
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'%' IDENTIFIED BY 'comleader123';
 ```
 
 
@@ -30,6 +30,7 @@ MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'%' IDENTIFIED BY 'coml
 
 ```
 # . admin-openrc
+# password: comleader123
 
 # openstack user create --domain default --password-prompt zun
 
@@ -102,7 +103,6 @@ su -s /bin/sh -c "cp etc/zun/zun.conf.sample /etc/zun/zun.conf" zun
 
 
 
-
 3.5 复制api-paste.ini配置文件
 
 ```
@@ -125,7 +125,7 @@ port = 9517
 [compute]
 [cors]
 [database]
-connection = mysql+pymysql://zun:comleader@123@controller/zun
+connection = mysql+pymysql://zun:comleader123@controller/zun
 [docker]
 [etcd]
 [glance]
@@ -139,7 +139,7 @@ project_domain_name = default
 user_domain_name = default
 project_name = service
 username = zun
-password = comleader@123
+password = comleader123
 auth_protocol = http
 iauth_version = v3
 service_token_roles_required = True
@@ -153,7 +153,7 @@ project_domain_name = default
 user_domain_name = default
 project_name = service
 username = zun
-password = comleader@123
+password = comleader123
 auth_protocol = http
 iauth_version = v3
 service_token_roles_required = True
@@ -303,6 +303,43 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 
 
 
+
+
+
+
+
+
+时间同步
+
+```
+ 1、安装软件包
+yum install -y chrony
+
+# 2、将时间同步服务器修改为controller节点
+sed -i '/^server/d' /etc/chrony.conf 
+sed -i '2aserver controller iburst' /etc/chrony.conf
+
+# 3、启动 NTP 服务并将其配置为随系统启动
+systemctl enable chronyd.service
+systemctl start chronyd.service
+
+# 4、设置时区
+timedatectl set-timezone Asia/Shanghai
+
+# 5、查看时间同步源
+chronyc sources
+
+# 6、查看时间是否正确
+timedatectl status
+
+```
+
+
+
+
+
+
+
 #### docker安装
 
 
@@ -317,23 +354,43 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 
 安装一点必备的依赖
 
-`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel`
+```
+yum -y upgrade # 只更新包，不更新内核和系统
+```
+
+
+
+`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
+
 配置仓库
 
 `yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo`
 
 好像最近的docker版本升级了，变成了20版本，然后kuryr就用不成了。之前用的19.03没问题，就换成这个，安装这个版本的。
 
+查询docker版本
+
+```
+yum list containerd.io --showduplicates | sort -r
+yum list docker-ce --showduplicates | sort -r
+yum install docker-ce-<VERSION_STRING> docker-ce-cli-<VERSION_STRING> containerd.io
+# for example docker-ce-18.09.1
+```
+
+
+
+
+
 通过本地包安装
 
 ```
-wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-19.03.14-3.el7.x86_64.rpm
-wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-cli-19.03.14-3.el7.x86_64.rpm
+wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-18.09.6-3.el7.x86_64.rpm
+wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-cli-18.09.6-3.el7.x86_64.rpm
 wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.3.9-3.1.el7.x86_64.rpm
 
-yum localinstall  -y  docker-ce-cli-19.03.14-3.el7.x86_64.rpm
+yum localinstall  -y  docker-ce-cli-18.09.6-3.el7.x86_64.rpm
 yum localinstall  -y  containerd.io-1.3.9-3.1.el7.x86_64.rpm
-yum localinstall  -y  docker-ce-19.03.14-3.el7.x86_64.rpm
+yum localinstall  -y  docker-ce-18.09.6-3.el7.x86_64.rpm
 ```
 
 如果需要安装最新的版本，命令是 yum install -y docker-ce docker-ce-cli containerd.io
@@ -377,6 +434,7 @@ net.ipv4.ip_forward = 1
 ```
 # . admin-openrc
 
+# comleader123
 # openstack user create --domain default --password-prompt kuryr
 
 5.2 添加角色
@@ -424,7 +482,7 @@ net.ipv4.ip_forward = 1
 
 
 ```
-#yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
+yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
 
 # cd /var/lib/kuryr
 
@@ -434,26 +492,26 @@ net.ipv4.ip_forward = 1
 
 # cd kuryr-libnetwork
 
-# 安装下一步时如果报错，看下面操作
-# pip install -r requirements.txt
 
-# python setup.py install
-```
-
-
-
-```
 # 直接执行pip install --upgrade pip，如果报错，可能是py2.7版本问题，通过下面途径更新pip
 wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
 sudo python get-pip.py
 更新setuptools
 pip install --upgrade setuptools
 
-yum install python-devel  # 没有安装时提示gcc 失败， yappi失败，缺少python.h文件
+# 提示自带的python-ipaddress版本太旧(1.0.6)，pip直接安装失败
+wget https://cbs.centos.org/kojifiles/packages/python-ipaddress/1.0.18/5.el7/noarch/python2-ipaddress-1.0.18-5.el7.noarch.rpm
+yum install -y python2-ipaddress-1.0.18-5.el7.noarch.rpm
 
-更新后在执行pip install -r requirements.txt
+pip install pyroute2==0.5.10
 
+# pip install -r requirements.txt
+# python setup.py install
 ```
+
+
+
+
 
 
 
@@ -487,7 +545,7 @@ project_domain_name = default
 user_domain_name = default
 project_name = service
 username = kuryr
-password = comleader@123
+password = comleader123
 
 ```
 
@@ -518,9 +576,7 @@ systemctl start kuryr-libnetwork
 systemctl restart docker
 ```
 
-启动遇到问题，可能跟pip和python2.7版本有关系
 
-重新安装了pip install pyroute2==0.4.21
 
 6.8 验证
 6.8.1 创建kuryr网络
@@ -528,20 +584,22 @@ systemctl restart docker
 
 
 ```
-docker network create --driver kuryr --ipam-driver kuryr --subnet 10.10.0.0/16 --gateway=10.10.0.1 test_net
+docker network create --driver kuryr --ipam-driver kuryr --subnet 173.19.12.0/24 --gateway=173.19.12.1 test_docker_net
 
 
 ```
 
 
 
-# 
+
+
+
 
 6.8.2 查看网络
 
 `docker network ls`
 
-6.8.3 创建容器
+6.8.3 创建容器(网络连接失败)
 
 `docker run --net test_net cirros ifconfig`
 
@@ -571,9 +629,19 @@ chown zun:zun /etc/zun
 
 安装依赖
 
+python2版本
+
 ```
 yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
 ```
+
+python3版本
+
+```
+yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl
+```
+
+
 
 
 
@@ -586,8 +654,17 @@ git clone -b stable/stein https://git.openstack.org/openstack/zun.git
 chown -R zun:zun zun
 
 cd zun
+
+# python2安装
 pip install -r requirements.txt
 python setup.py install
+
+
+# python36安装
+pip3 install --upgrade pip
+pip3 install --upgrade setuptools
+# pip3 install -r requirements.txt
+# python3 setup.py install
 ```
 
 
@@ -598,14 +675,13 @@ python setup.py install
 
 ```
 # su -s /bin/sh -c "oslo-config-generator --config-file etc/zun/zun-config-generator.conf" zun
-
 # su -s /bin/sh -c "cp etc/zun/zun.conf.sample /etc/zun/zun.conf" zun
-
 # su -s /bin/sh -c "cp etc/zun/rootwrap.conf /etc/zun/rootwrap.conf" zun
-
 # su -s /bin/sh -c "mkdir -p /etc/zun/rootwrap.d" zun
-
 # su -s /bin/sh -c "cp etc/zun/rootwrap.d/* /etc/zun/rootwrap.d/" zun
+
+# su -s /bin/sh -c "cp etc/cni/net.d/* /etc/cni/net.d/" zun
+
 ```
 
 
@@ -615,6 +691,8 @@ python setup.py install
 ```
 echo "zun ALL=(root) NOPASSWD: /usr/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
 
+python3
+echo "zun ALL=(root) NOPASSWD: /usr/local/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
 ```
 
 
@@ -623,6 +701,8 @@ echo "zun ALL=(root) NOPASSWD: /usr/bin/zun-rootwrap /etc/zun/rootwrap.conf *" |
 
 vim /etc/zun/zun.conf
 
+sed -i.default -e "/^$/d" -e "/^#/d" /etc/zun/zun.conf
+
 ```
 [DEFAULT]
 
@@ -630,7 +710,7 @@ transport_url = rabbit://openstack:openstack@controller
 state_path = /var/lib/zun
 
 [database]
-connection = mysql+pymysql://zun:comleader@123@controller/zun
+connection = mysql+pymysql://zun:comleader123@controller/zun
 
 [keystone_auth]
 memcached_servers = controller:11211
@@ -638,7 +718,7 @@ www_authenticate_uri = http://controller:5000
 project_domain_name = default
 project_name = service
 user_domain_name = default
-password = comleader@123
+password = comleader123
 username = zun
 auth_url = http://controller:5000
 auth_type = password
@@ -653,7 +733,7 @@ www_authenticate_uri= http://controller:5000
 project_domain_name = default
 project_name = service
 user_domain_name = default
-password = comleader@123
+password = comleader123
 username = zun
 auth_url = http://controller:5000
 auth_type = password
@@ -662,6 +742,11 @@ auth_type = password
 base_url = ws://controller:6784/
 [oslo_concurrency]
 lock_path = /var/lib/zun/tmp
+
+
+[compute]
+# If you want to run both containers and nova instances in this compute node, in the [compute] section, configure the host_shared_with_nova:
+host_shared_with_nova = true
 ```
 
 
@@ -675,6 +760,8 @@ lock_path = /var/lib/zun/tmp
 
 vim /etc/systemd/system/docker.service.d/docker.conf
 
+**此处把compute和controller替换成对应的服务host名称或者ip地址**
+
 ```
 [Service]
 ExecStart=
@@ -683,12 +770,13 @@ ExecStart=/usr/bin/dockerd --group zun -H tcp://compute:2375 -H unix:///var/run/
 
 
 
+
+
 7.7.3 重启docker
 
 ```
-# systemctl daemon-reload
-
-# systemctl restart docker
+systemctl daemon-reload
+systemctl restart docker
 ```
 
 
@@ -715,6 +803,55 @@ systemctl restart kuryr-libnetwork
 
 
 
+
+
+配置containerd
+
+`containerd config default > /etc/containerd/config.toml`
+
+ chown zun:zun /etc/containerd/config.toml 
+
+```
+[grpc]
+  ...
+  gid = ZUN_GROUP_ID
+  
+```
+
+获取zun_group_id的方法如下
+
+```
+getent group zun | cut -d: -f3
+```
+
+
+
+```
+systemctl restart containerd
+
+```
+
+配置CNI
+
+```
+# mkdir -p /opt/cni/bin
+# curl -L https://github.com/containernetworking/plugins/releases/download/v0.7.1/cni-plugins-amd64-v0.7.1.tgz \
+      | tar -C /opt/cni/bin -xzvf - ./loopback
+      
+   
+   
+# install -o zun -m 0555 -D /usr/bin/zun-cni /opt/cni/bin/zun-cni
+
+
+
+```
+
+
+
+
+
+
+
 7.8 创建启动文件
 
 vim /etc/systemd/system/zun-compute.service
@@ -735,17 +872,51 @@ WantedBy = multi-user.target
 
 7.9 启动zun-compute
 
+直接启动报错，需要安装
+
 ```
-# systemctl enable zun-compute
-# systemctl start zun-compute
-# systemctl status zun-compute
+# python2
+yum install mysql-devel python-devel
+pip install Mysql-python
+
+# python3
+pip3 install pymysql
+yum install pciutils
+```
+
+同时修改
+
+```
+# python2
+sed -i "s/with_lockmode('update')/with_for_update()/" /usr/lib/python2.7/site-packages/zun/db/sqlalchemy/api.py
+
+
+
+# python3
+sed -i "s/with_lockmode('update')/with_for_update()/" /usr/local/lib/python3.6/site-packages/zun/db/sqlalchemy/api.py
 ```
 
 
 
 
 
+```
+systemctl enable zun-compute
+systemctl start zun-compute
+systemctl status zun-compute
+```
 
+
+
+
+
+启动zun-cni-daemon(暂时不安装)
+
+```
+# systemctl enable zun-cni-daemon
+# systemctl start zun-cni-daemon
+# systemctl status zun-cni-daemon
+```
 
 
 
@@ -753,7 +924,7 @@ WantedBy = multi-user.target
 
 ##### 验证
 
-
+控制节点
 
 ```
  pip install python-zunclient==3.3.0
@@ -825,83 +996,6 @@ docker: Error response from daemon: failed to create endpoint great_colden on ne
 ```
 2021-08-27 15:36:52.711 30425 ERROR oslo_service.periodic_task AttributeError: 'Query' object has no attribute 'with_lockmode'
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- 
-
-7.10 验证
-
-```
-pip install python-zunclient==1.1.0
-source admin-openrc
-openstack appcontainer service list
-```
-
-
-
-
-
-
-
-
-
-
-
 
 
 
