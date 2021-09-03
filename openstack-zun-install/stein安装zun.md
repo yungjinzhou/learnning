@@ -1,16 +1,19 @@
-## zun安装与配置
+## stein版本zun在centos7环境下的安装与配置
 
-环境：centos7
+### 一、基本环境参数
 
-opentack-zun版本stein
+- 环境：centos7.6   mimic版本
 
-python2.7.5
+- opentack-zun版本stein
 
+- python2.7.5/python3.6，都是系统自带python环境
 
+- **默认zun数据库及zun服务密码 password: comleader123，可根据需要更改，在此环境下发现密码中有@需要修改pymysql源码进行处理，否则不能识别**
+- 设计到密码及ip地址及hostname的及
 
-### controller节点
+### 二、controller节点zun安装
 
-#### 创建数据库
+#### 2.1 创建数据库
 
 `mysql -uroot -pcomleader@123`
 
@@ -22,19 +25,17 @@ MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'localhost' IDENTIFIED 
 MariaDB [(none)]> GRANT ALL PRIVILEGES ON zun.* TO 'zun'@'%' IDENTIFIED BY 'comleader123';
 ```
 
-
-
-#### 创建openstack用户、服务、端点
-
-
+#### 2.2 创建openstack用户、服务、端点
 
 ```
-# . admin-openrc
-# password: comleader123
 
-# openstack user create --domain default --password-prompt zun
+. admin-openrc
 
-# openstack role add --project service --user zun admin
+# 默认zun数据库及zun服务密码 password: comleader123，可根据需要更改
+
+openstack user create --domain default --password-prompt zun
+
+openstack role add --project service --user zun admin
 
 openstack service create --name zun --description "Container Service" container
 
@@ -48,22 +49,16 @@ openstack endpoint create --region RegionOne container admin http://controller:9
 
 
 
+#### 2.3 安装、启动zun服务
 
-
-#### 安装、启动zun服务
-
-3.1 创建用户、组
-
-
+##### 2.3.1 创建用户、组
 
 ```
 groupadd --system zun
 useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g zun zun
 ```
 
-
-
-3.2 创建目录
+##### 2.3.2 创建目录
 
 
 ```
@@ -71,13 +66,7 @@ mkdir -p /etc/zun
 chown zun:zun /etc/zun
 ```
 
-
-
-
-
-3.3 安装zun
-
-
+##### 2.3.3 安装zun
 
 ```
 yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
@@ -93,25 +82,20 @@ python setup.py install
 
 
 
-3.4 生成示例配置文件
+##### 2.3.4生成配置文件并配置
 
 ```
 su -s /bin/sh -c "oslo-config-generator --config-file etc/zun/zun-config-generator.conf" zun
-
 su -s /bin/sh -c "cp etc/zun/zun.conf.sample /etc/zun/zun.conf" zun
 ```
 
-
-
-3.5 复制api-paste.ini配置文件
+ 复制api-paste.ini配置文件
 
 ```
 su -s /bin/sh -c "cp etc/zun/api-paste.ini /etc/zun" zun
 ```
 
-
-
-3.6 编辑配置文件,在合适位置添加以下内容
+编辑配置文件,在合适位置添加以下内容
 
 vim /etc/zun/zun.conf
 
@@ -184,21 +168,17 @@ base_url = ws://controller:6784
 
 ```
 
-3.7 填充数据库
+##### 2.3.5 填充数据库
+
 `su -s /bin/sh -c "zun-db-manage upgrade" zun`
 
- 
-
-3.8 创建启动文件
-
-vim /usr/lib/systemd/system/zun-api.service(暂时不用)
+##### 2.3.6 创建启动文件
 
 vim /etc/systemd/system/zun-api.service
 
 ```
 [Unit]
 Description = OpenStack Container Service API
-
 
 [Service]
 ExecStart = /usr/bin/zun-api
@@ -207,8 +187,6 @@ User = zun
 [Install]
 WantedBy = multi-user.target
 ```
-
-vim /usr/lib/systemd/system/zun-wsproxy.service(暂时不用)
 
 vim /etc/systemd/system/zun-wsproxy.service
 
@@ -228,9 +206,7 @@ WantedBy = multi-user.target
 
 
 
-
-
-3.9 启动服务
+##### 2.3.7启动服务
 
 先执行systemctl daemon-reload
 
@@ -238,24 +214,17 @@ WantedBy = multi-user.target
 systemctl enable zun-api  zun-wsproxy
 systemctl start zun-api  zun-wsproxy
 systemctl status zun-api  zun-wsproxy
-
 ```
-
-
 
 如果启动报websocket或者selectors 报错
 
 ```
-
-
 pip install docker==4.4.4
 pip install websocket-client==0.32.0
 pip install websocket
 ```
 
-
-
-#### etcd安装
+#### 2.4 etcd安装
 
 ```
 yum install -y etcd
@@ -284,32 +253,22 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 启动
 
 ```
-# systemctl enable etcd
-# systemctl start etcd
+systemctl enable etcd
+systemctl start etcd
 ```
 
 
 
 
 
-
-
-### 计算节点
-
-
+### 三、计算节点zun安装
 
 > **在计算节点安装zun-compute服务前，需要在计算节点安装docker和kuryr-libnetwork**
 > **在控制节点安装etcd**
 
 
 
-
-
-
-
-
-
-时间同步
+#### 3.1 时间同步
 
 ```
  1、安装软件包
@@ -336,13 +295,7 @@ timedatectl status
 
 
 
-
-
-
-
-#### docker安装
-
-
+#### 3.2 docker安装
 
 卸载旧版本的docker
 
@@ -350,15 +303,13 @@ timedatectl status
 > yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
 > ```
 
-### 
+
 
 安装一点必备的依赖
 
 ```
 yum -y upgrade # 只更新包，不更新内核和系统
 ```
-
-
 
 `yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
 
@@ -376,8 +327,6 @@ yum list docker-ce --showduplicates | sort -r
 yum install docker-ce-<VERSION_STRING> docker-ce-cli-<VERSION_STRING> containerd.io
 # for example docker-ce-18.09.1
 ```
-
-
 
 
 
@@ -404,94 +353,62 @@ systemctl enable docker containerd.service
 
 
 
-4.7 添加内核配置参数
+添加内核配置参数
 
 cat /etc/sysctl.conf
 
 ```
 net.bridge.bridge-nf-call-ip6tables = 1
-
 net.bridge.bridge-nf-call-iptables = 1
-
 net.ipv4.ip_forward = 1
 ```
 
-
-
-​	`sysctl –p`
+`sysctl –p`
 
  
 
+#### 3.3 安装kuryr-libnetwork
 
+##### 3.3.1 控制节点
 
-#### 安装kuryr-libnetwork
-
-##### 控制节点
-
-5 在controller节点上添加kuryr-libnetwork用户
-5.1 创建kuryr用户
+###### 3.3.1.1 创建kuryr用户
 
 ```
-# . admin-openrc
-
 # comleader123
-# openstack user create --domain default --password-prompt kuryr
+. admin-openrc
+openstack user create --domain default --password-prompt kuryr
 
 5.2 添加角色
-# openstack role add --project service --user kuryr admin
+openstack role add --project service --user kuryr admin
 
 ```
 
 
 
-##### 计算节点
+##### 3.3.2 计算节点
 
-6 在compute节点安装kuryr-libnetwork
-6.1 创建用户
-
-
+###### 3.3.2.1 创建用户
 
 ```
-# groupadd --system kuryr
-
-# useradd --home-dir "/var/lib/kuryr" --create-home --system --shell /bin/false -g kuryr kuryr
-
+groupadd --system kuryr
+useradd --home-dir "/var/lib/kuryr" --create-home --system --shell /bin/false -g kuryr kuryr
 ```
 
-
-
-
-
-6.2 创建目录
-
-
+###### 3.3.2.2 创建目录
 
 ```
-# mkdir -p /etc/kuryr
-
-# chown kuryr:kuryr /etc/kuryr
-
+mkdir -p /etc/kuryr
+chown kuryr:kuryr /etc/kuryr
 ```
 
-
-
-
-
-6.3 安装kuryr-libnetwork
-
-
+###### 3.3.2.3 安装kuryr-libnetwork
 
 ```
 yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
-
-# cd /var/lib/kuryr
-
-# git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
-
-# chown -R kuryr:kuryr kuryr-libnetwork
-
-# cd kuryr-libnetwork
-
+cd /var/lib/kuryr
+git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
+chown -R kuryr:kuryr kuryr-libnetwork
+cd kuryr-libnetwork
 
 # 直接执行pip install --upgrade pip，如果报错，可能是py2.7版本问题，通过下面途径更新pip
 wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
@@ -511,13 +428,7 @@ pip install pyroute2==0.5.10
 
 
 
-
-
-
-
-
-
-6.4 生成示例配置文件
+###### 3.3.2.4 生成配置文件并配置
 
 ```
 # su -s /bin/sh -c "./tools/generate_config_file_samples.sh" kuryr
@@ -527,9 +438,7 @@ pip install pyroute2==0.5.10
 
 
 
-
-
-6.5 编辑配置文件，添加以下内容
+编辑配置文件，添加以下内容
 
 vim /etc/kuryr/kuryr.conf
 
@@ -551,7 +460,8 @@ password = comleader123
 
 
 
-6.6 创建启动文件
+###### 3.3.2.5 创建启动文件
+
  vim /etc/systemd/system/kuryr-libnetwork.service
 
 ```
@@ -567,8 +477,7 @@ WantedBy = multi-user.target
 
 ```
 
-
-6.7 启动服务
+###### 3.3.2.6 启动服务
 
 ```
 systemctl enable kuryr-libnetwork
@@ -578,47 +487,46 @@ systemctl restart docker
 
 
 
-6.8 验证
-6.8.1 创建kuryr网络
+######  3.3.2.7 验证
 
-
+ 创建kuryr网络
 
 ```
 docker network create --driver kuryr --ipam-driver kuryr --subnet 173.19.12.0/24 --gateway=173.19.12.1 test_docker_net
-
-
 ```
 
 
 
+由于neutron使用的是linuxbridge，需要修改成bridge
+
+vim /usr/lib/python2.7/site-packages/kuryr/lib/binding/drivers/veth.py
+
+![1630629260878](.\1630629260878.png)
+
+将kind值替换为bridge
 
 
 
-
-6.8.2 查看网络
+查看网络
 
 `docker network ls`
 
-6.8.3 创建容器(网络连接失败)
+创建容器
 
 `docker run --net test_net cirros ifconfig`
 
 
 
-#### zun-compute服务安装与配置
+#### 3.4 zun-compute服务安装与配置
 
-
-
-
-
-7.1 创建用户
+##### 3.4.1 创建用户
 
 ```
 groupadd --system zun
 useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g zun zun
 ```
 
-7.2 创建目录
+##### 3.4.2 创建目录
 
 ```
 mkdir -p /etc/zun
@@ -627,7 +535,9 @@ chown zun:zun /etc/zun
 
 
 
-安装依赖
+**下面安装py2、py3任选一种即可**
+
+##### 3.4.3 安装zun包依赖
 
 python2版本
 
@@ -643,16 +553,12 @@ yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl
 
 
 
-
-
-7.3 安装zun
+##### 3.4.4 安装zun
 
 ```
 cd /var/lib/zun
 git clone -b stable/stein https://git.openstack.org/openstack/zun.git
-
 chown -R zun:zun zun
-
 cd zun
 
 # python2安装
@@ -667,11 +573,7 @@ pip3 install --upgrade setuptools
 # python3 setup.py install
 ```
 
-
-
-
-
-7.4 生成示例配置文件
+##### 3.4.5 生成示例配置文件
 
 ```
 # su -s /bin/sh -c "oslo-config-generator --config-file etc/zun/zun-config-generator.conf" zun
@@ -684,9 +586,7 @@ pip3 install --upgrade setuptools
 
 ```
 
-
-
-7.5 配置zun用户
+##### 3.4.6 配置zun用户
 
 ```
 echo "zun ALL=(root) NOPASSWD: /usr/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
@@ -697,7 +597,7 @@ echo "zun ALL=(root) NOPASSWD: /usr/local/bin/zun-rootwrap /etc/zun/rootwrap.con
 
 
 
-7.6 编辑配置文件，添加以下内容
+##### 3.4.7 编辑配置文件
 
 vim /etc/zun/zun.conf
 
@@ -751,12 +651,13 @@ host_shared_with_nova = true
 
 
 
-7.7 配置docker和kuryr
-7.7.1 创建docker配置文件夹
+##### 3.4.8 配置docker和kuryr
+
+###### 3.4.8.1 创建docker配置文件夹
 
 `mkdir -p /etc/systemd/system/docker.service.d`
 
-###### 7.7.2 创建docker配置文件--报错
+###### 3.4.8.2 创建docker配置文件
 
 vim /etc/systemd/system/docker.service.d/docker.conf
 
@@ -768,20 +669,14 @@ ExecStart=
 ExecStart=/usr/bin/dockerd --group zun -H tcp://compute:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
 ```
 
-
-
-
-
-7.7.3 重启docker
+###### 3.4.8.3 重启docker
 
 ```
 systemctl daemon-reload
 systemctl restart docker
 ```
 
-
-
-7.7.4 编辑kuryr配置文件，添加以下内容
+###### 3.4.8.4 编辑kuryr配置文件
 
 vim  /etc/kuryr/kuryr.conf
 
@@ -791,9 +686,7 @@ capability_scope = global
 process_external_connectivity = False
 ```
 
-
-
-7.7.5 重启kuryr
+###### 3.4.8.5 重启kuryr
 
 ```
 systemctl restart kuryr-libnetwork
@@ -801,11 +694,7 @@ systemctl restart kuryr-libnetwork
 
 
 
-
-
-
-
-配置containerd
+##### 3.4.9 配置containerd
 
 `containerd config default > /etc/containerd/config.toml`
 
@@ -828,31 +717,25 @@ getent group zun | cut -d: -f3
 
 ```
 systemctl restart containerd
-
 ```
 
-配置CNI
+
+
+##### 3.4.10 配置CNI（可选）
 
 ```
 # mkdir -p /opt/cni/bin
 # curl -L https://github.com/containernetworking/plugins/releases/download/v0.7.1/cni-plugins-amd64-v0.7.1.tgz \
       | tar -C /opt/cni/bin -xzvf - ./loopback
       
-   
-   
 # install -o zun -m 0555 -D /usr/bin/zun-cni /opt/cni/bin/zun-cni
-
 
 
 ```
 
 
 
-
-
-
-
-7.8 创建启动文件
+##### 3.4.11 创建启动文件
 
 vim /etc/systemd/system/zun-compute.service
 
@@ -870,7 +753,7 @@ WantedBy = multi-user.target
 
 
 
-7.9 启动zun-compute
+##### 3.4.112 启动zun-compute
 
 直接启动报错，需要安装
 
@@ -889,7 +772,6 @@ yum install pciutils
 ```
 # python2
 sed -i "s/with_lockmode('update')/with_for_update()/" /usr/lib/python2.7/site-packages/zun/db/sqlalchemy/api.py
-
 
 
 # python3
@@ -922,7 +804,7 @@ systemctl status zun-compute
 
 
 
-##### 验证
+##### 3.4.13 验证
 
 控制节点
 
@@ -936,74 +818,15 @@ systemctl status zun-compute
 
 
 
-
-
-
-
-
-
-
-
-
-
-zun-ui安装
-
-
+### 四、zun-ui安装
 
 https://docs.openstack.org/zun-ui/latest/install/index.html
-
-
 
 horizon-dashboard安装配置
 
 https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.html
 
 
-
-
-
-
-
-
-
-### 安装过程中遇到的问题及解决
-
-
-
-#### <font color=red>docker使用kuryr网络报错(先继续向下安装)</font>
-
-Status: Downloaded newer image for cirros:latest
-docker: Error response from daemon: failed to create endpoint great_colden on network test_net: NetworkDriver.CreateEndpoint: vif_type(binding_failed) is not supported. A binding script for this type can't be found.
-
-
-
-
-
-
-
-
-
-#### 启动zun-compute报错
-
-提示
-
-```
-2021-08-27 11:14:52.813 28753 ERROR oslo_service.periodic_task ImportError: No module named pymysql
-```
-
-安装pymysql(pip install pymysql)后，不能解析地址`comleader@123@controller`，手动pymysql源码修改，判断host，password后
-
-运行`/usr/bin/zun-compute`
-
-报错lspci命令
-
-`yum install pciutils -y`
-
-重新执行，依然报错
-
-```
-2021-08-27 15:36:52.711 30425 ERROR oslo_service.periodic_task AttributeError: 'Query' object has no attribute 'with_lockmode'
-```
 
 
 
