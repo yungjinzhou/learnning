@@ -268,6 +268,14 @@ systemctl start etcd
 
 
 
+安装一点必备的依赖
+
+```
+yum -y upgrade # 只更新包，不更新内核和系统
+```
+
+`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
+
 #### 3.1 时间同步
 
 ```
@@ -300,18 +308,12 @@ timedatectl status
 卸载旧版本的docker
 
 > ```
-> yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
+> yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine -y
 > ```
 
 
 
-安装一点必备的依赖
 
-```
-yum -y upgrade # 只更新包，不更新内核和系统
-```
-
-`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
 
 配置仓库
 
@@ -349,6 +351,7 @@ yum localinstall  -y  docker-ce-18.09.6-3.el7.x86_64.rpm
 ```
 systemctl start docker containerd.service 
 systemctl enable docker containerd.service
+systemctl status docker containerd.service
 ```
 
 
@@ -363,7 +366,7 @@ net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
 ```
 
-`sysctl –p`
+`sysctl -p`
 
  
 
@@ -392,6 +395,7 @@ openstack role add --project service --user kuryr admin
 ```
 groupadd --system kuryr
 useradd --home-dir "/var/lib/kuryr" --create-home --system --shell /bin/false -g kuryr kuryr
+
 ```
 
 ###### 3.3.2.2 创建目录
@@ -399,6 +403,7 @@ useradd --home-dir "/var/lib/kuryr" --create-home --system --shell /bin/false -g
 ```
 mkdir -p /etc/kuryr
 chown kuryr:kuryr /etc/kuryr
+
 ```
 
 ###### 3.3.2.3 安装kuryr-libnetwork
@@ -422,8 +427,8 @@ yum install -y python2-ipaddress-1.0.18-5.el7.noarch.rpm
 
 pip install pyroute2==0.5.10
 
-# pip install -r requirements.txt
-# python setup.py install
+pip install -r requirements.txt
+python setup.py install
 ```
 
 
@@ -439,6 +444,8 @@ pip install pyroute2==0.5.10
 
 
 编辑配置文件，添加以下内容
+
+sed -i.default -e "/^#/d" -e "/^$/d" /etc/kuryr/kuryr.conf
 
 vim /etc/kuryr/kuryr.conf
 
@@ -483,6 +490,7 @@ WantedBy = multi-user.target
 systemctl enable kuryr-libnetwork
 systemctl start kuryr-libnetwork
 systemctl restart docker
+systemctl status docker kuryr-libnetwork
 ```
 
 
@@ -501,11 +509,13 @@ docker network create --driver kuryr --ipam-driver kuryr --subnet 173.19.12.0/24
 
 vim /usr/lib/python2.7/site-packages/kuryr/lib/binding/drivers/veth.py
 
+
+
 ![1630629260878](.\1630629260878.png)
 
 将kind值替换为bridge
 
-
+systemctl restart kuryr-libnetwork
 
 查看网络
 
@@ -700,6 +710,8 @@ systemctl restart kuryr-libnetwork
 
  chown zun:zun /etc/containerd/config.toml 
 
+
+
 ```
 [grpc]
   ...
@@ -739,6 +751,8 @@ systemctl restart containerd
 
 vim /etc/systemd/system/zun-compute.service
 
+
+
 ```
 [Unit]
 Description = OpenStack Container Service Compute Agent
@@ -759,12 +773,13 @@ WantedBy = multi-user.target
 
 ```
 # python2
-yum install mysql-devel python-devel
-pip install Mysql-python
+yum install mysql-devel python-devel pciutils numactl -y
+pip install Mysql-python pymysql
+
 
 # python3
 pip3 install pymysql
-yum install pciutils
+yum install pciutils numactl -y
 ```
 
 同时修改
