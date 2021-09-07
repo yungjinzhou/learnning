@@ -1,22 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## 5 实践案例：stein版本Nova创建虚拟机过程分析
+## 实践案例：stein版本Nova创建虚拟机过程分析
 
 这里以创建虚拟机过程为例，根据前面的理论基础，一步步跟踪其执行过程。需要注意的是，Nova支持同时创建多台虚拟机，因此在调度时需要同时选择调度多个宿主机。
 
-### 5.1 nova-api
+###  nova-api
 
 根据前面的理论，创建虚拟机的入口为`nova/api/openstack/compute/servers.py`的`create`方法，该方法检查了一堆参数以及policy后，调用`compute_api`的`create()`方法。
 
@@ -160,7 +146,7 @@ def schedule_and_build_instances(...):
 
 截至到现在，虽然目录由`api->compute->conductor`，但仍在nova-api进程中运行，直到cast方法执行，该方法由于是异步调用，会立即返回，不会等待RPC返回，因此nova-api任务完成，此时会响应用户请求，虚拟机状态为`building`。
 
-### 5.2 nova-conductor
+### nova-conductor
 
 由于是向nova-conductor发起的RPC调用(根据RPC_TOPIC判定)，而前面说了接收端肯定是`manager.py`，因此进程跳到`nova-conductor`服务，入口为`nova/conductor/manager.py`的`schedule_and_build_instances`方法。
 
@@ -207,7 +193,7 @@ def select_destinations(self, ...):
 
 注意这里调用的是`call`方法，说明这是同步RPC调用，此时`nova-conductor`并不会退出，而是等待直到`nova-scheduler`返回。因此当前nova-conductor为堵塞状态，等待`nova-scheduler`返回，此时`nova-scheduler`接管任务。
 
-### 5.3 nova-scheduler
+### nova-scheduler
 
 同理找到scheduler的manager.py模块的`select_destinations`方法，该方法会调用driver方法:
 
@@ -222,7 +208,7 @@ def select_destinations(self, ctxt, ...):
 
 最后nova-scheduler返回调度的`hosts`集合，任务结束。由于nova-conductor通过同步方法调用的该方法，因此nova-scheduler会把结果返回给nova-conductor服务。
 
-### 5.4 nova-condutor
+### nova-condutor
 
 nova-conductor等待nova-scheduler返回后，拿到调度的计算节点列表，回到`scheduler/manager.py`的`schedule_and_build_instances`方法。
 
@@ -248,7 +234,7 @@ def build_and_run_instance(self, ctxt, ...):
 
 由于是`cast`调用，因此发起的是异步RPC，因此nova-conductor任务结束，紧接着终于轮到nova-compute服务登场了。
 
-### 5.5 nova-compute
+### nova-compute
 
 终于等到nova-compute服务，服务入口为`nova/compute/manager.py`，找到`build_and_run_instance`方法，该方法调用关系如下：
 
@@ -294,7 +280,7 @@ build_and_run_instance()
 
 
 
-## 分析nova组件启动流程，
+## 分析nova组件启动流程
 
 以nova-conductor为例
 
@@ -493,6 +479,7 @@ LocalAPI 的 wait_until_ready 方法直接返回，所以不需要等待 nova-co
 初始化调用baserpc的BaseAPI
 
 ```
+# nova/baserpc.py
 class BaseAPI(object):
     """Client side of the base rpc API.
 
@@ -545,13 +532,13 @@ class BaseRPCAPI(object):
 
 
 
-生成的service_obj对象`<Service: host=controller, binary=nova-conductor, manager_class_name=nova.conductor.manager.ConductorManager>`, 继续向下serve和wait方法
+生成的service_obj对象`<Service: host=controller, binary=nova-conductor, manager_class_name=nova.conductor.manager.ConductorManager>`, 
 
- 后面分析服务启动的start方法时，能看到，每一个rpcserver 服务的 endpoints 都 包括 `BaseRPCAPI` 对象！nova-conductor 服务的 BaseRPCAPI 实例化对象 topic 值刚好是 “conductor”， 我们可以从代码中看到这一点。所以，只有 nova-conductor 服务启动了，并 处理 base_rpcapi 发起的 call 请求，才会退出 while 循环！ 
+> 后面分析服务启动的start方法时，能看到，每一个rpcserver 服务的 endpoints 都 包括 `BaseRPCAPI` 对象！nova-conductor 服务的 BaseRPCAPI 实例化对象 topic 值刚好是 “conductor”， 我们可以从代码中看到这一点。所以，只有 nova-conductor 服务启动了，并 处理 base_rpcapi 发起的 call 请求，才会退出 while 循环！ 
 
 
 
-所以会调用ConductorManager运行，该类位置在nova/conductor/manger.py中
+所以会调用ConductorManager初始化，该类位置在nova/conductor/manger.py中
 
 ```
 # nova/conductor/manager.py
@@ -685,7 +672,7 @@ class Service(service.Service):
             baserpc.BaseRPCAPI(self.manager.service_name, self.backdoor_port)
         ]
         endpoints.extend(self.manager.additional_endpoints)
-
+		# [<nova.conductor.manager.ConductorManager object at 0x7f85fb2be210>, <nova.baserpc.BaseRPCAPI object at 0x7f8606617d50>, <nova.conductor.manager.ComputeTaskManager object at 0x7f85fb265050>]
         serializer = objects_base.NovaObjectSerializer()
 
         self.rpcserver = rpc.get_server(target, endpoints, serializer)
@@ -714,22 +701,12 @@ class Service(service.Service):
 
 
 
-
-
-
-
-
-
-
-
 经过上面这么多步骤，还只是创建了一个服务对象，服务并没有运行。我们接下来看下面的代码
 
 
- 
 
 ```
 # nova/nova/service.py
-
 
 def serve(server, workers=None):
     global _launcher
@@ -749,13 +726,7 @@ def wait():
 
 
 
-
-
-
-
-
-
-其中serve调用的launch方法，并启动
+其中serve调用oslo.service/service的launch方法，
 
 ```
 # oslo_service/service.py
@@ -786,7 +757,7 @@ def launch(conf, service, workers=1, restart_method='reload'):
 
 ```
 
-launcher.launch_service启动服务
+launcher.launch_service
 
 ```
 # oslo_service/service.py
@@ -817,6 +788,26 @@ class ProcessLauncher(object):
         while self.running and len(wrap.children) < wrap.workers:
             self._start_child(wrap)
 ```
+
+
+
+最终是调用service.py的start方法启动
+
+```
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(781)wait()
+-> for service in self.services:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(783)wait()
+-> self.tg.wait()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(170)start()
+-> context.CELL_CACHE = {}
+
+```
+
+
+
+
 
 
 
@@ -888,6 +879,386 @@ class ComputeTaskManager(base.Base):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+nova-conductor  pdb定位启动流程
+
+```
+> /usr/lib/python2.7/site-packages/nova/service.py(260)create()
+-> if not host:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(261)create()
+-> host = CONF.host
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(262)create()
+-> if not binary:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(264)create()
+-> if not topic:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(266)create()
+-> if not manager:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(267)create()
+-> manager = SERVICE_MANAGERS.get(binary)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(268)create()
+-> if report_interval is None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(269)create()
+-> report_interval = CONF.report_interval
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(270)create()
+-> if periodic_enable is None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(271)create()
+-> periodic_enable = CONF.periodic_enable
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(272)create()
+-> if periodic_fuzzy_delay is None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(273)create()
+-> periodic_fuzzy_delay = CONF.periodic_fuzzy_delay
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(275)create()
+-> debugger.init()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(277)create()
+-> service_obj = cls(host, binary, topic, manager,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(278)create()
+-> report_interval=report_interval,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(279)create()
+-> periodic_enable=periodic_enable,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(280)create()
+-> periodic_fuzzy_delay=periodic_fuzzy_delay,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(281)create()
+-> periodic_interval_max=periodic_interval_max)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(123)__init__()
+-> self.host = host
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(124)__init__()
+-> self.binary = binary
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(125)__init__()
+-> self.topic = topic
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(126)__init__()
+-> self.manager_class_name = manager
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(127)__init__()
+-> self.servicegroup_api = servicegroup.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(128)__init__()
+-> manager_class = importutils.import_class(self.manager_class_name)
+(Pdb) n
+n
+> /usr/lib/python2.7/site-packages/nova/service.py(129)__init__()
+-> if objects_base.NovaObject.indirection_api:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(132)__init__()
+-> self.manager = manager_class(host=self.host, *args, **kwargs)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(118)__init__()
+-> self.compute_task_mgr = ComputeTaskManager()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(238)__init__()
+-> super(ComputeTaskManager, self).__init__()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(239)__init__()
+-> self.compute_rpcapi = compute_rpcapi.ComputeAPI()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(240)__init__()
+-> self.volume_api = cinder.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(241)__init__()
+-> self.image_api = image.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(242)__init__()
+-> self.network_api = network.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(243)__init__()
+-> self.servicegroup_api = servicegroup.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(244)__init__()
+-> self.query_client = query.SchedulerQueryClient()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(245)__init__()
+-> self.report_client = report.SchedulerReportClient()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(246)__init__()
+-> self.notifier = rpc.get_notifier('compute', CONF.host)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(248)__init__()
+-> self.host = CONF.host
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(248)__init__()->None
+-> self.host = CONF.host
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(119)__init__()
+-> self.additional_endpoints.append(self.compute_task_mgr)
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(119)__init__()->None
+-> self.additional_endpoints.append(self.compute_task_mgr)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(133)__init__()
+-> self.rpcserver = None
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(134)__init__()
+-> self.report_interval = report_interval
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(135)__init__()
+-> self.periodic_enable = periodic_enable
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(136)__init__()
+-> self.periodic_fuzzy_delay = periodic_fuzzy_delay
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(137)__init__()
+-> self.periodic_interval_max = periodic_interval_max
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(138)__init__()
+-> self.saved_args, self.saved_kwargs = args, kwargs
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(139)__init__()
+-> self.backdoor_port = None
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(140)__init__()
+-> setup_profiler(binary, self.host)
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(140)__init__()->None
+-> setup_profiler(binary, self.host)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(283)create()
+-> return service_obj
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(283)create()-><Service...rManager>
+-> return service_obj
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(46)main()
+-> workers = CONF.conductor.workers or processutils.get_worker_count()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(47)main()
+-> workers = 1
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(48)main()
+-> import pdb; pdb.set_trace()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(49)main()
+-> service.serve(server, workers=workers)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(497)serve()
+-> if _launcher:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(500)serve()
+-> _launcher = service.launch(CONF, server, workers=workers,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(501)serve()
+-> restart_method='mutate')
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(833)launch()
+-> if workers is not None and workers <= 0:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(836)launch()
+-> if workers is None or workers == 1:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(837)launch()
+-> launcher = ServiceLauncher(conf, restart_method=restart_method)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(331)__init__()
+-> super(ServiceLauncher, self).__init__(
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(332)__init__()
+-> conf, restart_method=restart_method)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(263)__init__()
+-> self.conf = conf
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(264)__init__()
+-> conf.register_opts(_options.service_opts)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(265)__init__()
+-> self.services = Services(restart_method=restart_method)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(267)__init__()
+-> eventlet_backdoor.initialize_if_enabled(self.conf))
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(268)__init__()
+-> self.restart_method = restart_method
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(268)__init__()->None
+-> self.restart_method = restart_method
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(333)__init__()
+-> self.signal_handler = SignalHandler()
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(333)__init__()->None
+-> self.signal_handler = SignalHandler()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(840)launch()
+-> launcher.launch_service(service, workers=workers)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(842)launch()
+-> return launcher
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(842)launch()-><oslo_se...32d36f50>
+-> return launcher
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(501)serve()->None
+-> restart_method='mutate')
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(50)main()
+-> service.wait()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(170)start()
+-> context.CELL_CACHE = {}
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(172)start()
+-> assert_eventlet_uses_monotonic_clock()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(174)start()
+-> verstr = version.version_string_with_package()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(175)start()
+-> LOG.info(_LI('Starting %(topic)s node (version %(version)s)'),
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(176)start()
+-> {'topic': self.topic, 'version': verstr})
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(177)start()
+-> self.basic_config_check()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(178)start()
+-> self.manager.init_host()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(179)start()
+-> self.model_disconnected = False
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(180)start()
+-> ctxt = context.get_admin_context()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(181)start()
+-> self.service_ref = objects.Service.get_by_host_and_binary(
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(182)start()
+-> ctxt, self.host, self.binary)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(183)start()
+-> if self.service_ref:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(184)start()
+-> _update_service_ref(self.service_ref)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(196)start()
+-> self.manager.pre_start_hook()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(198)start()
+-> if self.backdoor_port is not None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(201)start()
+-> LOG.debug("Creating RPC server for service %s", self.topic)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(203)start()
+-> target = messaging.Target(topic=self.topic, server=self.host)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(207)start()
+-> self.manager,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(208)start()
+-> baserpc.BaseRPCAPI(self.manager.service_name, self.backdoor_port)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/baserpc.py(73)__init__()
+-> self.service_name = service_name
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/baserpc.py(74)__init__()
+-> self.backdoor_port = backdoor_port
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/baserpc.py(74)__init__()->None
+-> self.backdoor_port = backdoor_port
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(210)start()
+-> endpoints.extend(self.manager.additional_endpoints)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(216)start()
+-> serializer = objects_base.NovaObjectSerializer()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(218)start()
+-> self.rpcserver = rpc.get_server(target, endpoints, serializer)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(219)start()
+-> self.rpcserver.start()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(221)start()
+-> self.manager.post_start_hook()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(223)start()
+-> LOG.debug("Join ServiceGroup membership for this service %s",
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(224)start()
+-> self.topic)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(226)start()
+-> self.servicegroup_api.join(self.host, self.topic, self)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(228)start()
+-> if self.periodic_enable:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(229)start()
+-> if self.periodic_fuzzy_delay:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(230)start()
+-> initial_delay = random.randint(0, self.periodic_fuzzy_delay)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(234)start()
+-> self.tg.add_dynamic_timer(self.periodic_tasks,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(235)start()
+-> initial_delay=initial_delay,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(237)start()
+-> self.periodic_interval_max)
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(237)start()->None
+-> self.periodic_interval_max)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(817)run_service()
+-> done.wait()
+
+
+
+
+
+```
 
 
 
