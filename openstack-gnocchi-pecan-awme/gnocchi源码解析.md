@@ -1010,9 +1010,57 @@ class MetricProcessor(MetricProcessBase):
 
 
 
+### 4. 修改启动方式
+
+gnocchi-api.service
+
+```
+[Unit]
+Description=Gnocchi API service
+After=syslog.target network.target
+
+[Service]
+KillSignal=SIGQUIT
+Type=notify
+User=root
+Type=notify
+NotifyAccess=all
+StandardError=syslog
+ExecStart=/usr/sbin/uwsgi --ini /etc/gnocchi/uwsgi-gnocchi.ini
+ExecStop=/usr/sbin/uwsgi --stop /var/run/gnocchi-uwsgi.pid
+ExecReload=/usr/sbin/uwsgi --reload /var/run/gnocchi-uwsgi.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+```
 
 
 
+/etc/gnocchi/uwsgi-gnocchi.ini
+
+```
+[uwsgi]
+http-socket = controller:8041
+#http-socket = controller:8071
+wsgi-file = /usr/bin/gnocchi-api
+master = true
+die-on-term = true
+threads = 10
+processes = 8
+enabled-threads = true
+thunder-lock = true
+plugins = python
+buffer-size = 65535
+listen = 4096
+logfile = /var/log/gnocchi/uwsgi-gnocchi.log
+max-requests = 4000
+log-maxsize = 50000000
+socket-timeout = 60
+#daemonize = /var/log/gnocchi/uwsgi-gnocchi.log
+pidfile = /var/run/gnocchi-uwsgi.pid
+```
 
 
 
