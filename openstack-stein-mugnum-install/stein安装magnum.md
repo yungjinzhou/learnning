@@ -4,13 +4,16 @@
 
 ### 依赖环境
 
-安装环境centos7
+- 安装环境centos7
 
-magnum相关的密码都是comleader123
+- magnum相关的密码都是comleader123
+- 需要有基本openstack环境，且已经安装了heat服务
 
 
 
-### 控制节点
+### 安装步骤
+
+> 均在控制节点安装
 
 #### 创建magnum数据库
 
@@ -197,9 +200,11 @@ openstack coe service list
 
 ### 创建集群实例
 
-如果没有外部网络，创建一个外部网络
+- 如果没有外部网络，创建一个外部网络
 
-创建密钥对，magnum集群需要
+- 创建密钥对，magnum集群需要
+- 创建规格
+- 创建符合条件的镜像
 
 #### 上传集群需要的镜像
 
@@ -226,11 +231,13 @@ openstack image create \
 
 ##### 创建集群模板
 
+- 注意要配置docker_volume_type，即volume_type，heat会调用cinder找对应的backend_driver，如果没有配置ceph、swift等，默认是lvm；
+- 不配置doker-volume-size同样报错
+- 创建前镜像、规格都要创建好，镜像选择适合magnum使用的几种对应的镜像，具体参考官网
+
 ```
 
-
-openstack coe cluster template create kubernetes-cluster-template --image fedora_atomic_for_magnum_k8s  --external-network provider --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 5 --flavor m1.small --coe kubernetes
-                     
+openstack coe cluster template create kubernetes-cluster-template --image fedora_atomic_for_magnum_k8s  --external-network provider --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 5 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
                      
 ```
 
@@ -288,20 +295,6 @@ def enforce_driver_supported():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ##### 用秘钥创建master和node节点
 
 ```
@@ -309,10 +302,24 @@ openstack coe cluster create kubernetes-cluster \
                         --cluster-template kubernetes-cluster-template \
                         --master-count 1 \
                         --node-count 1 \
+                        --docker-volume-size 5 \
+                        --master-flavor m1.small \
+                        --flavor m1.small \
                         --keypair keyparitestmagnumcluster
 ```
 
+- 遇到创建失败，提示` reason: Resource CREATE failed: ResourceInError: resources.kube_masters.resources[0].resources.kube-master: Went to status ERROR due to "Message: No valid host was found. , Code: 500"`，扩展了计算节点的资源，删除无用实例后问题解决
 
+- 创建失败提示`Cluster error, stack status: CREATE_FAILED, stack_id: 3802e51a-d30b-4a5b-bf15-f344ebfc0729, reason: Resource CREATE failed: ResourceInError: resources.kube_masters.resources[0].resources.docker_volume: Went to status error due to "Unknown"`查看卷scheduler日志，无法找到默认驱动，修改可用域x86_cinder为nova，并在cinder-api节点cinder-volume节点修改配置文件cinder.conf，增加
+
+  ```
+  [lvm]
+  volume_driver = cinder.volume.drivers.lvm.LVMVolumeDriver
+  volume_group = cinder-volumes
+  target_protocol = iscsi
+  target_helper = lioadm
+  volume_backend_name = lvm
+  ```
 
 ##### 查看状态
 
@@ -369,6 +376,8 @@ nginx-701339712-tb5lp   1/1       Running   0          15s
 
 
 ### 安装 
+
+控制节点安装
 
 ```
 yum install -y openstack-magnum-ui

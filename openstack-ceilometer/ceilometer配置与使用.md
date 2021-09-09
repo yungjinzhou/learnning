@@ -289,6 +289,59 @@
 ```chmod -R 777 /var/lib/gnocchi```
 
 ###### 5.3.  启动gnocchi
+
+配置/etc/gnocchi/uwsgi-gnocchi.ini，注意修改系统的监听数（默认128）,参考修改链接：https://blog.csdn.net/qq_35876972/article/details/105340159
+
+```
+[uwsgi]
+http-socket = controller:8041
+#http-socket = controller:8071
+wsgi-file = /usr/bin/gnocchi-api
+master = true
+die-on-term = true
+threads = 10
+processes = 8
+enabled-threads = true
+thunder-lock = true
+plugins = python
+buffer-size = 65535
+listen = 4096
+logfile = /var/log/gnocchi/uwsgi-gnocchi.log
+max-requests = 4000
+log-maxsize = 50000000
+socket-timeout = 60
+pidfile = /var/run/gnocchi-uwsgi.pid
+```
+
+
+
+修改openstack-goncchi-api.service
+
+```
+[Unit]
+Description=Gnocchi API service
+After=syslog.target network.target
+
+[Service]
+KillSignal=SIGQUIT
+Type=notify
+User=root
+Type=notify
+NotifyAccess=all
+StandardError=syslog
+ExecStart=/usr/sbin/uwsgi --ini /etc/gnocchi/uwsgi-gnocchi.ini
+ExecStop=/usr/sbin/uwsgi --stop /var/run/gnocchi-uwsgi.pid
+ExecReload=/usr/sbin/uwsgi --reload /var/run/gnocchi-uwsgi.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
+
+
+
 ```
 systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
 ```
@@ -323,6 +376,14 @@ rpm -ivh dm-gnocchi.rpm --force
 
 systemctl restart openstack-gnocchi-api.service openstack-gnocchi-metricd.service
 ```
+
+
+
+
+
+
+
+
 
 #### 6. 安装和配置Ceilometer（控制节点）
 
