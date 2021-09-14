@@ -280,17 +280,13 @@ pdb定位代码
 def enforce_driver_supported():
     @decorator.decorator
     def wrapper(func, *args, **kwargs):
-       # import pdb; pdb.set_trace()
         cluster_template = args[1]
         cluster_distro = cluster_template.cluster_distro
-      #  if str(cluster_distro) ==  "Unset":
-      #      cluster_distro == None
-        cluster_distro == None
+        if str(cluster_distro) ==  "Unset":
+            cluster_distro == None
         if not cluster_distro:
             try:
                 cli = clients
-此处对镜像设置cluster_distro后，cluster_template.cluster_distro得到的是unsetType类
-临时处理，强制用image里的cluster_distro
 ```
 
 
@@ -417,4 +413,22 @@ systemctl restart httpd.service memcached.service
 horizon安装参考链接：https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.html
 
 magnum-ui安装参考链接：https://github.com/openstack/magnum-ui
+
+
+
+
+
+
+
+
+
+### 部署k8s错误日志
+
+
+
+- 2021-09-13 16:51:33.708 64247 INFO heat.engine.scheduler [req-08854888-d52d-4808-88b6-b21fcd5f985d - admin - default default] Task create from SoftwareDeployment "kube_cluster_deploy" Stack "fedora-atomic-root-test-with-d-idlv2qepaqew" [73a2d6a9-f047-4139-9c7f-c5a5df906403] timed out
+
+
+
+- 2021-09-13 16:51:34.080 64249 DEBUG heat.engine.scheduler [req-08854888-d52d-4808-88b6-b21fcd5f985d - admin - default default] Task create from HeatWaitCondition "minion_wait_condition" Stack "fedora-atomic-root-test-with-d-idlv2qepaqew-kube_minions-izcygqwk34gc-0-drtixczvrzar" [c8060190-102a-40c4-aab8-b3b78b410e3a] sleeping _sleep /usr/lib/python2.7/site-packages/heat/engine/scheduler.py:150
 
