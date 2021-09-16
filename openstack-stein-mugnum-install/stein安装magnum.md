@@ -317,6 +317,14 @@ openstack coe cluster create kubernetes-cluster \
   volume_backend_name = lvm
   ```
 
+- 创建失败，修改模板中的heat_wait_condition参数改为10800，参考链接：https://bugs.launchpad.net/kolla-ansible/+bug/1842449；
+- 创建模板时优化参数，参考链接https://lingxiankong.github.io/2018-02-15-magnum-note.html；
+- 创建卡住，卡到kube_minions可能原因是minion发送请求到控制节点，但是endpoints配置的是controller，无法识别，需要在master  minion节点修改/etc/hosts配置 controller到ip的映射。参考链接：https://bugs.launchpad.net/kolla-ansible/+bug/1762754
+
+
+
+
+
 ##### 查看状态
 
 ```
