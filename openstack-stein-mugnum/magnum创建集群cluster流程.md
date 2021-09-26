@@ -493,8 +493,6 @@ class EngineService(service.ServiceBase):
 
 convergence   openstack N版本后，默认convergence=Ture
 
-
-
 ```
 /usr/lib/python2.7/site-packages/heat/engine/stack.py(1344)converge_stack()
 

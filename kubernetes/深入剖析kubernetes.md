@@ -15,7 +15,7 @@ Google 与 RedHat 公司共同主导的 Kubernetes 项目。
 
 **Kubernetes 项目确定了一个如下图所示的全局架构**
 
-![img](E:\code\learnning\kubernetes\企业微信截图_16325397933865.png)
+![img](.\企业微信截图_16325397933865.png)
 
 
 
@@ -33,7 +33,7 @@ Google 与 RedHat 公司共同主导的 Kubernetes 项目。
 
 围绕着容器和 Pod 不断向真实的技术场景扩展，我们就能够摸索出一幅如下所示的**Kubernetes 项目核心功能的“全景图”**。
 
-![img](E:\code\learnning\kubernetes\企业微信截图_16325401794689.png)
+![img](.\企业微信截图_16325401794689.png)
 
 
 
