@@ -125,7 +125,7 @@ project_name = service
 username = zun
 password = comleader123
 auth_protocol = http
-iauth_version = v3
+auth_version = v3
 service_token_roles_required = True
 endpoint_type = internalURL
 [keystone_authtoken]
@@ -139,7 +139,7 @@ project_name = service
 username = zun
 password = comleader123
 auth_protocol = http
-iauth_version = v3
+auth_version = v3
 service_token_roles_required = True
 endpoint_type = internalURL
 
@@ -181,7 +181,7 @@ vim /etc/systemd/system/zun-api.service
 Description = OpenStack Container Service API
 
 [Service]
-ExecStart = /usr/bin/zun-api
+ExecStart = /usr/bin/zun-api --config-file=/etc/zun/zun.conf --log-file=/var/log/zun/zun-api.log
 User = zun
 
 [Install]
@@ -195,7 +195,7 @@ vim /etc/systemd/system/zun-wsproxy.service
 Description = OpenStack Container Service Websocket Proxy
 
 [Service]
-ExecStart = /usr/bin/zun-wsproxy
+ExecStart = /usr/bin/zun-wsproxy --config-file=/etc/zun/zun.conf --log-file=/var/log/zun/zun-wsproxy.log
 User = zun
 
 [Install]
@@ -204,7 +204,9 @@ WantedBy = multi-user.target
 
 ```
 
+ 创建目录  **mkdir /var/log/zun/**
 
+更改权限 **chmod -R 777 /var/log/zun**
 
 ##### 2.3.7启动服务
 

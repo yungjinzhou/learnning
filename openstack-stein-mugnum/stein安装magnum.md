@@ -44,17 +44,18 @@ openstack role add --project service --user magnum admin
 ```
 openstack service create --name magnum --description "OpenStack Container Infrastructure Management Service" container-infra
 
-
 ```
 
 
 
 #### 创建容器管理服务 API endpoints
 
+controller替换为控制节点的ip地址
+
 ```
-openstack endpoint create --region RegionOne container-infra public http://controller:9511/v1
-openstack endpoint create --region RegionOne container-infra internal http://controller:9511/v1
-openstack endpoint create --region RegionOne container-infra admin http://controller:9511/v1
+openstack endpoint create --region RegionOne container-infra public http://192.168.204.173:9511/v1
+openstack endpoint create --region RegionOne container-infra internal http://192.168.204.173:9511/v1
+openstack endpoint create --region RegionOne container-infra admin http://192.168.204.173:9511/v1
 ```
 
 
@@ -149,6 +150,114 @@ driver = messaging
 [oslo_concurrency]
 lock_path = /var/lib/magnum/tmp
 
+```
+
+
+
+##### 安装barbican(optional)
+
+###### 创建数据库
+
+```
+mysql -uroot -p
+
+CREATE DATABASE barbican;
+
+GRANT ALL PRIVILEGES ON barbican.* TO 'barbican'@'localhost' IDENTIFIED BY 'comleader123';
+GRANT ALL PRIVILEGES ON barbican.* TO 'barbican'@'%' IDENTIFIED BY 'comleader123';
+```
+
+###### 创建用户和角色
+
+```
+source admin-openrc
+openstack user create --domain default --password-prompt barbican
+openstack role add --project service --user barbican admin
+
+openstack role create creator
+openstack role add --project service --user barbican creator
+```
+
+###### 创建服务与endpoint
+
+controller替换为ip地址
+
+```
+openstack service create --name barbican --description "Key Manager" key-manager
+
+openstack endpoint create --region RegionOne key-manager public http://192.168.204.173:9311
+openstack endpoint create --region RegionOne key-manager internal http://192.168.204.173:9311
+openstack endpoint create --region RegionOne key-manager admin http://192.168.204.173:9311
+```
+
+###### 安装
+
+```
+yum install openstack-barbican-api -y
+```
+
+###### 修改配置
+
+
+
+sed -i.default -e "/^#/d" -e "/^$/d" /etc/barbican/barbican.conf
+
+
+
+```
+[DEFAULT]
+sql_connection = mysql+pymysql://barbican:comleader123@controller/barbican
+transport_url = rabbit://openstack:openstack@controller
+db_auto_create = false
+
+[keystone_authtoken]
+www_authenticate_uri = http://192.168.204.173:5000
+auth_url = http://192.168.204.173:5000
+memcached_servers = 192.168.204.173:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = barbican
+password = comleader123
+
+```
+
+
+
+###### 同步数据库
+
+```
+su -s /bin/sh -c "barbican-manage db upgrade" barbican
+```
+
+###### 最终安装、配置httpd
+
+ 创建 /etc/httpd/conf.d/wsgi-barbican.conf
+
+```
+<VirtualHost [::1]:9311>
+    ServerName controller
+
+    ## Logging
+    ErrorLog "/var/log/httpd/barbican_wsgi_main_error_ssl.log"
+    LogLevel debug
+    ServerSignature Off
+    CustomLog "/var/log/httpd/barbican_wsgi_main_access_ssl.log" combined
+
+    WSGIApplicationGroup %{GLOBAL}
+    WSGIDaemonProcess barbican-api display-name=barbican-api group=barbican processes=2 threads=8 user=barbican
+    WSGIProcessGroup barbican-api
+    WSGIScriptAlias / "/usr/lib/python2.7/site-packages/barbican/api/app.wsgi"
+    WSGIPassAuthorization On
+</VirtualHost>
+```
+
+###### 重启服务
+
+```
+systemctl enable httpd.service
+systemctl start httpd.service
 ```
 
 
@@ -320,6 +429,7 @@ openstack coe cluster create kubernetes-cluster \
 - 创建失败，修改模板中的heat_wait_condition参数改为10800，参考链接：https://bugs.launchpad.net/kolla-ansible/+bug/1842449；
 - 创建模板时优化参数，参考链接https://lingxiankong.github.io/2018-02-15-magnum-note.html；
 - 创建卡住，卡到kube_minions可能原因是minion发送请求到控制节点，但是endpoints配置的是controller，无法识别，需要在master  minion节点修改/etc/hosts配置 controller到ip的映射。参考链接：https://bugs.launchpad.net/kolla-ansible/+bug/1762754
+- 配置文件修改，参考链接：https://bugs.launchpad.net/kolla-ansible/+bug/1885420
 
 
 
@@ -440,3 +550,187 @@ magnum-ui安装参考链接：https://github.com/openstack/magnum-ui
 
 - 2021-09-13 16:51:34.080 64249 DEBUG heat.engine.scheduler [req-08854888-d52d-4808-88b6-b21fcd5f985d - admin - default default] Task create from HeatWaitCondition "minion_wait_condition" Stack "fedora-atomic-root-test-with-d-idlv2qepaqew-kube_minions-izcygqwk34gc-0-drtixczvrzar" [c8060190-102a-40c4-aab8-b3b78b410e3a] sleeping _sleep /usr/lib/python2.7/site-packages/heat/engine/scheduler.py:150
 
+
+
+
+
+
+
+
+
+
+
+ `export KUBERNETES_MASTER=http://10.0.0.93:8080`
+
+
+
+
+
+```
+ 对于非root用户 
+mkdir -p $HOME/.kube
+
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config 
+sudo chown $(id -u):$(id -g) $HOME/.kube/config  
+
+
+对于root用户 
+export KUBECONFIG=/etc/kubernetes/admin.conf 
+也可以直接放到~/.bash_profile 
+echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> ~/.bash_profile 
+```
+
+
+
+
+
+
+
+
+
+[root@atomichostv1cluster-h5efkkibeh23-master-0 ~]# kubeadm init
+
+I0917 00:34:39.938180   28691 version.go:93] could not fetch a Kubernetes version from the internet: unable to get URL "https://dl.k8s.io/release/stable-1.txt": Get https://storage.googleapis.com/kubernetes-release/release/stable-1.txt: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+I0917 00:34:40.012729   28691 version.go:94] falling back to the local client version: v1.12.5
+[init] using Kubernetes version: v1.12.5
+[preflight] running pre-flight checks
+	[WARNING FileExisting-ethtool]: ethtool not found in system path
+	[WARNING Hostname]: hostname "atomichostv1cluster-h5efkkibeh23-master-0.novalocal" could not be reached
+	[WARNING Hostname]: hostname "atomichostv1cluster-h5efkkibeh23-master-0.novalocal" lookup atomichostv1cluster-h5efkkibeh23-master-0.novalocal on 8.8.8.8:53: no such host
+[preflight] Some fatal errors occurred:
+	[ERROR Port-10251]: Port 10251 is in use
+	[ERROR Port-10252]: Port 10252 is in use
+	[ERROR Port-2379]: Port 2379 is in use
+	[ERROR DirAvailable--var-lib-etcd]: /var/lib/etcd is not empty
+[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`
+
+
+
+
+
+2021-09-23 12:39:43.221 71521 INFO heat.engine.scheduler [req-5d63ee43-b892-4a51-9285-152ebc5e4fe6 - admin - default default] Task create from SoftwareDeployment "kube_cluster_deploy" Stack "atomichostv2cluster-b4vyomps5xay" [ea6069c8-f0a9-4f53-9c25-868daf09c7ff] timed out
+
+
+
+
+
+cp RPM-GPG-KEY-fedora-29-x86_64   RPM-GPG-KEY-fedora-x86_64
+
+
+
+
+
+```
+[fedora] 
+name=Fedora $releasever - $basearch - aliyun
+failovermethod=priority 
+baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/os/ 
+#mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch 
+enabled=1 
+metadata_0xpire=7d 
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch 
+ 
+[fedora-debuginfo] 
+name=Fedora $releasever - $basearch - Debug - aliyun
+failovermethod=priority 
+baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/debug/ 
+#mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-debug-$releasever&arch=$basearch 
+enabled=1 
+metadata_expire=7d 
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch 
+ 
+[fedora-source] 
+name=Fedora $releasever - Source - aliyun
+failovermethod=priority 
+baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/source/SRPMS/ 
+#mirrorli0t=https://mirrors.fedoraproject.org/metalink?repo=fedora-source-$releasever&arch=$basearch 
+enabled=1 
+metadata_expire=7d 
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch 
+
+```
+
+
+
+```
+
+[updates]
+name=Fedora $releasever - $basearch - Updates - aliyun
+failovermethod=priority 
+baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/$basearch/ 
+#mirrorli0t=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch 
+enabled=1 
+gpgcheck=0 
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch 
+ 
+[updates-debuginfo] 
+name=Fedora $releasever - $basearch - Updates - Debug -aliyun
+failovermethod=priority 
+baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/$basearch/debug/ 
+#mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=updates-released-debug-f$releasever&arch=$basearch 
+enabled=0 
+gpgcheck=0 
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch 
+ 
+[updates-source] 
+name=Fedora $releasever - Updates Source - aliyun
+failovermethod=priority 
+baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/SRPMS/ 
+#mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=updates-released-source-f$releasever&arch=$basearch 
+enabled=0 
+gpgcheck=0 
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch 
+
+
+
+```
+
+
+
+
+
+
+
+
+
+/var/lib/cloud/instance/scripts/part-010
+
+
+
+/usr/bin/python3 -Es /usr/bin/atomic install  --storage ostredd --system --system-package=no --namea=kube-controller-manger docker.io/openstackmagnum/kubernetes-controller-manager:v1.11.6 
+
+
+
+
+
+/var/lib/containers/atomic/kube-controller-manger.0
+
+
+
+
+
+  cloud-init.target                                                                         loaded inactive   dead      start Cloud-init target                                                            
+
+
+
+  cloud-config.target                                                                       loaded active     active          Cloud-config availability                                                    
+
+
+
+
+
+atomic install  --storage ostredd --system --system-package no --set REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt --name heat-container-agent docker.io/openstackmagnum/kubernetes-controller-agent:stein-dev
+
+
+
+
+
+
+
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.204.173  controller
+10.0.0.59  atomichostv2cluster-gxwzlxwykemh-master-0.novalocal
