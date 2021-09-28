@@ -2,8 +2,6 @@
 
 
 
-
-
 创建cluster  
 
 controller:9511/v1/clusters

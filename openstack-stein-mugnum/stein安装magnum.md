@@ -346,7 +346,7 @@ openstack image create \
 
 ```
 
-openstack coe cluster template create kubernetes-cluster-template --image fedora_atomic_for_magnum_k8s  --external-network provider --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 5 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
+openstack coe cluster template create kubernetes-cluster-template --image atomichostv3  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
                      
 ```
 
@@ -726,6 +726,35 @@ atomic install  --storage ostredd --system --system-package no --set REQUESTS_CA
 
 
 
+atomic install --storage ostree --system '--set=ADDTL_MOUNTS=,{"type":"bind","source":"/opt/cni","destination":"/opt/cni","options":["bind","rw","slave","mode=777"]},{"type":"bind","source":"/var/lib/docker","destination":"/var/lib/docker","options":["bind","rw","slave","mode=755"]}' --system-package=no --name=kubelet docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6
+
+atomic install --storage ostree --system --system-package=no --name=kube-apiserver docker.io/openstackmagnum/kubernetes-apiserver:v1.11.6
+
+
+
+
+
+
+
+
+
+kube      2981  2969 59 06:59 ?        00:00:20 /usr/local/bin/kube-apiserver --logtostderr=true --v=0 --etcd-servers=http://127.0.0.1:2379 --bind-address=0.0.0.0 --secure-port=6443 --insecure-bind-address=127.0.0.1 --insecure-port=8080 --allow-privileged=true --service-cluster-ip-range=10.254.0.0/16 --admission-control=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota --runtime-config=api/all=true --allow-privileged=true --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP --authorization-mode=Node,Webhook,RBAC --tls-cert-file=/etc/kubernetes/certs/server.crt --tls-private-key-file=/etc/kubernetes/certs/server.key --client-ca-file=/etc/kubernetes/certs/ca.crt --service-account-key-file=/etc/kubernetes/certs/service_account.key --kubelet-certificate-authority=/etc/kubernetes/certs/ca.crt --kubelet-client-certificate=/etc/kubernetes/certs/server.crt --kubelet-client-key=/etc/kubernetes/certs/server.key --kubelet-https=true --proxy-client-cert-file=/etc/kubernetes/certs/server.crt --proxy-client-key-file=/etc/kubernetes/certs/server.key --requestheader-allowed-names=front-proxy-client,kube,kubernetes --requestheader-client-ca-file=/etc/kubernetes/certs/ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --cloud-provider=external --authentication-token-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --authorization-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml
+
+
+
+
+
+
+
+
+
+/sysroot/ostree/deploy/fedora-atomic/deploy/10b7d79eb645fcb1fd5f36c40ce3cc8c3269a89fe9c17f430dcc57e1641df492.0/usr/etc/systemd/system/kubelet.service.d/kubeadm.conf
+/sysroot/ostree/deploy/fedora-atomic/deploy/10b7d79eb645fcb1fd5f36c40ce3cc8c3269a89fe9c17f430dcc57e1641df492.0/etc/systemd/system/kubelet.service.d/kubeadm.conf
+/usr/etc/systemd/system/kubelet.service.d/kubeadm.conf
+/etc/systemd/system/kubelet.service.d/kubeadm.conf
+
+
+
 
 
 
@@ -916,6 +945,45 @@ syncFrequency: 1m0s
 volumeStatsAggPeriod: 1m0s
 
 ```
+
+
+
+
+
+```
+/usr/local/bin/kube-apiserver --logtostderr=true --v=0 --etcd-servers=http://127.0.0.1:2379 --bind-address=0.0.0.0 --secure-port=6443 --insecure-bind-address=0.0.0.0 --insecure-port=8080 --allow-privileged=true --service-cluster-ip-range=10.254.0.0/16 --admission-control=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota --runtime-config=api/all=true --allow-privileged=true --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP --authorization-mode=Node,Webhook,RBAC --tls-cert-file=/etc/kubernetes/certs/server.crt --tls-private-key-file=/etc/kubernetes/certs/server.key --client-ca-file=/etc/kubernetes/certs/ca.crt --service-account-key-file=/etc/kubernetes/certs/service_account.key --kubelet-certificate-authority=/etc/kubernetes/certs/ca.crt --kubelet-client-certificate=/etc/kubernetes/certs/server.crt --kubelet-client-key=/etc/kubernetes/certs/server.key --kubelet-https=true --proxy-client-cert-file=/etc/kubernetes/certs/server.crt --proxy-client-key-file=/etc/kubernetes/certs/server.key --requestheader-allowed-names=front-proxy-client,kube,kubernetes --requestheader-client-ca-file=/etc/kubernetes/certs/ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --cloud-provider=external --authentication-token-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --authorization-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml
+```
+
+
+
+
+
+
+
+临时禁用ipv6
+
+```
+$ sudo sh -c 'echo 1 > /proc/sys/net/ipv6/conf/<interface-name>/disable_ipv6'
+
+$ sudo sh -c 'echo 1 > /proc/sys/net/ipv6/conf/lo/disable_ipv6'
+
+```
+
+
+
+
+
+systemd-tmpfiles --create /etc/tmpfiles.d/heat-container-agent.conf
+
+
+
+
+
+```
+bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
+```
+
+
 
 
 
