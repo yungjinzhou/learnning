@@ -334,6 +334,15 @@ openstack image create \
                       --file=Fedora-Atomic-27-20180419.0.x86_64.qcow2\
                       --property os_distro='fedora-atomic' \
                       fedora-atomic-latest
+                      
+                      
+openstack image create \
+                      --disk-format=qcow2 \
+                      --container-format=bare \
+                      --file=fedora-coreos-34.qcow2\
+                      --property os_distro='coreos' \
+                      fedora-coreos-34latest                      
+                      
 ```
 
 #### 配置k8s集群，然后部署
@@ -618,13 +627,19 @@ cp RPM-GPG-KEY-fedora-29-x86_64   RPM-GPG-KEY-fedora-x86_64
 
 
 
+http://mirrors.aliyun.com/fedora/releases/27/Everything/x86_64/os/ /repodata/repomd.xml
+
+https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/27/Everything/
+
+
+
 
 
 ```
 [fedora] 
 name=Fedora $releasever - $basearch - aliyun
-failovermethod=priority 
-baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/os/ 
+baseurl=https://archives.fedoraproject.org/pub/archive/fedora/releases/$releasever/Everything/$basearch/os/
+#baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/os/ 
 #mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch 
 enabled=1 
 metadata_0xpire=7d 
@@ -634,7 +649,8 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch
 [fedora-debuginfo] 
 name=Fedora $releasever - $basearch - Debug - aliyun
 failovermethod=priority 
-baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/debug/ 
+
+#baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/debug/ 
 #mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-debug-$releasever&arch=$basearch 
 enabled=1 
 metadata_expire=7d 
@@ -644,7 +660,7 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch
 [fedora-source] 
 name=Fedora $releasever - Source - aliyun
 failovermethod=priority 
-baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/source/SRPMS/ 
+baseurl=https://archives.fedoraproject.org/pub/archive/fedora/releases/$releasever/Everything/source/SRPMS/ 
 #mirrorli0t=https://mirrors.fedoraproject.org/metalink?repo=fedora-source-$releasever&arch=$basearch 
 enabled=1 
 metadata_expire=7d 
@@ -660,7 +676,8 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch
 [updates]
 name=Fedora $releasever - $basearch - Updates - aliyun
 failovermethod=priority 
-baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/$basearch/ 
+# baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/$basearch/ 
+baseurl=https://archives.fedoraproject.org/pub/archive/fedora/updates/$releasever/Everything/$basearch/ 
 #mirrorli0t=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch 
 enabled=1 
 gpgcheck=0 
@@ -669,7 +686,8 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch
 [updates-debuginfo] 
 name=Fedora $releasever - $basearch - Updates - Debug -aliyun
 failovermethod=priority 
-baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/$basearch/debug/ 
+#baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/$basearch/debug/ 
+baseurl=https://archives.fedoraproject.org/pub/archive/fedora/updates/$releasever/Everything/$basearch/debug/ 
 #mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=updates-released-debug-f$releasever&arch=$basearch 
 enabled=0 
 gpgcheck=0 
@@ -678,7 +696,8 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-29-$basearch
 [updates-source] 
 name=Fedora $releasever - Updates Source - aliyun
 failovermethod=priority 
-baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/SRPMS/ 
+baseurl=https://archives.fedoraproject.org/pub/archive/fedora/updates/$releasever/Everything/SRPMS/ 
+#baseurl=http://mirrors.aliyun.com/fedora/updates/$releasever/Everything/SRPMS/ 
 #mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=updates-released-source-f$releasever&arch=$basearch 
 enabled=0 
 gpgcheck=0 
@@ -977,8 +996,6 @@ systemd-tmpfiles --create /etc/tmpfiles.d/heat-container-agent.conf
 
 
 
-
-
 ```
 bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
 ```
@@ -986,4 +1003,53 @@ bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/
 
 
 
+
+
+
+
+
+```
+sed -i "s/#baseurl/baseurl/g" /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo
+sed -i "s/metalink/#metalink/g" /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo
+sed -i "s http://download.fedoraproject.org/pub/fedora/linux https://repo.huaweicloud.com/fedora g" /etc/yum.repos.d/fedora.repo /etc/yum.repos.d/fedora-updates.repo
+```
+
+
+
+
+
+
+
+
+
+```
+###
+# kubernetes system config
+#
+# The following values are used to configure the kube-apiserver
+#
+
+# The address on the local server to listen to.
+#KUBE_API_ADDRESS="--bind-address=0.0.0.0 --secure-port=6443 --insecure-bind-address=127.0.0.1 --insecure-port=8080"
+KUBE_API_ADDRESS="--bind-address=0.0.0.0 --secure-port=6443 --insecure-bind-address=127.0.0.1 --insecure-port=8080"
+
+# The port on the local server to listen on.
+# KUBE_API_PORT="--port=8080"
+
+# Port minions listen on
+# KUBELET_PORT="--kubelet-port=10250"
+
+# Comma separated list of nodes in the etcd cluster
+KUBE_ETCD_SERVERS="--etcd-servers=http://127.0.0.1:2379"
+
+# Address range to use for services
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
+
+# default admission control policies
+KUBE_ADMISSION_CONTROL="--admission-control=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
+
+# Add your own!
+KUBE_API_ARGS="--runtime-config=api/all=true --allow-privileged=true --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP  --authorization-mode=Node,Webhook,RBAC --tls-cert-file=/etc/kubernetes/certs/server.crt --tls-private-key-file=/etc/kubernetes/certs/server.key --client-ca-file=/etc/kubernetes/certs/ca.crt --service-account-key-file=/etc/kubernetes/certs/service_account.key --kubelet-certificate-authority=/etc/kubernetes/certs/ca.crt --kubelet-client-certificate=/etc/kubernetes/certs/server.crt --kubelet-client-key=/etc/kubernetes/certs/server.key --kubelet-https=true         --proxy-client-cert-file=/etc/kubernetes/certs/server.crt         --proxy-client-key-file=/etc/kubernetes/certs/server.key         --requestheader-allowed-names=front-proxy-client,kube,kubernetes         --requestheader-client-ca-file=/etc/kubernetes/certs/ca.crt         --requestheader-extra-headers-prefix=X-Remote-Extra-         --requestheader-group-headers=X-Remote-Group         --requestheader-username-headers=X-Remote-User --cloud-provider=external --authentication-token-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --authorization-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --log=/var/log/apiserver.log"
+
+```
 

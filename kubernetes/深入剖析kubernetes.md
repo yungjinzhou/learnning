@@ -1007,8 +1007,8 @@ kubectl expose deployment nginx --port=80 --type=NodePort
 kubectl get pod,svc
 
 NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
-service/kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP        148m
-service/nginx        NodePort    10.97.184.183   <none>        80:31312/TCP   4s
+service/kubernetes   ClusterIP   10.0.0.7       <none>        443/TCP        148m
+service/nginx        NodePort    10.0.0.7  <none>        80:31312/TCP   4s
 ```
 
 测试访问
