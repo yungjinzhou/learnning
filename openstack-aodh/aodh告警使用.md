@@ -140,7 +140,7 @@ WantedBy=multi-user.target
 
 
 
-- 新aodh-api启动方式
+- 新aodh-api启动方式（忽略后面uwsgi启动）
 
 配置/etc/aodh/uwsgi-aodh.ini，注意修改系统的监听数（默认128）,参考修改链接：https://blog.csdn.net/qq_35876972/article/details/105340159
 
@@ -207,7 +207,7 @@ systemctl daemon-reload
 
 ```systemctl stop openstack-aodh-api.service```
 
-更改为uwsgi启动
+更改为uwsgi启动（如果前面已经用新方式修改，忽略这个）
 
 ```
 [uwsgi]

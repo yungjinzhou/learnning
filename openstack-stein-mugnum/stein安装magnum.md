@@ -336,12 +336,7 @@ openstack image create \
                       fedora-atomic-latest
                       
                       
-openstack image create \
-                      --disk-format=qcow2 \
-                      --container-format=bare \
-                      --file=fedora-coreos-34.qcow2\
-                      --property os_distro='coreos' \
-                      fedora-coreos-34latest                      
+openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='coreos' fedora-coreos-34latest                      
                       
 ```
 
@@ -356,7 +351,10 @@ openstack image create \
 ```
 
 openstack coe cluster template create kubernetes-cluster-template --image atomichostv3  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
-                     
+ 
+ 
+openstack coe cluster template create kubernetes-cluster-template --image fedora-coreos-34latest  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
+ 
 ```
 
 
@@ -379,7 +377,8 @@ pdb定位代码
 (Pdb) p definition_map
 {
 ('bm', 'fedora', 'kubernetes'): {'class': <class 'magnum.drivers.k8s_fedora_ironic_v1.driver.Driver'>, 'entry_point_name': 'k8s_fedora_ironic_v1'}, 
-('vm', 'ubuntu', 'mesos'): {'class': <class 'magnum.drivers.mesos_ubuntu_v1.driver.Driver'>, 'entry_point_name': 'mesos_ubuntu_v1'}, ('vm', 'coreos', 'kubernetes'): {'class': <class 'magnum.drivers.k8s_coreos_v1.driver.Driver'>, 'entry_point_name': 'k8s_coreos_v1'}, ('vm', 'fedora-atomic', 'swarm-mode'): {'class': <class 'magnum.drivers.swarm_fedora_atomic_v2.driver.Driver'>, 'entry_point_name': 'swarm_fedora_atomic_v2'}, 
+('vm', 'ubuntu', 'mesos'): {'class': <class 'magnum.drivers.mesos_ubuntu_v1.driver.Driver'>, 'entry_point_name': 'mesos_ubuntu_v1'}, 
+('vm', 'coreos', 'kubernetes'): {'class': <class 'magnum.drivers.k8s_coreos_v1.driver.Driver'>, 'entry_point_name': 'k8s_coreos_v1'}, ('vm', 'fedora-atomic', 'swarm-mode'): {'class': <class 'magnum.drivers.swarm_fedora_atomic_v2.driver.Driver'>, 'entry_point_name': 'swarm_fedora_atomic_v2'}, 
 ('vm', 'fedora-atomic', 'kubernetes'): {'class': <class 'magnum.drivers.k8s_fedora_atomic_v1.driver.Driver'>, 'entry_point_name': 'k8s_fedora_atomic_v1'}, 
 ('vm', 'fedora-atomic', 'swarm'): {'class': <class 'magnum.drivers.swarm_fedora_atomic_v1.driver.Driver'>, 'entry_point_name': 'swarm_fedora_atomic_v1'}}
 (Pdb) 
@@ -1050,6 +1049,106 @@ KUBE_ADMISSION_CONTROL="--admission-control=NodeRestriction,NamespaceLifecycle,L
 
 # Add your own!
 KUBE_API_ARGS="--runtime-config=api/all=true --allow-privileged=true --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP  --authorization-mode=Node,Webhook,RBAC --tls-cert-file=/etc/kubernetes/certs/server.crt --tls-private-key-file=/etc/kubernetes/certs/server.key --client-ca-file=/etc/kubernetes/certs/ca.crt --service-account-key-file=/etc/kubernetes/certs/service_account.key --kubelet-certificate-authority=/etc/kubernetes/certs/ca.crt --kubelet-client-certificate=/etc/kubernetes/certs/server.crt --kubelet-client-key=/etc/kubernetes/certs/server.key --kubelet-https=true         --proxy-client-cert-file=/etc/kubernetes/certs/server.crt         --proxy-client-key-file=/etc/kubernetes/certs/server.key         --requestheader-allowed-names=front-proxy-client,kube,kubernetes         --requestheader-client-ca-file=/etc/kubernetes/certs/ca.crt         --requestheader-extra-headers-prefix=X-Remote-Extra-         --requestheader-group-headers=X-Remote-Group         --requestheader-username-headers=X-Remote-User --cloud-provider=external --authentication-token-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --authorization-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --log=/var/log/apiserver.log"
+
+```
+
+
+
+fedora atomic system   atomic usage
+
+
+
+```
+[root@huaweirepo1-rh7sb66kntau-master-0 ~]# atomic --help
+usage: atomic [-h] [-v] [--debug] [-i] [-y]
+              {containers,diff,help,images,host,info,install,mount,pull,push,upload,run,scan,sign,stop,storage,migrate,top,trust,uninstall,unmount,umount,update,verify,version}
+              ...
+
+Atomic Management Tool
+
+positional arguments:
+  {containers,diff,help,images,host,info,install,mount,pull,push,upload,run,scan,sign,stop,storage,migrate,top,trust,uninstall,unmount,umount,update,verify,version}
+                        commands
+    containers          operate on containers
+    diff                Show differences between two container images, file
+                        diff or RPMS.
+    images              operate on images
+    host                execute Atomic host commands
+    install             execute container image install method
+    mount               mount container image to a specified directory
+    pull                pull latest image from a repository
+    push (upload)       push latest image to repository
+    run                 execute container image run method
+    scan                scan an image or container for CVEs or configuration
+                        compliance
+    sign                Sign an image
+    stop                execute container image stop method
+    storage (migrate)   manage container storage
+    top                 Show top-like stats about processes running in
+                        containers
+    trust               Manage system container trust policy
+    uninstall           execute container image uninstall method
+    unmount (umount)    unmount container image
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --version         show atomic version and exit
+  --debug               show debug messages
+  -i, --ignore          ignore install-first requirement
+  -y, --assumeyes       automatically answer yes for all questions
+  
+  
+  
+  
+  
+  
+  
+runc exec -t kube-apiserver /bin/sh
+  
+atomic run kube-apiserver
+
+atomic pull quay.io/coreos/flannel:v0.10.0-amd64
+
+rpm-ostree install kubernetes-kubeadm ethtool -r
+ 
+```
+
+
+
+
+
+kube-apiserver 启动命令
+
+```
+/usr/local/bin/kube-apiserver --logtostderr=true --v=0 --etcd-servers=http://127.0.0.1:2379 --bind-address=0.0.0.0 --secure-port=6444 --insecure-bind-address=0.0.0.0 --insecure-port=8081 --allow-privileged=true --service-cluster-ip-range=10.254.0.0/16 --admission-control=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota --runtime-config=api/all=true --allow-privileged=true --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP --authorization-mode=Node,Webhook,RBAC --tls-cert-file=/etc/kubernetes/certs/server.crt --tls-private-key-file=/etc/kubernetes/certs/server.key --client-ca-file=/etc/kubernetes/certs/ca.crt --service-account-key-file=/etc/kubernetes/certs/service_account.key --kubelet-certificate-authority=/etc/kubernetes/certs/ca.crt --kubelet-client-certificate=/etc/kubernetes/certs/server.crt --kubelet-client-key=/etc/kubernetes/certs/server.key --kubelet-https=true --proxy-client-cert-file=/etc/kubernetes/certs/server.crt --proxy-client-key-file=/etc/kubernetes/certs/server.key --requestheader-allowed-names=front-proxy-client,kube,kubernetes --requestheader-client-ca-file=/etc/kubernetes/certs/ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --cloud-provider=external --authentication-token-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --authorization-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml
+ 
+```
+
+
+
+
+
+
+
+```
+ETCD_NAME="10.0.0.246"
+ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+ETCD_LISTEN_CLIENT_URLS="https://10.0.0.246:2379,http://0.0.0.0:2379"
+ETCD_LISTEN_PEER_URLS="https://10.0.0.246:2380"
+
+ETCD_ADVERTISE_CLIENT_URLS="https://10.0.0.246:2379,http://0.0.0.0:2379"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://10.0.0.246:2380"
+ETCD_DISCOVERY="https://discovery.etcd.io/c32a249f2ea0d73e31ebeafbbdd13f33"
+ETCD_CA_FILE=/etc/etcd/certs/ca.crt
+ETCD_TRUSTED_CA_FILE=/etc/etcd/certs/ca.crt
+ETCD_CERT_FILE=/etc/etcd/certs/server.crt
+ETCD_KEY_FILE=/etc/etcd/certs/server.key
+ETCD_CLIENT_CERT_AUTH=true
+ETCD_PEER_CA_FILE=/etc/etcd/certs/ca.crt
+ETCD_PEER_TRUSTED_CA_FILE=/etc/etcd/certs/ca.crt
+ETCD_PEER_CERT_FILE=/etc/etcd/certs/server.crt
+ETCD_PEER_KEY_FILE=/etc/etcd/certs/server.key
+ETCD_PEER_CLIENT_CERT_AUTH=true
 
 ```
 

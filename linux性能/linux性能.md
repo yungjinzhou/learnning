@@ -319,15 +319,15 @@ $ sar -n DEV 1
 
 
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16244955228161.png) 
+![img](.\企业微信截图_16244955228161.png) 
 
 
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_1624495488667.png)  
+![img](.\企业微信截图_1624495488667.png)  
 
 
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16244954676633.png) 
+ ![img](.\企业微信截图_16244954676633.png) 
 #### 二、 内存
 
 ##### 1.1 内存概念
@@ -338,7 +338,7 @@ $ sar -n DEV 1
 
 2. 虚拟内存空间分布
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16238465767688.png) 
+ ![img](.\企业微信截图_16238465767688.png) 
      虚拟内存分内核空间和用户空间，其中用户空间又分为下面5部分：
      只读段，包括代码和常量等。
      数据段，包括全局变量等。
@@ -523,7 +523,7 @@ addr = 7f8f704752c0 size = 8192
 
    除了直接内存回收，还有一个专门的内核线程用来定期回收内存，也就是kswapd0。为了衡量内存的使用情况，kswapd0 定义了三个内存阈值（watermark，也称为水位），分别是页最小阈值（pages_min）、页低阈值（pages_low）和页高阈值（pages_high）。剩余内存，则使用 pages_free 表示。
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_1624580713665.png) 
+![img](.\企业微信截图_1624580713665.png) 
 
 
 ```
@@ -599,13 +599,13 @@ $ dmesg | grep -i "Out of memory"
         可以直接从物理内存中分配时，被称为次缺页异常。
         需要磁盘 I/O 介入（比如 Swap）时，被称为主缺页异常。
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245816702213.png) 
+![img](.\企业微信截图_16245816702213.png) 
 
  
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245817207878.png) 
+ ![img](.\企业微信截图_16245817207878.png) 
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16245817521386.png) 
+ ![img](.\企业微信截图_16245817521386.png) 
 
 
 
@@ -624,7 +624,7 @@ Linux 文件系统为每个文件都分配两个数据结构，索引节点（in
 
 文件系统又把连续的扇区组成了逻辑块，然后每次都以逻辑块为最小单元，来管理数据。常见的逻辑块大小为 4KB，也就是由连续的 8 个扇区组成。
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16254875676017.png) 
+![img](.\企业微信截图_16254875676017.png) 
 
 磁盘在执行文件系统格式化时，会被分成三个存储区域，超级块、索引节点区和数
 据块区。其中，
@@ -727,7 +727,7 @@ IOPS（Input/Output Per Second），是指每秒的 I/O 请求数。
 用性能测试工具 fio ，来测试磁盘的 IOPS、吞吐量以及响应时间等核心
 指标。
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16254883048336.png) 
+ ![img](.\企业微信截图_16254883048336.png) 
 
 %util ，就是我们前面提到的磁盘 I/O 使用率；
 r/s+ w/s ，就是 IOPS；
@@ -823,7 +823,7 @@ $ nsenter --target $PID --net -- lsof -i
 
 
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257905929796.png) 
+![img](.\企业微信截图_16257905929796.png) 
 
 第一，在文件系统的原理中，我介绍了查看文件系统容量的工具 df。它既可以查看文件系统数据的空间容量，也可以查看索引节点的容量。至于文件系统缓存，我们通过
 /proc/meminfo、/proc/slabinfo 以及 slabtop 等各种来源，观察页缓存、目录项缓
@@ -840,11 +840,11 @@ IOPS 等性能指标；而通过 pidstat ，则可以观察到进程的 I/O吞�
 最后，在 MySQL 和 Redis 的案例中，同样的思路，我们先用 top、iostat 以及 idstat
 ，确定并找出 I/O 性能问题的瓶颈来源，它们正是 mysqld 和 redis-server。随后，我们又用 strace+lsof 找出了它们正在读写的文件
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257907709794.png) 
+ ![img](.\企业微信截图_16257907709794.png) 
 
 
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257908083610.png) 
+ ![img](.\企业微信截图_16257908083610.png) 
 
 **分析思路**
 
@@ -853,7 +853,7 @@ IOPS 等性能指标；而通过 pidstat ，则可以观察到进程的 I/O吞�
 3. 随后分析进程的 I/O 行为；
 4. 最后，结合应用程序的原理，分析这些 I/O 的来源。
 
- ![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16257908709466.png) 
+ ![img](.\企业微信截图_16257908709466.png) 
 ##### 1.4 磁盘I/O性能测试
 
 fio（Flexible I/O Tester）正是最常用的文件系统和磁盘 I/O 性能基准测试工具。它提供了大量的可定制化选项，可以用来测试，裸盘或者文件系统在各种场景下的 I/O 性能，包括了不同块大小、不同 I/O 引擎以及是否使用缓存等场景。
@@ -965,7 +965,7 @@ i/o性能优化
 
 最后，应用程序就可以使用 Socket 接口，读取到新接收到的数据了。
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269352384947.png)
+![img](.\企业微信截图_16269352384947.png)
 
 
 
@@ -1194,13 +1194,13 @@ Nginx操作
 第一种机制，DPDK，是用户态网络的标准。它跳过内核协议栈，直接由用户态进程通过
 轮询的方式，来处理网络接收。
 
-![pr-3303](E:\code\learnning\linux-releated\linux性能\PR-3303.png)
+![pr-3303](.\PR-3303.png)
 
 
 
 第二种机制，XDP（eXpress Data Path），则是 Linux 内核提供的一种高性能网络数据路径。它允许网络包，在进入内核协议栈之前，就进行处理，也可以带来更高的性能。XDP 底层跟我们之前用到的 bcc-tools 一样，都是基于 Linux 内核的 eBPF 机制实现的。
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269377726719.png)
+![img](.\企业微信截图_16269377726719.png)
 
 你可以看到，XDP 对内核的要求比较高，需要的是 Linux 4.8 以上版本，并且它也不提供缓存队列。基于 XDP 的应用程序通常是专用的网络应用，常见的有 IDS（入侵检测系统）、DDoS 防御、 cilium 容器网络插件等。
 
@@ -1234,7 +1234,7 @@ TCP 接收的带宽（吞吐量）为 860 Mb/s
 
 而通常的四次挥手：服务器端收到客户端的 FIN 后，很可能还没发送完数据，所以就会先回复客户端一个 ACK 包。稍等一会儿，完成所有数据包的发送后，才会发送 FIN 包。这也就是四次挥手了。
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269511374039.png)
+![img](.\企业微信截图_16269511374039.png)
 
 ###### 6.1.1 **网络延时-tcp优化**
 
@@ -1374,7 +1374,7 @@ dig trace 的输出，主要包括四部分:
 	最后一部分，就是从 geekbang.org. 的 NS 服务器（dns10.hichina.com）查询最终主机 						ime.geekbang.org. 的 A 记录。
 ```
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269398878226.png)
+![img](.\企业微信截图_16269398878226.png)
 
 
 
@@ -1411,11 +1411,11 @@ dnsmasq 是最常用的 DNS 缓存服务之一，还经常作为 DHCP 服务来�
 
 ###### 7.5 tcpdump和wireshark使用
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269414081609.png)
+![img](.\企业微信截图_16269414081609.png)
 
 
 
-![img](E:\code\learnning\linux-releated\linux性能\企业微信截图_16269414832366.png)
+![img](.\企业微信截图_16269414832366.png)
 
 
 
@@ -1450,7 +1450,7 @@ SYN Flood 正是互联网中最经典的 DDoS 攻击方式。它的原理：
 这种等待状态的 TCP 连接，通常也称为半开连接。由于连接表的大小有限，大量的半开连接就会导致连接表迅速占满，从而无法建立新的 TCP 连接。
 参考下面这张 TCP 状态图，你能看到，此时，服务器端的 TCP 连接，会处于SYN_RECEIVED 状态：
 
-![File:Tcp state diagram.png](E:\code\learnning\linux-releated\linux性能\Tcp_state_diagram.png)
+![File:Tcp state diagram.png](.\Tcp_state_diagram.png)
 
 
 
@@ -1534,7 +1534,7 @@ Linux 内核提供的 Netfilter 框架，允许对网络数据包进行修改（
 
 iptables 就是最常用的一种配置工具。要掌握 iptables 的原理和使用方法，最核心的就是弄清楚，网络数据包通过 Netfilter 时的工作流向，下面这张图就展示了这一过程。
 
-![img](E:\code\learnning\linux-releated\linux性能\1920px-Netfilter-packet-flow.svg.png)
+![img](.\1920px-Netfilter-packet-flow.svg.png)
 
 在这张图中，绿色背景的方框，表示表（table），用来管理链。Linux 支持 4 种表，包括filter（用于过滤）、nat（用于 NAT）、mangle（用于修改分组数据） 和 raw（用于原始数据包）等。
 
@@ -1639,11 +1639,11 @@ $ ulimit -n 65536
 
 ###### 10.1根据指标找工具 
 
-![1628490809379](E:\code\learnning\linux-releated\linux性能\1628490809379.png)
+![1628490809379](.\1628490809379.png)
 
 ###### 10.2 根据工具查指标
 
-![1628490872970](E:\code\learnning\linux-releated\linux性能\1628490872970.png)
+![1628490872970](.\1628490872970.png)
 
 ###### 10.3 套接字优化
 
@@ -1653,7 +1653,7 @@ $ ulimit -n 65536
 - 增大套接字接收缓冲区大小 net.core.rmem_max 和发送缓冲区大小net.core.wmem_max；
 - 增大 TCP 接收缓冲区大小 net.ipv4.tcp_rmem 和发送缓冲区大小net.ipv4.tcp_wmem。
 
-![1628490940634](E:\code\learnning\linux-releated\linux性能\1628490940634.png)
+![1628490940634](.\1628490940634.png)
 
 tcp_rmem 和 tcp_wmem 的三个数值分别是 min，default，max，系统会根据这些设置，自动调整 TCP 接收 / 发送缓冲区的大小。
 udp_mem 的三个数值分别是 min，pressure，max，系统会根据这些设置，自动调整UDP 发送缓冲区的大小。
@@ -1669,7 +1669,7 @@ udp_mem 的三个数值分别是 min，pressure，max，系统会根据这些设
 - 缩短发送 Keepalive 探测包的间隔时间 net.ipv4.tcp_keepalive_intvl；
 - 减少 Keepalive 探测失败后，一直到通知应用程序前的重试次数net.ipv4.tcp_keepalive_probes。
 
-![image-20210722202404063](E:\code\learnning\linux-releated\linux性能\image-20210722202404063.png)
+![image-20210722202404063](.\image-20210722202404063.png)
 
 
 
