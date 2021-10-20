@@ -336,7 +336,11 @@ openstack image create \
                       fedora-atomic-latest
                       
                       
-openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='coreos' fedora-coreos-34latest                      
+openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='coreos' fedora-coreos-34latest       
+
+
+openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='fedora-atomic' fedora-atomic20180212    
+
                       
 ```
 
@@ -354,6 +358,11 @@ openstack coe cluster template create kubernetes-cluster-template --image atomic
  
  
 openstack coe cluster template create kubernetes-cluster-template --image fedora-coreos-34latest  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
+ 
+ 
+ 
+ 
+openstack coe cluster template create atomic-ussuritest --image e0b3a591-e3fa-4240-8339-5dd93c3ed7e0  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
  
 ```
 
@@ -374,6 +383,8 @@ Cluster type (vm, Unset, kubernetes) not supported (HTTP 400) (Request-ID: req-7
 pdb定位代码
 
 ```
+# magnum/drivers/common/driver.py
+
 (Pdb) p definition_map
 {
 ('bm', 'fedora', 'kubernetes'): {'class': <class 'magnum.drivers.k8s_fedora_ironic_v1.driver.Driver'>, 'entry_point_name': 'k8s_fedora_ironic_v1'}, 
@@ -419,6 +430,9 @@ openstack coe cluster create kubernetes-cluster \
                         --master-flavor m1.small \
                         --flavor m1.small \
                         --keypair keyparitestmagnumcluster
+                        
+                        
+openstack coe cluster create ussuri-test --cluster-template atomic-ussuritest --master-count 1 --node-count 1 --docker-volume-size 10 --master-flavor m1.small --flavor m1.small  --keypair copmute01keypair --timeout 180
 ```
 
 - 遇到创建失败，提示` reason: Resource CREATE failed: ResourceInError: resources.kube_masters.resources[0].resources.kube-master: Went to status ERROR due to "Message: No valid host was found. , Code: 500"`，扩展了计算节点的资源，删除无用实例后问题解决
@@ -637,8 +651,8 @@ https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/27/Everythi
 ```
 [fedora] 
 name=Fedora $releasever - $basearch - aliyun
-baseurl=https://archives.fedoraproject.org/pub/archive/fedora/releases/$releasever/Everything/$basearch/os/
-#baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/os/ 
+#baseurl=https://archives.fedoraproject.org/pub/archive/fedora/releases/$releasever/Everything/$basearch/os/
+baseurl=http://mirrors.aliyun.com/fedora/releases/$releasever/Everything/$basearch/os/ 
 #mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch 
 enabled=1 
 metadata_0xpire=7d 
@@ -1151,4 +1165,124 @@ ETCD_PEER_KEY_FILE=/etc/etcd/certs/server.key
 ETCD_PEER_CLIENT_CERT_AUTH=true
 
 ```
+
+
+
+
+
+
+
+```
+###
+# kubernetes system config
+#
+# The following values are used to configure the kube-apiserver
+#
+
+# The address on the local server to listen to.
+KUBE_API_ADDRESS="--bind-address=0.0.0.0 --secure-port=6443 --insecure-bind-address=0.0.0.0 --insecure-port=8080"
+
+# The port on the local server to listen on.
+# KUBE_API_PORT="--port=8080"
+
+# Port minions listen on
+# KUBELET_PORT="--kubelet-port=10250"
+
+# Comma separated list of nodes in the etcd cluster
+KUBE_ETCD_SERVERS="--etcd-servers=http://127.0.0.1:2379"
+
+# Address range to use for services
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=10.254.0.0/16"
+
+# default admission control policies
+KUBE_ADMISSION_CONTROL="--admission-control=NodeRestriction,NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
+
+# KUBE_ADMISSION_CONTROL="--admission-control=NodeRestriction,NamespaceLifecycle,LimitRanger,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
+
+# Add your own!
+KUBE_API_ARGS="--runtime-config=api/all=true --allow-privileged=true --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP --authorization-mode=Node,Webhook,RBAC --tls-cert-file=/etc/kubernetes/certs/server.crt --tls-private-key-file=/etc/kubernetes/certs/server.key --client-ca-file=/etc/kubernetes/certs/ca.crt --service-account-key-file=/etc/kubernetes/certs/service_account.key --kubelet-certificate-authority=/etc/kubernetes/certs/ca.crt --kubelet-client-certificate=/etc/kubernetes/certs/server.crt --kubelet-client-key=/etc/kubernetes/certs/server.key --kubelet-https=true --proxy-client-cert-file=/etc/kubernetes/certs/server.crt --proxy-client-key-file=/etc/kubernetes/certs/server.key --requestheader-allowed-names=front-proxy-client,kube,kubernetes --requestheader-client-ca-file=/etc/kubernetes/certs/ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --cloud-provider=external --authentication-token-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml --authorization-webhook-config-file=/etc/kubernetes/keystone_webhook_config.yaml"
+
+```
+
+
+
+
+
+
+
+
+
+```
+atomic install --storage ostree --system --system-package=no --name=kube-apiserver docker.io/openstackmagnum/kubernetes-apiserver:v1.11.6
+
+
+atomic install --storage ostree --system '--set=ADDTL_MOUNTS=,{"type":"bind","source":"/opt/cni","destination":"/opt/cni","options":["bind","rw","slave","mode=777"]},{"type":"bind","source":"/var/lib/docker","destination":"/var/lib/docker","options":["bind","rw","slave","mode=755"]}' --system-package=no --name=kubelet docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6
+
+
+
+atomic install --storage ostree --system --system-package=no --name=kube-controller-manager docker.io/openstackmagnum/kubernetes-controller-manager:v1.11.6
+
+
+atomic install --storage ostree --system --system-package=no --name=kube-scheduler docker.io/openstackmagnum/kubernetes-scheduler:v1.11.6
+
+atomic install --storage ostree --system --system-package=no --name=kube-proxy docker.io/openstackmagnum/kubernetes-proxy:v1.11.6
+
+ atomic install --storage ostree --system --system-package no --set REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt --name heat-container-agent docker.io/openstackmagnum/heat-container-agent:stein-dev
+ 
+ atomic install --system-package no --system --storage ostree --name=etcd docker.io/openstackmagnum/etcd:v3.2.7
+ 
+ 
+```
+
+
+
+
+
+```
+kubeadm config print init-defaults > kubeadm.conf
+
+
+```
+
+
+
+
+
+
+
+| 脚本名称                 | ussuri           | stein          |
+| ------------------------ | ---------------- | -------------- |
+| calico-service-v3.3-x.sh | 有               | 无             |
+| calico-service.sh        | 没有ETCD相关配置 | 有ETCD相关配置 |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+|                          |                  |                |
+
+ussuri:
+
+
+
+stein:
+
+
+
+
+
+
+
+
 
