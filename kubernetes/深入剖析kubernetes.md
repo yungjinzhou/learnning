@@ -479,6 +479,7 @@ sysctl --system
 ```stylus
 yum install ntpdate -y
 ntpdate time.windows.com
+
 ```
 
 
@@ -487,17 +488,22 @@ ntpdate time.windows.com
 
 
 
+
+
 安装docker
 
 ```awk
-wget https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo -O /etc/yum.repos.d/docker-ce.repo 
+wget -O https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo /etc/yum.repos.d/docker-ce.repo 
 
 yum -y install docker-ce-18.06.1.ce-3.el7 
 
 systemctl enable docker && systemctl start docker 
 
 docker --version
+
 ```
+
+
 
 添加阿里云YUM源
 
@@ -509,6 +515,7 @@ cat > /etc/docker/daemon.json << EOF
   "registry-mirrors": ["https://xxx.mirror.aliyuncs.com"] 
 }
 EOF
+
 ```
 
 添加 yum 源
@@ -524,7 +531,12 @@ epo_gpgcheck=0
 gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg 
 https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg 
 EOF
+
 ```
+
+
+
+
 
 
 
@@ -974,7 +986,7 @@ EOF
 yum install -y kubeadm-1.18.0
 ```
 
-在workerr节点执行
+在worker节点执行
 
 ```
 kubeadm join 10.0.0.7:6443 --token lj8kxk.xs9oy9jj7x0vp0s0 \

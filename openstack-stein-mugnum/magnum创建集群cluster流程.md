@@ -517,7 +517,7 @@ convergence   openstack N版本后，默认convergence=Ture
         if new_stack is not None:
             self.disable_rollback = new_stack.disable_rollback
             self.timeout_mins = new_stack.timeout_mins
-            self.converge = new_stack.converge
+            self.converge = new_stack.converge # ------
 
             self.defn = new_stack.defn
             self._set_param_stackid()
