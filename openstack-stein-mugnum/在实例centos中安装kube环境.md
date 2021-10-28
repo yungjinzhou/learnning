@@ -4,7 +4,7 @@
 
 openstack stein版本
 
-基础镜像：CentOS-7-x86_64-GenericCloud-1802.qcow2
+基础镜像：CentOS-7-x86_64-GenericCloud-2009.qcow2
 
 
 
@@ -50,15 +50,10 @@ nameserver 114.114.114.114
 
 
 
-
-
-
-
 ```
 yum -y upgrade # 升级包，不升级内核
-yum install -y epel-release vim net-tools wget lrzsz tree screen lsof tcpdump nmap mlocate gcc net-tools
 
-
+yum install -y vim net-tools wget lrzsz tree screen lsof tcpdump nmap mlocate gcc
 
 # 6、命令提示符颜色
 echo "PS1='[\[\e[31m\]\u\[\e[m\]@\[\e[36m\]\H\[\e[33m\] \W\[\e[m\]]\[\e[35m\]\\$ \[\e[m\]'" >>/etc/bashrc
@@ -68,71 +63,16 @@ source /etc/bashrc
 
 
 
-
-
-```
-curl扩展还是提示这个问题 需要重启一下PHP 重新加载一下扩展才能解决问题
-
-yum -y install ca-certificates
-pkill php-fpm
-/usr/local/php/sbin/php-fpm
-
-```
-
-
-
-epel.repo修改，否则会导致`yum doesn't have enough cached data to continue. At this point the only
- safe thing yum can do is fail. There are a few ways to work "fix" this:`
-
-```
-[epel]
-name=Extra Packages for Enterprise Linux 7 - $basearch
-baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch
-#metalink=https://mirrors.fedoraproject.org/metalink?repo=epel-7&arch=$basearch
-failovermethod=priority
-enabled=1
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
-
-[epel-debuginfo]
-name=Extra Packages for Enterprise Linux 7 - $basearch - Debug
-baseurl=http://download.fedoraproject.org/pub/epel/7/$basearch/debug
-#metalink=https://mirrors.fedoraproject.org/metalink?repo=epel-debug-7&arch=$basearch
-failovermethod=priority
-enabled=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
-gpgcheck=1
-
-[epel-source]
-name=Extra Packages for Enterprise Linux 7 - $basearch - Source
-baseurl=http://download.fedoraproject.org/pub/epel/7/SRPMS
-#metalink=https://mirrors.fedoraproject.org/metalink?repo=epel-source-7&arch=$basearch
-failovermethod=priority
-enabled=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
-gpgcheck=1
-
-```
-
-
-
-
-
-
-
-
-
 更换下载源
 
 ```
 mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.backup
 
 wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+
 yum clean all
 yum makecache
 ```
-
-
 
 
 
@@ -187,6 +127,7 @@ EOF
 
 # 生效
 sysctl --system 
+
 ```
 
 时间同步
@@ -203,12 +144,20 @@ ntpdate time.windows.com
 
 
 
+```
+You temporary disable verifying ssl in yum with the following.
+
+echo "sslverify=0" >> /etc/yum.conf
+yum reinstall -y ca-certificates
+Remove temporary hack with editor of your choice from /etc/yum.conf
+```
+
 
 
 安装docker
 
 ```awk
-wget -O https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo /etc/yum.repos.d/docker-ce.repo 
+wget -O /etc/yum.repos.d/docker-ce.repo  https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
 
 yum -y install docker-ce-18.06.1.ce-3.el7 
 
@@ -251,10 +200,6 @@ EOF
 
 
 
-
-
-
-
 安装kubelet kubeadm kubectl
 
 ```apache
@@ -270,6 +215,10 @@ systemctl enable kubelet
 
 ```apache
 kubeadm init --apiserver-advertise-address=10.0.0.7 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+kubeadm init --apiserver-advertise-address=192.168.204.82 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
 ```
 
 得到token
@@ -546,6 +495,116 @@ spec:
 
 
 
+
+```
+# CentOS-Base.repo
+#
+# The mirror system uses the connecting IP address of the client and the
+# update status of each mirror to pick mirrors that are updated to and
+# geographically close to the client.  You should use this for CentOS updates
+# unless you are manually picking other mirrors.
+#
+# If the mirrorlist= does not work for you, as a fall back you can try the 
+# remarked out baseurl= line instead.
+#
+#
+ 
+[base]
+name=CentOS-7.9.2009 - Base - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/os/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/os/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/os/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#released updates 
+[updates]
+name=CentOS-$releasever - Updates - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/7.9.2009/updates/$basearch/
+        http://mirrors.aliyuncs.com/centos/7.9.2009/updates/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/7.9.2009/updates/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#additional packages that may be useful
+[extras]
+name=CentOS-$releasever - Extras - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/7.9.2009/extras/$basearch/
+        http://mirrors.aliyuncs.com/centos/7.9.2009/extras/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/7.9.2009/extras/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#additional packages that extend functionality of existing packages
+[centosplus]
+name=CentOS-$releasever - Plus - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/7.9.2009/centosplus/$basearch/
+        http://mirrors.aliyuncs.com/centos/7.9.2009/centosplus/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/7.9.2009/centosplus/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#contrib - packages by Centos Users
+[contrib]
+name=CentOS-$releasever - Contrib - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/7.9.2009/contrib/$basearch/
+        http://mirrors.aliyuncs.com/centos/7.9.2009/contrib/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/7.9.2009/contrib/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+
+```
+
+
+
+
+
+```
+
+
+
+	Unfortunately, an error has occurred:
+		timed out waiting for the condition
+
+	This error is likely caused by:
+		- The kubelet is not running
+		- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+
+	If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
+		- 'systemctl status kubelet'
+		- 'journalctl -xeu kubelet'
+
+	Additionally, a control plane component may have crashed or exited when started by the container runtime.
+	To troubleshoot, list all containers using your preferred container runtimes CLI.
+
+	Here is one example how you may list all Kubernetes containers running in docker:
+		- 'docker ps -a | grep kube | grep -v pause'
+		Once you have found the failing container, you can inspect its logs with:
+		- 'docker logs CONTAINERID'
+
+error execution phase wait-control-plane: couldn't initialize a Kubernetes cluster
+To see the stack trace of this error execute with --v=5 or higher
+
+
+
+```
+
+
+
+
+
+创建时执行脚本
+
+```
+
+```
 
 
 
