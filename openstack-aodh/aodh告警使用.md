@@ -37,9 +37,9 @@ Aodh根据Gnocchi和Panko中存储的计量和事件数据，提供告警通知�
 创建endpoints：
 
 ```
-# openstack endpoint create --region RegionOne alarming public http://controller:8042
-# openstack endpoint create --region RegionOne alarming internal http://controller:8042
-# openstack endpoint create --region RegionOne alarming admin http://controller:8042
+openstack endpoint create --region RegionOne alarming public http://controller:8042
+openstack endpoint create --region RegionOne alarming internal http://controller:8042
+openstack endpoint create --region RegionOne alarming admin http://controller:8042
 ```
 
 #### 1.2.2 配置MySQL
@@ -51,10 +51,8 @@ Aodh根据Gnocchi和Panko中存储的计量和事件数据，提供告警通知�
 ```
 # mysql -u root -p
 mysql> CREATE DATABASE aodh;
-mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'localhost' \
-  IDENTIFIED BY 'comleader@123';
-mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'%' \
-  IDENTIFIED BY 'comleader2123';
+mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'localhost' IDENTIFIED BY 'comleader@123';
+mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'%' IDENTIFIED BY 'comleader@123';
 ```
 
 [![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
@@ -68,6 +66,8 @@ mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'%' \
 #### 1.2.4 编辑配置
 
 /etc/aodh/aodh.conf：服务运行参数。
+
+sed -i.default -e '/^#/d' -e '/^$/d'  /etc/aodh/aodh.conf
 
 [![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
 

@@ -1492,7 +1492,7 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
 
 
 
-#### 10.最新配置文件
+#### 10.最新配置文件(1.7更新后)
 
 ##### 10.1 polling.yaml (所有要监控的节点)
 
