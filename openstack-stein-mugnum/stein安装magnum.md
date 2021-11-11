@@ -341,7 +341,9 @@ openstack image create --disk-format=qcow2 --container-format=bare --file=fedora
 
 openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='fedora-atomic' fedora-atomic20180212    
 
-                      
+
+
+openstack image create --disk-format=qcow2 --container-format=bare --file=centos7-20210422.qcow2 --property os_distro='centos' centos7-20210422-raw
 ```
 
 #### 配置k8s集群，然后部署
