@@ -4,7 +4,7 @@
 
 openstack stein版本
 
-基础镜像：CentOS-7-x86_64-GenericCloud-2009.qcow2
+基础镜像：CentOS-7-x86_64-GenericCloud-20210422.qcow2
 
 
 
@@ -65,7 +65,6 @@ nameserver 114.114.114.114
 
 
 ```
-yum -y upgrade # 升级包，不升级内核
 
 yum install -y vim net-tools wget lrzsz tree screen lsof tcpdump nmap mlocate gcc
 
@@ -156,14 +155,13 @@ ntpdate time.windows.com
 
 重启机器
 
-
+设置ssl不验证
 
 ```
-You temporary disable verifying ssl in yum with the following.
 
 echo "sslverify=0" >> /etc/yum.conf
 yum reinstall -y ca-certificates
-Remove temporary hack with editor of your choice from /etc/yum.conf
+
 ```
 
 
