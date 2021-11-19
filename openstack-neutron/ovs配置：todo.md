@@ -28,7 +28,14 @@
 里面有变量，注意修改一下
 ```
 
+在有nova-compute服务的机器上执行上述步骤
 
+
+可以参考高凌云compute节点上的这个文件/etc/neutron/plugins/ml2/openvswitch_agent.ini  ， 其他文件跟bridge的一样，就不用改了
 
  
+
+
+
+
 
