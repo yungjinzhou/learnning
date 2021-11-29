@@ -86,8 +86,6 @@ OS::Heat::SoftwareConfig和OS::Heat::SoftwareDeployment协同工作，需要一�
 /opt/stack/os－config－refresh/error.d
 ```
 
-
-
 每个文件夹都应对了软件不同的阶段，比如预先配置阶段、配置阶段、后配置阶段和迁移阶段。如果任一阶段的脚本执行出现问题，它会运行error.d目录里的错误处理脚本。os－refresh－config 在配置阶段会调用一定预先定义的工具，比如heat－config，这样就触发了heat－config的应用，调用完heat－config后，又会调用os－apply－config。存在在heat－config或者os－apply－config里的都是一些脚本，也叫钩子。Heat对于各种不同的工具提供了不同的钩子脚本。用户也可以自己定义这样的脚本。
 
 等一切调用完成无误后，heat－config－notify 会被调用，它用来发信号给Heat，告诉这个软件部署的工作已经完成。当Heat 收到heat－config－notify 发来的信号后，它会把OS::Heat::SoftwareConfig 对应资源的状态改为Complete。如果有任何错误发生，就会改为CREATE＿FAILED 状态。
@@ -203,8 +201,6 @@ class EngineClient(object):
 ```
 
 create_task由engine接收
-
-
 
 ```
 # /usr/lib/python2.7/site-packages/heat/engine/service.py(827)create_stack()

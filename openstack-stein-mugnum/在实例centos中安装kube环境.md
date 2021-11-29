@@ -16,7 +16,7 @@ openstack stein版本
 
 
 
-配置ip地址
+### 配置ip地址
 
 ```]
 vim /etc/sysconfig/network-scripts/ifcfg-eth0
@@ -31,6 +31,19 @@ GATEWAY=10.0.0.2
 DNS1=8.8.8.8
 DNS2=114.114.114.114
 
+
+
+YPE=Ethernet
+BOOTPROTO=static
+NAME=eth0
+DEVICE=eth0
+ONBOOT=yes
+IPADDR=192.168.24.36
+NETMASK=255.255.255.0
+GATEWAY=10.0.0.2
+DNS1=8.8.8.8
+DNS2=114.114.114.114
+HWADDR=fa:16:3e:58:24:d3 # 每个机器不一样
 ```
 
 配置hostname
@@ -66,7 +79,7 @@ nameserver 114.114.114.114
 
 ```
 
-yum install -y vim net-tools wget lrzsz tree screen lsof tcpdump nmap mlocate gcc
+yum install -y vim net-tools wget lrzsz tree screen lsof tcpdump nmap mlocate gcc  traceroute
 
 # 6、命令提示符颜色
 echo "PS1='[\[\e[31m\]\u\[\e[m\]@\[\e[36m\]\H\[\e[33m\] \W\[\e[m\]]\[\e[35m\]\\$ \[\e[m\]'" >>/etc/bashrc
@@ -76,7 +89,7 @@ source /etc/bashrc
 
 
 
-更换下载源
+### 更换下载源
 
 ```
 mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.backup
@@ -130,7 +143,7 @@ EOF
 
 ```
 
-配置网络
+### 配置网络
 
 ```gauss
 cat > /etc/sysctl.d/k8s.conf << EOF 
@@ -138,30 +151,71 @@ net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1 
 EOF
 
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
 # 生效
 sysctl --system 
 
 ```
 
-时间同步
+### 时间同步
 
 ```stylus
+timedatectl set-timezone Asia/Shanghai 
+
 yum install ntpdate -y
 ntpdate time.windows.com
 
 ```
 
+### 解决https请求失败问题
+
+```
+解决GenericCloud centos7  curl 请求https失败
+
+curl -v https://www.baidu.com
+[root@k8sminion.novalocal home]# curl -v https://www* About to connect() to www.baidu.com port 443 (#0)*   Trying 103.235.46.39...
+* Connected to www.baidu.com (103.235.46.39) port 443 (#0)
+* Initializing NSS with certpath: sql:/etc/pki/nssdb
+* Closing connection 0
+curl: (77) Problem with the SSL CA cert (path? access rights?)
+
+解决办法：创建空文件 
+touch /etc/sysconfig/64bit_strstr_via_64bit_strstr_sse2_unaligned
+
+
+
+
+Unable to resolve HTTPs links from newly spawned VM using CENTOS generic cloud images.
+
+Issue found with images for CENTOS available on https://cloud.centos.org/centos/7/images/
+Tried on following IMAGES:
+
+CentOS-7-x86_64-GenericCloud.qcow2 2019-06-04 09:28 898M
+CentOS-7-x86_64-GenericCloud-1804_02.qcow2 2018-05-19 01:34 892M
+CentOS-7-x86_64-GenericCloud-1606.qcow2 2016-07-05 15:12 873M
+
+Command to test:
+curl -I -v https://google.com
+* About to connect() to google.com port 443 (#0)
+* Trying x.x.x.x....
+* Connected to google.com (x.x.x.x) port 443 (#0)
+* Initializing NSS with certpath: sql:/etc/pki/nssdb
+* Closing connection 0
+curl: (77) Problem with the SSL CA cert (path? access rights?)
+Steps To Reproduce	Install cloud instance on openstack with centos generic images and run "curl -I -v https://google.com"
+Additional Information	The issue gets resolved after creating an empty "/etc/sysconfig/64bit_strstr_via_64bit_strstr_sse2_unaligned" file
+```
+
+
+
+
+
+
+
 
 
 重启机器
-
-设置ssl不验证
-
-```
-
-echo "sslverify=0" >> /etc/yum.conf
-yum reinstall -y ca-certificates
-```
 
 
 
@@ -220,7 +274,17 @@ yum install -y kubelet-1.18.0 kubeadm-1.18.0 kubectl-1.18.0
 systemctl enable kubelet
 ```
 
-部署Kubenetes Master
+
+
+```
+echo 1 > /proc/sys/net/ipv4/ip_forward
+```
+
+
+
+
+
+### 部署Kubenetes Master
 
 在Master节点执行
 
@@ -228,7 +292,7 @@ systemctl enable kubelet
 kubeadm init --apiserver-advertise-address=10.0.0.7 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 
 
-kubeadm init --apiserver-advertise-address=192.168.24.179 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+kubeadm init --apiserver-advertise-address=192.168.24.16 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 
 ```
 
@@ -241,7 +305,7 @@ kubeadm join 10.0.0.7:6443 --token lj8kxk.xs9oy9jj7x0vp0s0 \
 
 
 
-提示使用kubectl工具
+### 提示使用kubectl工具
 
 ```awk
 mkdir -p $HOME/.kube
@@ -253,7 +317,7 @@ kubectl get nodes
 
 
 
-部署CNI网络插件
+### 部署CNI网络插件
 
 ```awk
 wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
@@ -611,10 +675,32 @@ To see the stack trace of this error execute with --v=5 or higher
 
 
 
+
+
 创建时执行脚本
 
 ```
+	Unfortunately, an error has occurred:
+		timed out waiting for the condition
 
+	This error is likely caused by:
+		- The kubelet is not running
+		- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+
+	If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
+		- 'systemctl status kubelet'
+		- 'journalctl -xeu kubelet'
+
+	Additionally, a control plane component may have crashed or exited when started by the container runtime.
+	To troubleshoot, list all containers using your preferred container runtimes CLI.
+
+	Here is one example how you may list all Kubernetes containers running in docker:
+		- 'docker ps -a | grep kube | grep -v pause'
+		Once you have found the failing container, you can inspect its logs with:
+		- 'docker logs CONTAINERID'
+
+error execution phase wait-control-plane: couldn't initialize a Kubernetes cluster
+To see the stack trace of this error execute with --v=5 or higher
 
 ```
 
