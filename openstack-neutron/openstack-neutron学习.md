@@ -17,7 +17,7 @@
 
 ##### 1.4.1  **Router**
 
-实现不同网段的通信，为租户提供路由、NAT等服务。
+实现不同网段的网络相互通信，为租户提供路由、NAT等服务。
 
 ##### 1.4.2  **Network**
 
@@ -69,7 +69,7 @@ Linux虚拟网络基础—tap（虚拟以太设备）
 
 Linux中谈到tap，经常会和tun并列谈论。两者都是操作系统内核中的**虚拟网络设备**。**tap位于网络OSI模型的二层（数据链路层），tun位于网络的三层。**需要说明的是，这里所说的设备是Linux的概念，并不是我们平时生活中所说的设备。比如，生活中，我们常常把一台物理路由器称为一台设备。而Linux所说的设备，其背后指的是一个类似于数据结构、内核模块或设备驱动着样的含义。
 虚拟网卡Tun/tap驱动是一个开源项目，支持很多的类UNIX平台，OpenVPN和Vtun都是基于它实现隧道包封装。
-tun/tap驱动程序实现了虚拟网卡的功能，tun表示虚拟的是点对点设备，tap表示虚拟的是以太网设备，这两种设备针对网络包实施不同的封装。利用tun/tap驱动，可以将tcp/ip协议栈处理好的网络分包传给任何一个使用tun/tap驱动的进程，由进程重新处理后再发到物理链路中。
+tun/tap驱动程序实现了虚拟网卡的功能，tun表示虚拟的是点对点设备（可以理解为隧道），tap表示虚拟的是以太网设备（可以理解为网卡），这两种设备针对网络包实施不同的封装。利用tun/tap驱动，可以将tcp/ip协议栈处理好的网络分包传给任何一个使用tun/tap驱动的进程，由进程重新处理后再发到物理链路中。
 
 用户层程序通过**tun设备只能读写IP数据包**，而通过**tap设备能读写链路层数据包**，类似于普通socket和raw socket的差别一样，处理数据包的格式不一样。
 
@@ -117,7 +117,7 @@ bridge-external，外部网桥，通常表示负责跟外部网络通信的网�
 
 #### 2.6 tun
 
-tun是一个网络层(IP)的点对点设备，它启用了IP层隧道功能。Linux原生支持的三层隧道。支持隧道情况：ipip(ipv4 in ipv4)、gre(ipv4/ipv6 over ipv4)、sit(ipv6 over ipv4)、isatap(ipv6/ipv4隧道)、vti(ipsec接口)。
+tun是一个网络层(IP)的点对点设备，它启用了**IP层隧道功能**。Linux原生支持的三层隧道。支持隧道情况：ipip(ipv4 in ipv4)、gre(ipv4/ipv6 over ipv4)、sit(ipv6 over ipv4)、isatap(ipv6/ipv4隧道)、vti(ipsec接口)。
 学过传统网络GRE隧道的人更容易理解，如图：
 NS1的tun1的ip 10.10.10.1与NS2的tun2的ip 10.10.20.2建立tun
 NS1的tun的ip是10.10.10.1，隧道的外层源ip是192.168.1.1，目的ip是192.168.2.1，是不是跟GRE很像。
@@ -201,10 +201,6 @@ Netfilter中的Firewall会在这三个点进行处理：INPUT/FORWARD/OUTPUT
 #### 2.11 Mangle
 
 mangle表主要用于修改数据包的ToS(  Type of Service，服务类型）、 TTL(Time to Live，生存周期）以及为数据包设置Mark标记，以实现QoS(Qualityof Service，服务质量）调整以及策略路由等应用。Netfilter每个点都可以做mangle。
-
-
-
-
 
 
 
@@ -326,6 +322,111 @@ datapath flows可以来自用户空间`ovs-vswitchd`缓存，也可以是datapat
 #### 3.4 管理flows的命令行工具
 
 #### 3.5 ovs-*工具的使用及区别
+
+##### **3.5.1 vs-vsctl**
+
+`ovs-vsctl`是一个管理或配置`ovs-vswitchd`的高级命令行工具，高级是说其操作对用户友好，封装了对数据库的操作细节。它是管理OVS最常用的命令，除了配置flows之外，其它大部分操作比如Bridge/Port/Interface/Controller/Database/Vlan等都可以完成
+
+```csharp
+#添加网桥br0
+ovs-vsctl add-br br0
+#列出所有网桥 
+ovs-vsctl list-br
+#添加一个Port p1到网桥br0
+ovs-vsctl add-port br0 p1
+#查看网桥br0上所有Port   
+ovs-vsctl list-ports br0
+#获取br0网桥的OpenFlow控制器地址，没有控制器则返回空 
+ovs-vsctl get-controller br0
+#设置OpenFlow控制器,控制器地址为192.168.1.10，端口为6633
+ovs-vsctl set-controller br0 tcp:192.168.1.10:6633
+#移除controller
+ovs-vsctl del-controller br0
+#删除网桥br0
+ovs-vsctl del-br br0
+#设置端口p1的vlan tag为100
+ovs-vsctl set Port p1 tag=100
+#设置Port p0类型为internal
+ovs-vsctl set Interface p0 type=internal
+#添加vlan10端口，并设置vlan tag为10，Port类型为Internal
+ovs-vsctl add-port br0 vlan10 tag=10 -- set Interface vlan10 type=internal
+#添加隧道端口gre0，类型为gre，远端IP为1.2.3.4
+ovs-vsctl add-port br0 gre0 -- set Interface gre0 type=gre options:remote_ip=1.2.3.4  
+```
+
+##### **3.5.2 ovsdb-tool**
+
+`ovsdb-tool`是一个专门管理OVS数据库文件的工具，不常用，它不直接与`ovsdb-server`进程通信
+
+
+
+```bash
+#可以使用此工具创建并初始化database文件
+ovsdb-tool create [db] [schema]
+#可以使用ovsdb-client get-schema [database]获取某个数据库的schema(json格式)
+#可以查看数据库更改记录，具体到操作命令，这个比较有用   
+ovsdb-tool show-log -m   
+record 48: 2017-01-07 03:34:15.147 "ovs-vsctl: ovs-vsctl --timeout=5 -- --if-exists del-port tapcea211ae-10"
+        table Interface row "tapcea211ae-10" (151f66b6):
+                delete row
+        table Port row "tapcea211ae-10" (cc9898cd):
+                delete row
+        table Bridge row "br-int" (fddd5e27):
+        table Open_vSwitch row a9fc1666 (a9fc1666):
+
+record 49: 2017-01-07 04:18:23.671 "ovs-vsctl: ovs-vsctl --timeout=5 -- --if-exists del-port tap5b4345ea-d5 -- add-port br-int tap5b4345ea-d5 -- set Interface tap5b4345ea-d5 "external-ids:attached-mac=\"fa:16:3e:50:1b:5b\"" -- set Interface tap5b4345ea-d5 "external-ids:iface-id=\"5b4345ea-d5ea-4285-be99-0e4cadf1600a\"" -- set Interface tap5b4345ea-d5 "external-ids:vm-id=\"0aa2d71e-9b41-4c88-9038-e4d042b6502a\"" -- set Interface tap5b4345ea-d5 external-ids:iface-status=active"
+        table Port insert row "tap5b4345ea-d5" (4befd532):
+        table Interface insert row "tap5b4345ea-d5" (b8a5e830):
+        table Bridge row "br-int" (fddd5e27):
+        table Open_vSwitch row a9fc1666 (a9fc1666):
+...
+```
+
+##### **3.5.3 ovsdb-client**
+
+`ovsdb-client`是`ovsdb-server`进程的命令行工具，主要是从正在运行的`ovsdb-server`中查询信息，操作的是数据库相关
+
+
+
+```php
+#列出主机上的所有databases，默认只有一个库Open_vSwitch
+ovsdb-client list-dbs
+#获取指定数据库的schema信息
+ovsdb-client get-schema [DATABASE]
+#列出指定数据库的所有表
+ovsdb-client list-tables [DATABASE]
+#dump指定数据库所有数据,默认dump所有table数据，如果指定table，只dump指定table数据  
+ovsdb-client dump [DATABASE] [TABLE]
+#监控指定数据库中的指定表记录改变  
+ovsdb-client monitor DATABASE TABLE
+```
+
+##### **3.5.4 ovs-ofctl**
+
+`ovs-ofctl`是专门管理配置OpenFlow交换机的命令行工具，我们可以用它手动配置OVS中的OpenFlow flows，注意其不能操作datapath flows和”hidden” flows
+
+
+
+```csharp
+#查看br-tun中OpenFlow flows
+ovs-ofctl dump-flows br-tun
+#查看br-tun端口信息   
+ovs-ofctl show br-tun
+#添加新的flow：对于从端口p0进入交换机的数据包，如果它不包含任何VLAN tag，则自动为它添加VLAN tag 101
+ovs-ofctl add-flow br0 "priority=3,in_port=100,dl_vlan=0xffff,actions=mod_vlan_vid:101,normal"
+#对于从端口3进入的数据包，若其vlan tag为100，去掉其vlan tag，并从端口1发出 
+ovs-ofctl add-flow br0 in_port=3,dl_vlan=101,actions=strip_vlan,output:1
+#添加新的flow: 修改从端口p1收到的数据包的源地址为9.181.137.1,show 查看p1端口ID为100   
+ovs-ofctl add-flow br0 "priority=1 idle_timeout=0,in_port=100,actions=mod_nw_src:9.181.137.1,normal"
+#添加新的flow: 重定向所有的ICMP数据包到端口 p2
+ovs-ofctl add-flow br0 idle_timeout=0,dl_type=0x0800,nw_proto=1,actions=output:102
+#删除编号为 100 的端口上的所有流表项   
+ovs-ofctl del-flows br0 "in_port=100"    
+```
+
+`ovs-vsctl`是一个综合的配置管理工具，`ovsdb-client`倾向于从数据库中查询某些信息，而`ovsdb-tool`是维护数据库文件工具
+
+
 
 第三章参考链接
 
