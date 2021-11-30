@@ -856,6 +856,10 @@ firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
 
 #### 5.2 neutron+vxlan+openvswitch模式
 
+安装openvswitch后需要创建虚拟交换机 如br-provider
+
+绑定机器上的与交换机连接的其他端口到改虚拟交换机上，<font color=red>二层mac转发</font>
+
 ##### 5.2.1控制节点/etc/neutron配置
 
 ###### 5.2.1.1 dhcp_agent.ini
