@@ -854,6 +854,229 @@ firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
 
 
 
+#### 5.2 neutron+vxlan+openvswitch模式
+
+##### 5.2.1控制节点/etc/neutron配置
+
+###### 5.2.1.1 dhcp_agent.ini
+
+```
+[DEFAULT]
+interface_driver = openvswitch
+dhcp_driver = neutron.agent.linux.dhcp.Dnsmasq
+enable_isolated_metadata = true
+force_metadata = True
+
+
+```
+
+###### 5.2.1.2 l3_agent.ini
+
+```
+[DEFAULT]
+interface_driver = openvswitch
+external_network_bridge = 
+[AGENT]
+extensions = fwaas_v2,vpnaas
+[vpnagent]
+vpn_device_driver = neutron_vpnaas.services.vpn.device_drivers.libreswan_ipsec.LibreSwanDriver
+```
+
+###### 5.2.1.3 metadata_agent.ini
+
+```
+[DEFAULT]
+nova_metadata_host = controller
+metadata_proxy_shared_secret = metadata_secret
+[cache]
+```
+
+###### 5.2.1.4 neutron.conf
+
+```
+[DEFAULT]
+core_plugin = ml2
+service_plugins = router
+allow_overlapping_ips = true
+transport_url = rabbit://openstack:openstack@controller
+auth_strategy = keystone
+notify_nova_on_port_status_changes = true
+notify_nova_on_port_data_changes = true
+[cors]
+[database]
+connection = mysql+pymysql://neutron:comleader@123@controller/neutron
+[keystone_authtoken]
+www_authenticate_uri = http://controller:5000
+auth_url = http://controller:5000
+memcached_servers =controller:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = neutron
+password = comleader@123
+[oslo_concurrency]
+lock_path = /var/lib/neutron/tmp
+[oslo_messaging_amqp]
+[oslo_messaging_kafka]
+[oslo_messaging_notifications]
+[oslo_messaging_rabbit]
+[oslo_middleware]
+[oslo_policy]
+[privsep]
+[ssl]
+[nova]
+auth_url = http://controller:5000
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+region_name = RegionOne
+project_name = service
+username = nova
+password = comleader@123
+```
+
+###### 5.2.1.5 plugin.ini
+
+```
+[DEFAULT]
+[ml2]
+type_drivers = flat,vlan,vxlan
+tenant_network_types = vxlan
+mechanism_drivers = openvswitch,l2population
+extension_drivers = port_security
+
+[ml2_type_flat]
+flat_networks = provider
+
+[ml2_type_vlan]
+vni_ranges = provider
+
+[ml2_type_vxlan]
+vni_ranges = 1:1000
+
+[securitygroup]
+enable_ipset = true
+firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
+enable_security_group = true
+```
+
+###### 5.2.1.6 ml2_conf.ini
+
+/etc/neutron/plugins/ml2
+
+```
+[DEFAULT]
+[ml2]
+type_drivers = flat,vlan,vxlan
+tenant_network_types = vxlan
+mechanism_drivers = openvswitch,l2population
+extension_drivers = port_security
+
+[ml2_type_flat]
+flat_networks = provider
+
+[ml2_type_vlan]
+vni_ranges = provider
+
+[ml2_type_vxlan]
+vni_ranges = 1:1000
+
+[securitygroup]
+enable_ipset = true
+firewall_driver = neutron.agent.linux.iptables_firewall.IptablesFirewallDriver
+enable_security_group = true
+
+```
+
+
+
+###### 5.2.1.7 openvswitch_agent.ini
+
+/etc/neutron/plugins/ml2
+
+```
+[DEFAULT]
+[ovs]
+bridge_mappings = provider:br-provider
+local_ip = 192.168.230.173
+
+#[vxlan]
+#enable_vxlan = True
+
+[agent]
+tunnel_types = vxlan
+l2_population = True
+
+[securitygroup]
+firewall_driver = iptables_hybrid
+enable_security_group = True
+firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+
+```
+
+
+
+##### 5.2.2 计算节点/etc/neutron配置
+
+###### 5.2.2.1 neutron.conf配置
+
+```
+[DEFAULT]
+transport_url = rabbit://openstack:openstack@controller
+auth_strategy = keystone
+[cors]
+[database]
+[keystone_authtoken]
+www_authenticate_uri = http://controller:5000
+auth_url = http://controller:5000
+memcached_servers =controller:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = neutron
+password = comleader@123
+[oslo_concurrency]
+lock_path = /var/lib/neutron/tmp
+[oslo_messaging_amqp]
+[oslo_messaging_kafka]
+[oslo_messaging_notifications]
+[oslo_messaging_rabbit]
+[oslo_middleware]
+[oslo_policy]
+[privsep]
+[ssl]
+```
+
+###### 5.2.2.2  openvswitch_agent.ini配置
+
+/etc/neutron/plugins/ml2/openvswitch_agent.ini
+
+```
+[DEFAULT]
+[ovs]
+bridge_mappings = provider:br-provider
+local_ip = 192.168.230.174
+#tunnel_id_ranges = provider
+
+#[vxlan]
+#enable_vxlan = True
+
+[agent]
+tunnel_types = vxlan
+l2_population = True
+#arp_responder = True
+
+[securitygroup]
+firewall_driver = iptables_hybrid
+enable_security_group = True
+firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+
+```
+
+
+
 
 
 ### 6. neutron服务
