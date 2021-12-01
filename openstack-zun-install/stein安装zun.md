@@ -69,6 +69,8 @@ chown zun:zun /etc/zun
 ##### 2.3.3 安装zun
 
 ```
+
+
 yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
 cd /var/lib/zun
 git clone -b stable/stein https://git.openstack.org/openstack/zun.git
@@ -267,13 +269,27 @@ systemctl start etcd
 
 > **在计算节点安装zun-compute服务前，需要在计算节点安装docker和kuryr-libnetwork**
 > **在控制节点安装etcd**
+> **当需要安装zun-compute其他包时，建议选择python3，否则可能和安装网络组件时的python2包冲突**
 
 
 
 安装一点必备的依赖
 
 ```
-yum -y upgrade # 只更新包，不更新内核和系统
+yum install -y centos-release-openstack-stein
+yum install -y python-openstackclient 
+
+yum install -y ebtables ipset
+yum install -y openstack-neutron-openvswitch  
+修改配置
+创建虚拟交换机
+ovs-vsctl add-br br-provider
+ovs-vsctl add-port br-provider ens36
+# 后面kuryr会调用ovs-vsctl，赋予最大权限
+chmod 777 /var/run/openvswitch/db.sock
+
+
+yum -y upgrade # 只更新包，不更新内核和系统(尽量不用，包有可能冲突)
 ```
 
 `yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
@@ -456,14 +472,18 @@ vim /etc/kuryr/kuryr.conf
 bindir = /usr/libexec/kuryr
 [binding]
 [neutron]
-www_authenticate_uri = http://controller:5000/v3
-auth_url = http://controller:5000/v3
+www_authenticate_uri = http://controller:5000
+auth_url = http://controller:5000
 auth_type = password
 project_domain_name = default
 user_domain_name = default
 project_name = service
-username = kuryr
-password = comleader123
+username = neutron
+password = comleader@123
+service_metadata_proxy = true
+metadata_proxy_shared_secret = metadata_secret
+bility_scope = global
+process_external_connectivity = False
 
 ```
 
@@ -478,7 +498,7 @@ password = comleader123
 Description = Kuryr-libnetwork - Docker network plugin for Neutron
 
 [Service]
-ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf
+ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
 CapabilityBoundingSet = CAP_NET_ADMIN
 
 [Install]
@@ -489,6 +509,8 @@ WantedBy = multi-user.target
 ###### 3.3.2.6 启动服务
 
 ```
+mkdir /var/log/kuryr/
+chmod 777 /var/log/kuryr/
 systemctl enable kuryr-libnetwork
 systemctl start kuryr-libnetwork
 systemctl restart docker
@@ -506,6 +528,8 @@ docker network create --driver kuryr --ipam-driver kuryr --subnet 173.19.12.0/24
 ```
 
 
+
+*修改源码这块，ovs下应该不需要修改，等待新的部署测试后更新bridge*
 
 由于neutron使用的是linuxbridge，需要修改成bridge
 
@@ -595,7 +619,6 @@ pip3 install --upgrade setuptools
 # su -s /bin/sh -c "cp etc/zun/rootwrap.d/* /etc/zun/rootwrap.d/" zun
 
 # su -s /bin/sh -c "cp etc/cni/net.d/* /etc/cni/net.d/" zun
-
 ```
 
 ##### 3.4.6 配置zun用户
@@ -673,12 +696,12 @@ host_shared_with_nova = true
 
 vim /etc/systemd/system/docker.service.d/docker.conf
 
-**此处把compute和controller替换成对应的服务host名称或者ip地址**
+**此处把zun和controller替换成对应的能解析到ip地址的host名称或者ip地址**
 
 ```
 [Service]
 ExecStart=
-ExecStart=/usr/bin/dockerd --group zun -H tcp://compute:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
+ExecStart=/usr/bin/dockerd --group zun -H tcp://zun:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
 ```
 
 ###### 3.4.8.3 重启docker
@@ -799,6 +822,8 @@ sed -i "s/with_lockmode('update')/with_for_update()/" /usr/local/lib/python3.6/s
 
 
 
+
+
 ```
 systemctl enable zun-compute
 systemctl start zun-compute
@@ -845,6 +870,49 @@ https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.h
 
 
 
+
+
+五、zun节点安装openvswitch
+
+
+
+```
+yum install libibverbs -y
+```
+
+
+
+```
+curl -O https://cbs.centos.org/kojifiles/packages/qpid-proton/0.22.0/1.el7/x86_64/qpid-proton-c-0.22.0-1.el7.x86_64.rpm
+
+
+curl -O https://cbs.centos.org/kojifiles/packages/qpid-proton/0.22.0/1.el7/x86_64/python2-qpid-proton-0.22.0-1.el7.x86_64.rpm
+
+rpm -ivh qpid-proton-c-0.22.0-1.el7.x86_64.rpm --force
+rpm -ivh python2-qpid-proton-0.22.0-1.el7.x86_64.rpm --force
+```
+
+
+
+```
+yum install -y openstack-neutron-openvswitch
+```
+
+
+
+```
+pip uninstall urllib3
+yum install -y python2-urllib3
+
+```
+
+
+
+
+
+
+
+配置
 
 
 
