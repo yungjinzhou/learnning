@@ -282,6 +282,7 @@ yum install -y python-openstackclient
 yum install -y ebtables ipset
 yum install -y openstack-neutron-openvswitch  
 修改配置
+yum install libibverbs -y
 创建虚拟交换机
 ovs-vsctl add-br br-provider
 ovs-vsctl add-port br-provider ens36
@@ -289,8 +290,9 @@ ovs-vsctl add-port br-provider ens36
 chmod 777 /var/run/openvswitch/db.sock
 
 
-yum -y upgrade # 只更新包，不更新内核和系统(尽量不用，包有可能冲突)
 ```
+
+安装后面安装步骤会用到的基础包
 
 `yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
 
@@ -427,7 +429,6 @@ chown kuryr:kuryr /etc/kuryr
 ###### 3.3.2.3 安装kuryr-libnetwork
 
 ```
-yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
 cd /var/lib/kuryr
 git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
 chown -R kuryr:kuryr kuryr-libnetwork
@@ -454,9 +455,9 @@ python setup.py install
 ###### 3.3.2.4 生成配置文件并配置
 
 ```
-# su -s /bin/sh -c "./tools/generate_config_file_samples.sh" kuryr
+su -s /bin/sh -c "./tools/generate_config_file_samples.sh" kuryr
 
-# su -s /bin/sh -c "cp etc/kuryr.conf.sample /etc/kuryr/kuryr.conf" kuryr
+su -s /bin/sh -c "cp etc/kuryr.conf.sample /etc/kuryr/kuryr.conf" kuryr
 ```
 
 
@@ -483,7 +484,7 @@ password = comleader@123
 service_metadata_proxy = true
 metadata_proxy_shared_secret = metadata_secret
 bility_scope = global
-process_external_connectivity = False
+process_external_connectivity = false
 
 ```
 
@@ -571,7 +572,7 @@ chown zun:zun /etc/zun
 
 
 
-**下面安装py2、py3任选一种即可**
+**下面安装py2、py3任选一种即可(建议用python3, 用py2可能导致安装kuryr的包变更导致kuryr网络有问题)**
 
 ##### 3.4.3 安装zun包依赖
 
@@ -584,7 +585,7 @@ yum install epel-release python-pip git python-devel libffi-devel gcc openssl-de
 python3版本
 
 ```
-yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl
+yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl -y
 ```
 
 
@@ -605,18 +606,18 @@ python setup.py install
 # python36安装
 pip3 install --upgrade pip
 pip3 install --upgrade setuptools
-# pip3 install -r requirements.txt
-# python3 setup.py install
+pip3 install -r requirements.txt
+python3 setup.py install
 ```
 
 ##### 3.4.5 生成示例配置文件
 
 ```
-# su -s /bin/sh -c "oslo-config-generator --config-file etc/zun/zun-config-generator.conf" zun
-# su -s /bin/sh -c "cp etc/zun/zun.conf.sample /etc/zun/zun.conf" zun
-# su -s /bin/sh -c "cp etc/zun/rootwrap.conf /etc/zun/rootwrap.conf" zun
-# su -s /bin/sh -c "mkdir -p /etc/zun/rootwrap.d" zun
-# su -s /bin/sh -c "cp etc/zun/rootwrap.d/* /etc/zun/rootwrap.d/" zun
+su -s /bin/sh -c "oslo-config-generator --config-file etc/zun/zun-config-generator.conf" zun
+su -s /bin/sh -c "cp etc/zun/zun.conf.sample /etc/zun/zun.conf" zun
+su -s /bin/sh -c "cp etc/zun/rootwrap.conf /etc/zun/rootwrap.conf" zun
+su -s /bin/sh -c "mkdir -p /etc/zun/rootwrap.d" zun
+su -s /bin/sh -c "cp etc/zun/rootwrap.d/* /etc/zun/rootwrap.d/" zun
 
 # su -s /bin/sh -c "cp etc/cni/net.d/* /etc/cni/net.d/" zun
 ```
@@ -624,6 +625,7 @@ pip3 install --upgrade setuptools
 ##### 3.4.6 配置zun用户
 
 ```
+python2
 echo "zun ALL=(root) NOPASSWD: /usr/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
 
 python3
@@ -637,6 +639,10 @@ echo "zun ALL=(root) NOPASSWD: /usr/local/bin/zun-rootwrap /etc/zun/rootwrap.con
 vim /etc/zun/zun.conf
 
 sed -i.default -e "/^$/d" -e "/^#/d" /etc/zun/zun.conf
+
+
+
+
 
 ```
 [DEFAULT]
@@ -696,7 +702,7 @@ host_shared_with_nova = true
 
 vim /etc/systemd/system/docker.service.d/docker.conf
 
-**此处把zun和controller替换成对应的能解析到ip地址的host名称或者ip地址**
+**此处把zun:2375和controller:2379替换成对应的能解析到ip地址的host名称或者ip地址(比如zun2:2379, 1.1.1.1:2379)，group后根据前面配置的实际用户名修改**
 
 ```
 [Service]
@@ -778,6 +784,8 @@ vim /etc/systemd/system/zun-compute.service
 
 
 
+python2
+
 ```
 [Unit]
 Description = OpenStack Container Service Compute Agent
@@ -789,6 +797,38 @@ User = zun
 [Install]
 WantedBy = multi-user.target
 ```
+
+
+
+
+
+python3
+
+```
+[Unit]
+Description = OpenStack Container Service Compute Agent
+
+[Service]
+ExecStart = /usr/local/bin/zun-compute --logfile /var/log/zun/zun-compute.log
+User = zun
+
+[Install]
+WantedBy = multi-user.target
+```
+
+创建日志文件夹
+
+`mkdir /var/log/zun/`
+
+```
+mkdir /var/log/zun/
+chown zun:zun /var/log/zun
+
+```
+
+
+
+
 
 
 
@@ -872,7 +912,7 @@ https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.h
 
 
 
-五、zun节点安装openvswitch
+注意事项、zun节点安装openvswitch
 
 
 
