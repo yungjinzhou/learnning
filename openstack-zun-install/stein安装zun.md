@@ -56,6 +56,7 @@ openstack endpoint create --region RegionOne container admin http://controller:9
 ```
 groupadd --system zun
 useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g zun zun
+
 ```
 
 ##### 2.3.2 创建目录
@@ -64,6 +65,7 @@ useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g z
 ```
 mkdir -p /etc/zun
 chown zun:zun /etc/zun
+
 ```
 
 ##### 2.3.3 安装zun
@@ -87,19 +89,29 @@ python setup.py install
 ##### 2.3.4生成配置文件并配置
 
 ```
+pip install PyYAML==5.4.1# 提示yaml有错误，安装该版本
+
 su -s /bin/sh -c "oslo-config-generator --config-file etc/zun/zun-config-generator.conf" zun
 su -s /bin/sh -c "cp etc/zun/zun.conf.sample /etc/zun/zun.conf" zun
+
 ```
 
  复制api-paste.ini配置文件
 
 ```
 su -s /bin/sh -c "cp etc/zun/api-paste.ini /etc/zun" zun
+
 ```
 
 编辑配置文件,在合适位置添加以下内容
 
+sed -i.default -e "/^#/d" -e "/^$/d" /etc/zun/zun.conf
+
+
+
 vim /etc/zun/zun.conf
+
+
 
 ```
 [DEFAULT]
@@ -178,26 +190,32 @@ base_url = ws://controller:6784
 
 vim /etc/systemd/system/zun-api.service
 
+
+
 ```
 [Unit]
 Description = OpenStack Container Service API
 
 [Service]
-ExecStart = /usr/bin/zun-api --config-file=/etc/zun/zun.conf --log-file=/var/log/zun/zun-api.log
+ExecStart = /usr/bin/zun-api --config-file=/etc/zun/zun.conf --logfile=/var/log/zun/zun-api.log
 User = zun
 
 [Install]
 WantedBy = multi-user.target
 ```
 
+
+
 vim /etc/systemd/system/zun-wsproxy.service
+
+
 
 ```
 [Unit]
 Description = OpenStack Container Service Websocket Proxy
 
 [Service]
-ExecStart = /usr/bin/zun-wsproxy --config-file=/etc/zun/zun.conf --log-file=/var/log/zun/zun-wsproxy.log
+ExecStart = /usr/bin/zun-wsproxy --config-file=/etc/zun/zun.conf --logfile=/var/log/zun/zun-wsproxy.log
 User = zun
 
 [Install]
@@ -214,6 +232,8 @@ WantedBy = multi-user.target
 
 先执行systemctl daemon-reload
 
+
+
 ```
 systemctl enable zun-api  zun-wsproxy
 systemctl start zun-api  zun-wsproxy
@@ -226,17 +246,25 @@ systemctl status zun-api  zun-wsproxy
 pip install docker==4.4.4
 pip install websocket-client==0.32.0
 pip install websocket
+
 ```
 
 #### 2.4 etcd安装
 
 ```
 yum install -y etcd
+
 ```
 
 
 
 配置etcd
+
+sed -i.default -e "/^#/d" -e "/^$/d" /etc/etcd/etcd.conf
+
+
+
+
 
 ```
 #[Member]
@@ -259,6 +287,7 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 ```
 systemctl enable etcd
 systemctl start etcd
+
 ```
 
 
@@ -279,18 +308,36 @@ systemctl start etcd
 yum install -y centos-release-openstack-stein
 yum install -y python-openstackclient 
 
+# neutron如果用的ovs，执行下面操作
 yum install -y ebtables ipset
 yum install -y openstack-neutron-openvswitch  
-修改配置
+修改配置文件
+安装依赖包
 yum install libibverbs -y
-创建虚拟交换机
+yum install bridge-utils -y
+systemctl start neutron-openvswitch-agent
+systemctl enable neutron-openvswitch-agent
+
+创建虚拟交换机（可不操作）
 ovs-vsctl add-br br-provider
 ovs-vsctl add-port br-provider ens36
+
 # 后面kuryr会调用ovs-vsctl，赋予最大权限
 chmod 777 /var/run/openvswitch/db.sock
 
 
+
+# neutron如果用的linuxbridge，执行下面操作
+yum install -y openstack-neutron-linuxbridge ebtables ipset
+yum install bridge-utils
+修改配置文件
+启动代理
+systemctl start neutron-linuxbridge-agent
+systemctl enable neutron-linuxbridge-agent
+
 ```
+
+
 
 安装后面安装步骤会用到的基础包
 
@@ -329,6 +376,7 @@ timedatectl status
 
 > ```
 > yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine -y
+> 
 > ```
 
 
@@ -362,6 +410,7 @@ wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/container
 yum localinstall  -y  docker-ce-cli-18.09.6-3.el7.x86_64.rpm
 yum localinstall  -y  containerd.io-1.3.9-3.1.el7.x86_64.rpm
 yum localinstall  -y  docker-ce-18.09.6-3.el7.x86_64.rpm
+
 ```
 
 如果需要安装最新的版本，命令是 yum install -y docker-ce docker-ce-cli containerd.io
@@ -379,6 +428,8 @@ systemctl status docker containerd.service
 添加内核配置参数
 
 cat /etc/sysctl.conf
+
+
 
 ```
 net.bridge.bridge-nf-call-ip6tables = 1
@@ -444,7 +495,7 @@ pip install --upgrade setuptools
 wget https://cbs.centos.org/kojifiles/packages/python-ipaddress/1.0.18/5.el7/noarch/python2-ipaddress-1.0.18-5.el7.noarch.rpm
 yum install -y python2-ipaddress-1.0.18-5.el7.noarch.rpm
 
-pip install pyroute2==0.5.10
+pip install pyroute2==0.5.10 (先不安装，注意不要和neutron-linuxbridge依赖包python2-pyroute2.noarch-0.5.6-冲突，如果不安装失败，先安装0.5.10，最后重装neutron-linuxbridge-agent)
 
 pip install -r requirements.txt
 python setup.py install
@@ -467,6 +518,8 @@ su -s /bin/sh -c "cp etc/kuryr.conf.sample /etc/kuryr/kuryr.conf" kuryr
 sed -i.default -e "/^#/d" -e "/^$/d" /etc/kuryr/kuryr.conf
 
 vim /etc/kuryr/kuryr.conf
+
+
 
 ```
 [DEFAULT]
@@ -494,6 +547,8 @@ process_external_connectivity = false
 
  vim /etc/systemd/system/kuryr-libnetwork.service
 
+
+
 ```
 [Unit]
 Description = Kuryr-libnetwork - Docker network plugin for Neutron
@@ -516,6 +571,7 @@ systemctl enable kuryr-libnetwork
 systemctl start kuryr-libnetwork
 systemctl restart docker
 systemctl status docker kuryr-libnetwork
+
 ```
 
 
@@ -586,6 +642,7 @@ python3版本
 
 ```
 yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl -y
+
 ```
 
 
@@ -721,6 +778,8 @@ systemctl restart docker
 
 vim  /etc/kuryr/kuryr.conf
 
+
+
 ```
 [DEFAULT]
 capability_scope = global
@@ -818,8 +877,6 @@ WantedBy = multi-user.target
 
 创建日志文件夹
 
-`mkdir /var/log/zun/`
-
 ```
 mkdir /var/log/zun/
 chown zun:zun /var/log/zun
@@ -845,6 +902,7 @@ pip install Mysql-python pymysql
 # python3
 pip3 install pymysql
 yum install pciutils numactl -y
+
 ```
 
 同时修改
@@ -909,50 +967,6 @@ horizon-dashboard安装配置
 https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.html
 
 
-
-
-
-注意事项、zun节点安装openvswitch
-
-
-
-```
-yum install libibverbs -y
-```
-
-
-
-```
-curl -O https://cbs.centos.org/kojifiles/packages/qpid-proton/0.22.0/1.el7/x86_64/qpid-proton-c-0.22.0-1.el7.x86_64.rpm
-
-
-curl -O https://cbs.centos.org/kojifiles/packages/qpid-proton/0.22.0/1.el7/x86_64/python2-qpid-proton-0.22.0-1.el7.x86_64.rpm
-
-rpm -ivh qpid-proton-c-0.22.0-1.el7.x86_64.rpm --force
-rpm -ivh python2-qpid-proton-0.22.0-1.el7.x86_64.rpm --force
-```
-
-
-
-```
-yum install -y openstack-neutron-openvswitch
-```
-
-
-
-```
-pip uninstall urllib3
-yum install -y python2-urllib3
-
-```
-
-
-
-
-
-
-
-配置
 
 
 
