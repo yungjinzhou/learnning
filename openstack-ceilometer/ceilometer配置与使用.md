@@ -168,7 +168,7 @@
       [storage]
       coordination_url = redis://controller:6379
       file_basepath = /var/lib/gnocchi
-      driver = file
+      driver = redis
       ```
 
       
@@ -192,7 +192,68 @@
 
       
 
-   
+
+
+
+完整配置
+
+```
+[DEFAULT]
+verbose = true
+log_dir = /var/log/gnocchi
+parallel_operations = 200
+coordination_url = redis://controller:6379?db=5
+[api]
+auth_mode = keystone
+host = controller
+port = 8041
+#port = 9041
+uwsgi_mode = http-socket
+max_limit = 1000
+[archive_policy]
+#default_aggregation_methods = mean,min,max,sum,std,count,rate:mean
+default_aggregation_methods = mean,sum,count,rate:mean
+[cors]
+allowed_origin = http://controller:3000
+[healthcheck]
+[incoming]
+redis_url = redis://controller:6379?db=5
+[indexer]
+url = mysql+pymysql://gnocchi:comleader@123@controller/gnocchi
+[metricd]
+workers = 6
+metric_processing_delay = 60
+greedy = false
+metric_reporting_delay = 120
+metric_cleanup_delay = 300
+processing_replicas=1
+[oslo_middleware]
+[oslo_policy]
+[statsd]
+[storage]
+redis_url = redis://controller:6379?db=5
+#coordination_url = redis://controller:6379
+#file_basepath = /var/lib/gnocchi
+#driver = file
+driver = redis
+[keystone_authtoken]
+www_authenticate_uri = http://controller:5000
+auth_url = http://controller:5000
+memcached_servers = controller:11211
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+project_name = service
+username = gnocchi
+password = comleader@123
+interface = internalURL
+region_name = RegionOne
+service_token_roles_required = true
+
+
+```
+
+
 
 #### 3. 安装配置redis
 
