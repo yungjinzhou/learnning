@@ -1009,8 +1009,8 @@ mount |grep $(df /var/lib/docker |awk 'FNR==2 {print $1}') |grep -E 'pquota|prjq
 
 解决办法
 磁盘需要支持配额
-https://blog.csdn.net/hanpengyu/article/details/7475645
-https://www.cnblogs.com/yaokaka/p/14186153.html
+https://blog.csdn.net/hanpengyu/article/details/7475645(vmware虚拟机添加磁盘)
+https://www.cnblogs.com/yaokaka/p/14186153.html（目录级别磁盘配额）
 ```
 
 
