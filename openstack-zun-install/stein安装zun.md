@@ -3,13 +3,11 @@
 ### 一、基本环境参数
 
 - 环境：centos7.6   mimic版本
-
 - opentack-zun版本stein
-
 - python2.7.5/python3.6，都是系统自带python环境
-
 - **默认zun数据库及zun服务密码 password: comleader123，可根据需要更改，在此环境下发现密码中有@需要修改pymysql源码进行处理，否则不能识别**
 - 设计到密码及ip地址及hostname的及
+- 如需docker磁盘功能，需要开启磁盘配额的功能
 
 ### 二、controller节点zun安装
 
@@ -999,14 +997,119 @@ vim zun/common/privileged.py
 
 ```
 
+
+
+##### 3.4.15 容器设置磁盘，做目录级别的磁盘配额功能
+
 本地磁盘配额问题，导致设置disk大小后失败
 
 ```
 （zun/container/docker/host.py）
-mount |grep $(df /var/lib/docker |awk 'FNR==2 {print $1}') |-E 'pquota|prjquota'
+mount |grep $(df /var/lib/docker |awk 'FNR==2 {print $1}') |grep -E 'pquota|prjquota'
+
+解决办法
+磁盘需要支持配额
+https://blog.csdn.net/hanpengyu/article/details/7475645
+https://www.cnblogs.com/yaokaka/p/14186153.html
 ```
 
 
+
+**做支持目录级别的磁盘配额功能**
+
+**docker images备份**
+
+```
+[root@node1 ~]# docker image save busybox > /tmp/busybox.tar
+```
+
+**第一步：添加一个新硬盘sdb**
+
+```
+[root@node1 ~]# fdisk -l
+
+Disk /dev/sda: 21.5 GB, 21474836480 bytes, 41943040 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x0004ff38
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sda1   *        2048     1026047      512000   83  Linux
+/dev/sda2         1026048    41938943    20456448   83  Linux
+/dev/sda3        41938944    41943039        2048   82  Linux swap / Solaris
+
+Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+```
+
+**第二步：格式化硬盘为xfs文件系统格式**
+
+```
+[root@node1 ~]# mkfs.xfs -f /dev/sdb
+meta-data=/dev/sdb               isize=512    agcount=4, agsize=1310720 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=0, sparse=0
+data     =                       bsize=4096   blocks=5242880, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0 ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+```
+
+**第三步：创建data目录，后续将作为docker数据目录；**
+
+```
+[root@node1 ~]# mkdir /data/ -p
+```
+
+**第四步：挂载data目录，并且开启磁盘配额功能（默认xfs支持配额功能）**
+
+```
+[root@node1 ~]# mount -o uquota,prjquota /dev/sdb /data/
+```
+
+**第五步：查看配额-配置详情**
+
+```
+[root@node1 ~]# xfs_quota -x -c 'report' /data/
+User quota on /data (/dev/sdb)
+                               Blocks                     
+User ID          Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+root                0          0          0     00 [--------]
+
+Project quota on /data (/dev/sdb)
+                               Blocks                     
+Project ID       Used       Soft       Hard    Warn/Grace     
+---------- -------------------------------------------------- 
+#0                  0          0          0     00 [--------]
+```
+
+运行了xfs_quota这个命令后，显示如上，说明，/data/这个目录已经支持了目录配额功能
+
+**第六步：从/data/docker/作软链接到/var/lib下**
+
+把/var/lib目录下docker目录备份走，再重新做一个/data/docker的软连接到/var/lib下；
+
+不支持目录级别的磁盘配额功能的源/var/lib/docker/目录移走，把支持目录级别的磁盘配额功能软链接到/data/docker/目录下的/var/lib/docker/目录
+
+```
+cd /var/lib
+mv docker docker.bak
+mkdir -p /data/docker
+ln -s /data/docker/ /var/lib/
+```
+
+**第七步：重启docker服务**
+
+```
+systemctl restart docker 
+```
 
 
 
