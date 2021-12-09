@@ -328,8 +328,7 @@ chmod 777 /var/run/openvswitch/db.sock
 
 
 # neutron如果用的linuxbridge，执行下面操作
-yum install -y openstack-neutron-linuxbridge ebtables ipset
-yum install bridge-utils
+yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
 修改配置文件
 启动代理
 systemctl start neutron-linuxbridge-agent
@@ -341,7 +340,7 @@ systemctl enable neutron-linuxbridge-agent
 
 安装后面安装步骤会用到的基础包
 
-`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools` 
+`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools iscsi-initiator-utils nano  ` 
 
 #### 3.1 时间同步
 
@@ -492,10 +491,10 @@ sudo python get-pip.py
 pip install --upgrade setuptools
 
 # 提示自带的python-ipaddress版本太旧(1.0.6)，pip直接安装失败
-wget https://cbs.centos.org/kojifiles/packages/python-ipaddress/1.0.18/5.el7/noarch/python2-ipaddress-1.0.18-5.el7.noarch.rpm
+curl -O  https://cbs.centos.org/kojifiles/packages/python-ipaddress/1.0.18/5.el7/noarch/python2-ipaddress-1.0.18-5.el7.noarch.rpm
 yum install -y python2-ipaddress-1.0.18-5.el7.noarch.rpm
 
-pip install pyroute2==0.5.10 (先不安装，注意不要和neutron-linuxbridge依赖包python2-pyroute2.noarch-0.5.6-冲突，如果不安装失败，先安装0.5.10，最后重装neutron-linuxbridge-agent)
+pip install pyroute2==0.5.10 (注意neutron-linuxbridge依赖包python2-pyroute2.noarch-0.5.6-先安装0.5.10，最后重装neutron-linuxbridge-agent,否则zun无法创建docker网络)
 
 pip install -r requirements.txt
 python setup.py install
@@ -536,8 +535,8 @@ username = neutron
 password = comleader@123
 service_metadata_proxy = true
 metadata_proxy_shared_secret = metadata_secret
-bility_scope = global
-process_external_connectivity = false
+#bility_scope = global
+#process_external_connectivity = false
 
 ```
 
@@ -574,6 +573,17 @@ systemctl status docker kuryr-libnetwork
 
 ```
 
+```
+重新安装与配置linuxbridge
+yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
+修改配置文件
+启动代理
+systemctl start neutron-linuxbridge-agent
+systemctl enable neutron-linuxbridge-agent
+```
+
+
+
 
 
 ######  3.3.2.7 验证
@@ -581,24 +591,10 @@ systemctl status docker kuryr-libnetwork
  创建kuryr网络
 
 ```
-docker network create --driver kuryr --ipam-driver kuryr --subnet 173.19.12.0/24 --gateway=173.19.12.1 test_docker_net
+docker network create --driver kuryr --ipam-driver kuryr --subnet 173.18.12.0/24 --gateway=173.18.12.1 test_net
 ```
 
 
-
-*修改源码这块，ovs下应该不需要修改，等待新的部署测试后更新bridge*
-
-由于neutron使用的是linuxbridge，需要修改成bridge
-
-vim /usr/lib/python2.7/site-packages/kuryr/lib/binding/drivers/veth.py
-
-
-
-![1630629260878](.\1630629260878.png)
-
-将kind值替换为bridge
-
-systemctl restart kuryr-libnetwork
 
 查看网络
 
@@ -606,7 +602,7 @@ systemctl restart kuryr-libnetwork
 
 创建容器
 
-`docker run --net test_net cirros ifconfig`
+`docker run --net test_net cirros /sbin/init`
 
 
 
@@ -661,8 +657,8 @@ python setup.py install
 
 
 # python36安装
-pip3 install --upgrade pip
-pip3 install --upgrade setuptools
+pip3 install --upgrade pip==21.3.1
+pip3 install --upgrade setuptools==44.1.1
 pip3 install -r requirements.txt
 python3 setup.py install
 ```
@@ -778,13 +774,19 @@ systemctl restart docker
 
 vim  /etc/kuryr/kuryr.conf
 
-
+可不修改改位置，测试修改后联网报错，如果没有报错，可以先不添加
 
 ```
 [DEFAULT]
 capability_scope = global
 process_external_connectivity = False
 ```
+
+优化kuryr创建网络时的等待时间（可不操作）
+
+ ![img](H:\code\learnning\openstack-zun-install\企业微信截图_16390289337530.png) 
+
+https://review.opendev.org/c/openstack/zun/+/679573/2/zun/network/kuryr_network.py
 
 ###### 3.4.8.5 重启kuryr
 
@@ -864,6 +866,7 @@ WantedBy = multi-user.target
 python3
 
 ```
+
 [Unit]
 Description = OpenStack Container Service Compute Agent
 
@@ -873,6 +876,7 @@ User = zun
 
 [Install]
 WantedBy = multi-user.target
+
 ```
 
 创建日志文件夹
@@ -954,6 +958,54 @@ systemctl status zun-compute
  openstack appcontainer service list
 ```
 
+##### 3.4.14 挂载卷权限修改
+
+zun-compute挂载volume暂行方法
+
+```
+1. 安装yum install iscsi-initiator-utils -y
+2. 修改zun-compute.service ,更改User=root
+3. 修改代码oslo_privsep/daemon.py (去掉sudo前缀)
+
+            cmd = context.helper_command(sockpath)
+            if "zun-rootwrap" in str(cmd) and "privsep-helper" in str(cmd):
+                cmd = cmd[1:]
+            LOG.info('Running privsep helper: %s', cmd)
+4. 修改/etc/zun/rootwrap.conf，将/usr/local/bin/放在最前面
+exec_dirs=/usr/local/bin/,/sbin,/usr/sbin,/bin,/usr/bin,/usr/local/sbin
+```
+
+
+
+尝试在非root情况下修改以下位置，没有成功
+
+```
+
+1. 修改/etc/sudoers.d/zun-rootwrap
+[root@zun163 ~]# cat /etc/sudoers.d/zun-rootwrap 
+zun ALL=(root) NOPASSWD: /usr/local/bin/zun-rootwrap /etc/zun/rootwrap.conf *
+zun ALL=(root) NOPASSWD: /usr/local/bin/privsep-helper /etc/zun/rootwrap.conf *
+
+2.修改代码
+/etc/sudoers    zun ALL = (root) NOPASSWD: ALL
+zun 
+3.修改代码
+vim zun/common/privileged.py
+    capabilities=[c.CAP_SYS_ADMIN, c.CAP_DAC_READ_SEARCH],
+4.修改配置文件zun.conf
+[privsep]
+#user = root
+#helper_command = privsep-helper
+
+```
+
+本地磁盘配额问题，导致设置disk大小后失败
+
+```
+（zun/container/docker/host.py）
+mount |grep $(df /var/lib/docker |awk 'FNR==2 {print $1}') |-E 'pquota|prjquota'
+```
+
 
 
 
@@ -965,7 +1017,6 @@ https://docs.openstack.org/zun-ui/latest/install/index.html
 horizon-dashboard安装配置
 
 https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.html
-
 
 
 

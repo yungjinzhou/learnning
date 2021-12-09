@@ -1648,7 +1648,7 @@ sources:
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.total
-        - custom.hardware.swap.available
+        - custom.hardware.swap.avail
         - custom.hardware.swap.utilization
         - custom.hardware.network.interface.status
         - custom.hardware.disk.utilization
@@ -1766,7 +1766,7 @@ sources:
         - custom.hardware.memory.cache
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
-        - custom.hardware.swap.available
+        - custom.hardware.swap.avail
         - custom.hardware.swap.total
         - custom.hardware.swap.utilization
         - custom.hardware.network.interface.status
@@ -2072,7 +2072,7 @@ resources:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
       custom.hardware.swap.total:
-      custom.hardware.swap.available:
+      custom.hardware.swap.avail:
       custom.hardware.swap.utilization:
       custom.hardware.network.interface.status:
     attributes:
@@ -2153,7 +2153,7 @@ resources:
       custom.hardware.memory.cache:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
-      custom.hardware.swap.available:
+      custom.hardware.swap.avail:
       custom.hardware.swap.total:
       custom.hardware.swap.utilization:
       custom.hardware.network.interface.status:
@@ -2204,7 +2204,7 @@ instance:
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.total
-        - custom.hardware.swap.available
+        - custom.hardware.swap.avail
         - custom.hardware.swap.utilization
         - custom.hardware.network.interface.status
         - custom.hardware.disk.size.total
