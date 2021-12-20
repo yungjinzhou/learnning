@@ -4,9 +4,7 @@
 
 openstack octavia 是 openstack lbaas的支持的一种后台程序，提供为虚拟机流量的[负载均衡](https://cloud.tencent.com/product/clb?from=10680)。实质是类似于trove，调用 nove 以及neutron的api生成一台安装好haproxy和keepalived软件的虚拟机，并连接到目标网路。octavia共有4个组件 housekeeping,worker,api,health-manager，octavia agent。api作用就不详细说了。worker：主要作用是和nova，neutron等组件通信，用于虚拟机调度以及把对于虚拟机操作的指令下发给octavia agent。housekeeping：查看octavia/controller/housekeeping/house_keeping.py得知其三个功能点：SpareAmphora,DatabaseCleanup,CertRotation。依次是清理虚拟机的池子，清理过期数据库，更新证书。health-manager：检查虚拟机状态，和虚拟机中的octavia agent通信，来更新各个组件的状态。octavia agent 位于虚拟机内部：对下是接受指令操作下层的haproxy软件，对上是和health-manager通信汇报各种情况。可以参考博文http://lingxiankong.github.io/blog/2016/03/30/octavia/?utm_source=tuicool&utm_medium=referral
 
-写的比我更详细一点
 
-目前官方不提供安装文档。谷歌了下似乎也没人写过具体的安装步骤，只推荐用devstack来进行安装。本人尝试根据devstack的安装脚本总结了下安装octavia的步骤，验证是成功的，不当之处请各位指正。
 
 一 安装
 
@@ -32,14 +30,37 @@ openstack endpoint create octavia internal http://controller:9876/ --region Regi
 3 安装软件包
 
 ```javascript
-yum install openstack-octavia-worker openstack-octavia-api python2-octavia openstack-octavia-health-manager openstack-octavia-housekeeping python2-octaviaclient  openstack-octavia-common    openstack-octavia-diskimage-create net-tools bridge-utils
--y
+yum install openstack-octavia-worker openstack-octavia-api python2-octavia openstack-octavia-health-manager openstack-octavia-housekeeping python2-octaviaclient openstack-octavia-common openstack-octavia-diskimage-create net-tools bridge-utils -y
+
+```
+
+创建证书配置文件 openssl.cnf
+
+```
+mkdir -p /var/lib/octavia/
+cd /var/lib/octavia/
+git clone https://opendev.org/openstack/octavia.git -b stable/train
 
 
+mkdir certs
+chmod 700 certs
+cd certs
+
+
+cp /var/lib/octavia/etc/certificates/openssl.cnf certs/
+修改openssl.cnf，有效期改为10年
+```
+
+
+
+创建认证密钥
+
+```
 mkdir -p /var/lib/octavia/
 cd /var/lib/octavia/
 git clone https://opendev.org/openstack/octavia.git -b stable/train
 cd octavia/bin/
+# 修改 create_dual_intermediate_CA.sh里所有密码pass:not-secure-passphrase ,为pass:foobar
 source create_dual_intermediate_CA.sh
 mkdir -p /etc/octavia/certs/private
 chmod 755 /etc/octavia -R
@@ -49,11 +70,28 @@ cp -p etc/octavia/certs/server_ca.key.pem /etc/octavia/certs/private
 cp -p etc/octavia/certs/client_ca.cert.pem /etc/octavia/certs
 cp -p etc/octavia/certs/client.cert-and-key.pem /etc/octavia/certs/private
 
+mkdir -p /etc/octavia/.ssh
+# 设置密码foobar(不能有@，否则解析错误)
+@ ssh-keygen -b 2048 -t rsa -N "" -f /etc/octavia/.ssh/octavia_ssh_key
+ssh-keygen -b 1024 -t rsa -N "" -f /etc/octavia/.ssh/octavia_ssh_key
 
-openstack keypair create --public-key ~/.ssh/id_rsa.pub octavia_key
+
+openstack keypair create --public-key /etc/octavia/.ssh/octavia_ssh_key.pub octavia_ssh_key  --project service
+chown -R octavia. /etc/octavia/.ssh/
+
 ```
 
+
+
 4 导入镜像 镜像是从devstack 生成的系统中导出来的
+
+```
+参考：制作镜像
+官方教程：Building Octavia Amphora Images — octavia 9.1.0.dev16 documentation (openstack.org)
+
+```
+
+
 
 ```javascript
 openstack image create --disk-format qcow2 --container-format bare  --private --tag amphora --file amphora-x64-haproxy.qcow2 amphora-x64-haproxy
@@ -124,11 +162,54 @@ cp /var/lib/octavia/octavia/etc/octavia/dhcp/dhclient.conf /etc/octavia/dhcp/dhc
 dhclient -v o-hm0 -cf /etc/octavia/dhcp/dhclient.conf
 ```
 
+设置后，可能dhclient会设置默认路由更改原来的路由，导致ssh链接不上或者与本机默认网关冲突，建议删除
+
+```
+route -n 
+route del default gw 19.178.0.1
+```
+
+设置开机启动
+
+```
+$ vi /opt/octavia-interface-start.sh
+#!/bin/bash
+
+set -x
+
+#MAC=$MGMT_PORT_MAC
+#PORT_ID=$MGMT_PORT_ID
+
+# MAC 为 $MGMT_PORT_MAC ，PORT_ID 为 $MGMT_PORT_ID，具体含义看前面
+MAC="fa:16:3e:77:87:9c"
+PORT_ID="d8362f9b-c114-4df7-bc73-52beb570cd49"
+
+sleep 120s
+
+ovs-vsctl --may-exist add-port br-int o-hm0 \
+  -- set Interface o-hm0 type=internal \
+  -- set Interface o-hm0 external-ids:iface-status=active \
+  -- set Interface o-hm0 external-ids:attached-mac=$MAC \
+  -- set Interface o-hm0 external-ids:iface-id=$PORT_ID
+
+ip link set dev o-hm0 address $MAC
+ip link set dev o-hm0 up
+# iptables -I INPUT -i o-hm0 -p udp --dport 5555 -j ACCEPT
+iptables -A INPUT -i o-hm0 -j ACCEPT # 完全放开，开发环境，方便调试
+dhclient -v o-hm0 -cf /etc/dhcp/octavia
+route del default gw 19.178.0.1
+
+$ chmod +x /opt/octavia-interface-start.sh
+$ echo 'nohup sh /opt/octavia-interface-start.sh > /var/log/octavia-interface-start.log 2>&1 &' >> /etc/rc.d/rc.local
+$ chmod +x /etc/rc.d/rc.local
+
+```
+
 6 配置修改，和其他openstack组件设置差不多
 
 sed  -i.default  -e '/^#/d'  -e '/^$/d' /etc/octavia/octavia.conf
 
-
+总配置
 
 ```
 [DEFAULT]
@@ -142,6 +223,7 @@ connection = mysql+pymysql://octavia:comleader@123@controller/octavia
 bind_port = 5555
 bind_ip = 19.178.0.127
 controller_ip_port_list = 19.178.0.127:5555
+heartbeat_key=insecure
 [keystone_authtoken]
 www_authenticate_uri = http://controller:5000
 auth_url = http://controller:5000
@@ -153,25 +235,28 @@ project_name = service
 username = octavia
 password = comleader@123
 
-[certificates]
-server_certs_key_passphrase = insecure-key-do-not-use-this-key
-ca_private_key_passphrase = not-secure-passphrase
+[certificates] 
+ca_private_key_passphrase = foobar  # 证书密码，建议所有都一致
 ca_private_key = /etc/octavia/certs/private/server_ca.key.pem
 ca_certificate = /etc/octavia/certs/server_ca.cert.pem
+# ca_private_key = /etc/octavia/certs/private/cakey.pem
+# ca_certificate = /etc/octavia/certs/ca_01.pem
 [anchor]
 [networking]
 [haproxy_amphora]
 server_ca = /etc/octavia/certs/server_ca-chain.cert.pem
 client_cert = /etc/octavia/certs/private/client.cert-and-key.pem
-#key_path = /etc/octavia/.ssh/octavia_key
-#base_cert_dir = /var/lib/octavia/certs
+# server_ca = /etc/octavia/certs/ca_01.pem
+# client_cert = /etc/octavia/certs/client.pem
+key_path = /etc/octavia/.ssh/octavia_ssh_key
+base_cert_dir = /var/lib/octavia/certs
 connection_max_retries = 1500
 connection_retry_interval = 1
 [controller_worker]
-amp_image_owner_id = 4d0fba13b50e48d4a3e9809fa633a5db  # octavia service id
+amp_image_owner_id = b5a1eb4ee8374fa1aa88cd4b59afda98  # image owner id
 amp_image_id = 8546902d-c84c-489d-a8bb-0d2235d3e187 # image  amphora-x64-haproxy id
 amp_image_tag = amphora
-amp_ssh_key_name = octavia_key  # opesntack keypair
+amp_ssh_key_name = octavia_ssh_key  # opesntack keypair
 amp_active_wait_sec = 1
 amp_active_retries = 100
 amp_secgroup_list = 93b4ace2-00fe-4f64-893d-9f7a1d5c1b54 # 	lb-mgmt-sec-grp id
@@ -180,7 +265,6 @@ amp_flavor_id = 1630128403613
 network_driver = allowed_address_pairs_driver
 compute_driver = compute_nova_driver
 amphora_driver = amphora_haproxy_rest_driver
-client_ca = /etc/octavia/certs/client_ca.cert.pem
 [task_flow]
 [oslo_messaging]
 topic = octavia_prov
@@ -211,7 +295,7 @@ rabbit_password = openstack
 
 ```
 
-
+分解配置解释
 
  6.1 设置数据库
 
@@ -279,7 +363,7 @@ compute_driver = compute_nova_driver
 amphora_driver = amphora_haproxy_rest_driver
 ```
 
-7 修改neutron配置
+7 修改neutron配置（暂时没有修改原有配置）
 
  7.1 修改 /etc/neutron/neutron.conf 增加lbaas服务（没有配置，配置后会有错误）
 
@@ -317,9 +401,9 @@ systemctl restart  octavia-housekeeping  octavia-worker octavia-api octavia-heal
 
 
 
+参考安装，配置证书
 
-
-
+https://www.cnblogs.com/leffss/p/15598094.html#could-not-sign-the-certificate-request-failed-to-load-ca-certificate
 
 
 
