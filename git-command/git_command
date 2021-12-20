@@ -19,3 +19,7 @@ RESET  REVERT区别
 在github上拉master后，切换分支命令，
 比如远端opensatck  master， 远端分支 statble/stein
 git checkout -b stein remotes/origin/stable/stein，这样新分支可以与远端分支关联
+
+# 拉取代码
+# 命令：git clone --branch [tags标签] [git地址] 或者 git clone --b [tags标签] [git地址]
+git clone -b 1.4.1 https://github.com/openstack/octavia.git
