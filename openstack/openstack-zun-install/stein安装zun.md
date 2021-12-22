@@ -384,7 +384,9 @@ timedatectl status
 
 配置仓库
 
-`yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo`
+```
+yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+```
 
 好像最近的docker版本升级了，变成了20版本，然后kuryr就用不成了。之前用的19.03没问题，就换成这个，安装这个版本的。
 
@@ -442,7 +444,7 @@ net.ipv4.ip_forward = 1
 
 #### 3.3 安装kuryr-libnetwork
 
-##### 3.3.1 控制节点
+##### 3.3.1 <font color=red>控制节点</font>
 
 ###### 3.3.1.1 创建kuryr用户
 
@@ -478,6 +480,10 @@ chown kuryr:kuryr /etc/kuryr
 
 ###### 3.3.2.3 安装kuryr-libnetwork
 
+有python3和python2两种方式安装，建议py3
+
+python2安装方法
+
 ```
 cd /var/lib/kuryr
 git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
@@ -499,6 +505,25 @@ pip install pyroute2==0.5.10 (注意neutron-linuxbridge依赖包python2-pyroute2
 pip install -r requirements.txt
 python setup.py install
 ```
+
+python3安装方法
+
+```
+cd /var/lib/kuryr
+git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
+chown -R kuryr:kuryr kuryr-libnetwork
+cd kuryr-libnetwork
+
+yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl -y
+
+pip3 install --upgrade pip==21.3.1
+pip3 install --upgrade setuptools==44.1.1
+pip3 install -r requirements.txt
+python3 setup.py install
+
+```
+
+
 
 
 
@@ -522,7 +547,8 @@ vim /etc/kuryr/kuryr.conf
 
 ```
 [DEFAULT]
-bindir = /usr/libexec/kuryr
+bindir = /usr/libexec/kuryr  # py2
+# bindir = /usr/local/libexec/kuryr  # py3
 [binding]
 [neutron]
 www_authenticate_uri = http://controller:5000
@@ -554,6 +580,7 @@ Description = Kuryr-libnetwork - Docker network plugin for Neutron
 
 [Service]
 ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
+# ExecStart = /usr/local/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log 
 CapabilityBoundingSet = CAP_NET_ADMIN
 
 [Install]
@@ -574,6 +601,7 @@ systemctl status docker kuryr-libnetwork
 ```
 
 ```
+# python3安装方式，不用执行下面的操作
 重新安装与配置linuxbridge
 yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
 修改配置文件
@@ -592,6 +620,13 @@ systemctl enable neutron-linuxbridge-agent
 
 ```
 docker network create --driver kuryr --ipam-driver kuryr --subnet 173.18.12.0/24 --gateway=173.18.12.1 test_net
+```
+
+有报错
+
+```
+Error response from daemon: This node is not a swarm manager. Use "docker swarm init" or "docker swarm join" to connect this node to swarm and try again.
+
 ```
 
 
@@ -749,7 +784,9 @@ host_shared_with_nova = true
 
 ###### 3.4.8.1 创建docker配置文件夹
 
-`mkdir -p /etc/systemd/system/docker.service.d`
+```
+mkdir -p /etc/systemd/system/docker.service.d
+```
 
 ###### 3.4.8.2 创建docker配置文件
 
@@ -798,7 +835,9 @@ systemctl restart kuryr-libnetwork
 
 ##### 3.4.9 配置containerd
 
-`containerd config default > /etc/containerd/config.toml`
+```
+containerd config default > /etc/containerd/config.toml
+```
 
  chown zun:zun /etc/containerd/config.toml 
 
