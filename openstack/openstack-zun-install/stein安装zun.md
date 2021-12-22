@@ -336,9 +336,11 @@ systemctl enable neutron-linuxbridge-agent
 
 
 
-安装后面安装步骤会用到的基础包
+安装后面步骤会用到的基础包
 
-`yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools iscsi-initiator-utils nano  ` 
+```
+yum install -y epel-release yum-utils device-mapper-persistent-data lvm2 python-pip git python-devel libffi-devel gcc openssl-devel wget vim net-tools iscsi-initiator-utils nano
+```
 
 #### 3.1 时间同步
 
