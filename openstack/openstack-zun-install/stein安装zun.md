@@ -243,7 +243,7 @@ systemctl status zun-api  zun-wsproxy
 ```
 pip install docker==4.4.4
 pip install websocket-client==0.32.0
-pip install websocket
+pip install websocket==0.2.1
 
 ```
 
