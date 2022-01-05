@@ -294,15 +294,10 @@ systemctl start etcd
 
 ### 三、计算节点zun安装
 
-> **在计算节点安装zun-compute服务前，需要在计算节点安装docker和kuryr-libnetwork**
-> **在控制节点安装etcd**
-> **当需要安装zun-compute其他包时，建议选择python3，否则可能和安装网络组件时的python2包冲突**
-
-
-
 安装一点必备的依赖
 
 ```
+# 以下是centos7安装方式，
 yum install -y centos-release-openstack-stein
 yum install -y python-openstackclient 
 
@@ -329,7 +324,7 @@ chmod 777 /var/run/openvswitch/db.sock
 yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
 修改配置文件
 启动代理
-systemctl restart neutron-linuxbridge-agent
+systemctl start neutron-linuxbridge-agent
 systemctl enable neutron-linuxbridge-agent
 
 ```
@@ -371,52 +366,56 @@ timedatectl status
 
 #### 3.2 docker安装
 
+参考链接：https://docs.docker.com/engine/install/ubuntu/
+
 卸载旧版本的docker
 
 > ```
-> yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine -y
+> sudo apt-get remove docker docker-engine docker.io containerd runc
 > 
 > ```
-
-
 
 
 
 配置仓库
 
 ```
-yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+sudo apt-get update
+sudo apt-get install ca-certificates curl gnupg lsb-release
+    
 ```
 
-好像最近的docker版本升级了，变成了20版本，然后kuryr就用不成了。之前用的19.03没问题，就换成这个，安装这个版本的。
+Add Docker’s official GPG key:
+
+```
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+```
+
+Use the following command to set up the **stable** repository.
+
+```
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+
 
 查询docker版本
 
 ```
-yum list containerd.io --showduplicates | sort -r
-yum list docker-ce --showduplicates | sort -r
-yum install docker-ce-<VERSION_STRING> docker-ce-cli-<VERSION_STRING> containerd.io
-# for example docker-ce-18.09.1
-```
+# 查看docker版本
+apt-cache madison containerd
+sudo apt-get update
 
-
-
-通过本地包安装
-
-```
-wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-18.09.6-3.el7.x86_64.rpm
-wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-cli-18.09.6-3.el7.x86_64.rpm
-wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.3.9-3.1.el7.x86_64.rpm
-
-yum localinstall  -y  docker-ce-cli-18.09.6-3.el7.x86_64.rpm
-yum localinstall  -y  containerd.io-1.3.9-3.1.el7.x86_64.rpm
-yum localinstall  -y  docker-ce-18.09.6-3.el7.x86_64.rpm
+# 安装 docker-ce、docker-ce-cli、containerd.io
+apt install docker-ce=5:18.09.6~3-0~ubuntu-bionic
+apt install docker-ce-cli=5:18.09.6~3-0~ubuntu-bionic
+apt install containerd.io=1.3.9-1
 
 ```
 
-如果需要安装最新的版本，命令是 yum install -y docker-ce docker-ce-cli containerd.io
-
-启动服务，自启动
+启动服务
 
 ```
 systemctl start docker containerd.service 
@@ -480,45 +479,18 @@ chown kuryr:kuryr /etc/kuryr
 
 ###### 3.3.2.3 安装kuryr-libnetwork
 
-有python3和python2两种方式安装，建议py3
-
-python2安装方法
-
 ```
 cd /var/lib/kuryr
 git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
 chown -R kuryr:kuryr kuryr-libnetwork
 cd kuryr-libnetwork
 
-# 直接执行pip install --upgrade pip，如果报错，可能是py2.7版本问题，通过下面途径更新pip
-wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
-sudo python get-pip.py
-更新setuptools
-pip install --upgrade setuptools
-
-# 提示自带的python-ipaddress版本太旧(1.0.6)，pip直接安装失败
-curl -O  https://cbs.centos.org/kojifiles/packages/python-ipaddress/1.0.18/5.el7/noarch/python2-ipaddress-1.0.18-5.el7.noarch.rpm
-yum install -y python2-ipaddress-1.0.18-5.el7.noarch.rpm
-
-pip install pyroute2==0.5.10 (注意neutron-linuxbridge依赖包python2-pyroute2.noarch-0.5.6-先安装0.5.10，最后重装neutron-linuxbridge-agent,否则zun无法创建docker网络)
-
-pip install -r requirements.txt
-python setup.py install
-```
-
-python3安装方法
-
-```
-cd /var/lib/kuryr
-git clone -b stable/stein https://git.openstack.org/openstack/kuryr-libnetwork.git
-chown -R kuryr:kuryr kuryr-libnetwork
-cd kuryr-libnetwork
-
-yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl -y
+# yum install python3-pip git python3-devel libffi-devel gcc openssl-devel numactl -y
 
 pip3 install --upgrade pip==21.3.1
 pip3 install --upgrade setuptools==44.1.1
 pip3 install -r requirements.txt
+pip3 install -u pyrouter2==0.5.10
 python3 setup.py install
 
 ```
@@ -533,7 +505,6 @@ python3 setup.py install
 su -s /bin/sh -c "./tools/generate_config_file_samples.sh" kuryr
 
 su -s /bin/sh -c "cp etc/kuryr.conf.sample /etc/kuryr/kuryr.conf" kuryr
-
 ```
 
 
@@ -576,13 +547,12 @@ metadata_proxy_shared_secret = metadata_secret
 
 
 ```
-
 [Unit]
 Description = Kuryr-libnetwork - Docker network plugin for Neutron
 
 [Service]
-# ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
-ExecStart = /usr/local/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log 
+ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
+# ExecStart = /usr/local/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log 
 CapabilityBoundingSet = CAP_NET_ADMIN
 
 [Install]
@@ -650,7 +620,6 @@ Error response from daemon: This node is not a swarm manager. Use "docker swarm 
 ```
 groupadd --system zun
 useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g zun zun
-
 ```
 
 ##### 3.4.2 创建目录
@@ -658,7 +627,6 @@ useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g z
 ```
 mkdir -p /etc/zun
 chown zun:zun /etc/zun
-
 ```
 
 
@@ -666,12 +634,6 @@ chown zun:zun /etc/zun
 **下面安装py2、py3任选一种即可(建议用python3, 用py2可能导致安装kuryr的包变更导致kuryr网络有问题)**
 
 ##### 3.4.3 安装zun包依赖
-
-python2版本
-
-```
-yum install epel-release python-pip git python-devel libffi-devel gcc openssl-devel -y
-```
 
 python3版本
 
@@ -690,15 +652,13 @@ git clone -b stable/stein https://git.openstack.org/openstack/zun.git
 chown -R zun:zun zun
 cd zun
 
-# python2安装
-pip install -r requirements.txt
-python setup.py install
-
 
 # python36安装
-# pip3 install --upgrade pip==21.3.1 #前面安装过了
-# pip3 install --upgrade setuptools==44.1.1
+pip3 install --upgrade pip==21.3.1
+pip3 install --upgrade setuptools==44.1.1
 pip3 install -r requirements.txt
+pip3 install websocket-client==1.2.3
+pip3 install websockify==0.10.0
 python3 setup.py install
 ```
 
@@ -717,8 +677,6 @@ su -s /bin/sh -c "cp etc/zun/rootwrap.d/* /etc/zun/rootwrap.d/" zun
 ##### 3.4.6 配置zun用户
 
 ```
-python2
-echo "zun ALL=(root) NOPASSWD: /usr/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
 
 python3
 echo "zun ALL=(root) NOPASSWD: /usr/local/bin/zun-rootwrap /etc/zun/rootwrap.conf *" | sudo tee /etc/sudoers.d/zun-rootwrap
@@ -737,7 +695,6 @@ sed -i.default -e "/^$/d" -e "/^#/d" /etc/zun/zun.conf
 
 
 ```
-
 [DEFAULT]
 
 transport_url = rabbit://openstack:openstack@controller
@@ -800,7 +757,6 @@ vim /etc/systemd/system/docker.service.d/docker.conf
 **此处把zun:2375和controller:2379替换成对应的能解析到ip地址的host名称或者ip地址(比如zun2:2379, 1.1.1.1:2379)，group后根据前面配置的实际用户名修改**
 
 ```
-
 [Service]
 ExecStart=
 ExecStart=/usr/bin/dockerd --group zun -H tcp://zun:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
@@ -843,9 +799,9 @@ systemctl restart kuryr-libnetwork
 
 ```
 containerd config default > /etc/containerd/config.toml
- chown zun:zun /etc/containerd/config.toml 
-
 ```
+
+ chown zun:zun /etc/containerd/config.toml 
 
 
 
@@ -890,24 +846,6 @@ vim /etc/systemd/system/zun-compute.service
 
 
 
-python2
-
-```
-[Unit]
-Description = OpenStack Container Service Compute Agent
-
-[Service]
-ExecStart = /usr/bin/zun-compute
-User = zun
-
-[Install]
-WantedBy = multi-user.target
-```
-
-
-
-
-
 python3
 
 ```
@@ -936,33 +874,23 @@ chown zun:zun /var/log/zun
 
 
 
-
-
 ##### 3.4.112 启动zun-compute
 
 直接启动报错，需要安装
 
 ```
-# python2
-yum install mysql-devel python-devel pciutils numactl -y
-pip install Mysql-python pymysql
-
-
 # python3
-pip3 install pymysql
-yum install pciutils numactl -y
+pip3 install pymysql==1.0.2
+apt-get install -y numactl pciutils
 
 ```
 
 同时修改
 
 ```
-# python2
-sed -i "s/with_lockmode('update')/with_for_update()/" /usr/lib/python2.7/site-packages/zun/db/sqlalchemy/api.py
-
 
 # python3
-sed -i "s/with_lockmode('update')/with_for_update()/" /usr/local/lib/python3.6/site-packages/zun/db/sqlalchemy/api.py
+sed -i "s/with_lockmode('update')/with_for_update()/" /usr/local/lib/python3.6/dist-packages/zun/db/sqlalchemy/api.py
 ```
 
 
@@ -1008,7 +936,9 @@ systemctl status zun-compute
 zun-compute挂载volume暂行方法
 
 ```
-1. 安装yum install iscsi-initiator-utils -y
+1. 安装
+# yum install iscsi-initiator-utils -y
+ apt-get install open-iscsi
 2. 修改zun-compute.service ,更改User=root
 3. 修改代码oslo_privsep/daemon.py (去掉sudo前缀)
 
