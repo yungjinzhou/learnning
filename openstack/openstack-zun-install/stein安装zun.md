@@ -814,7 +814,7 @@ systemctl restart docker
 
 vim  /etc/kuryr/kuryr.conf
 
-可不修改位置，测试修改后联网报错，如果没有报错，可以先不添加
+此处如果capability_scope不设置global，网络只能在最初创建的节点上使用，其他节点使用该网络创建容器会报错
 
 ```
 [DEFAULT]
@@ -831,7 +831,8 @@ https://review.opendev.org/c/openstack/zun/+/679573/2/zun/network/kuryr_network.
 ###### 3.4.8.5 重启kuryr
 
 ```
-systemctl restart kuryr-libnetwork
+systemctl restart kuryr-libnetwork  
+systemctl restart docker containerd
 ```
 
 
