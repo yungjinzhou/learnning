@@ -1012,3 +1012,9 @@ host = {
 
 
 
+## 容器网络问题
+
+kuryr-libnetwork设置为global时，在一个zun-compute节点创建该docker网络，会同步在其他节点创建，同步代码逻辑暂时没有定位到。
+
+
+
