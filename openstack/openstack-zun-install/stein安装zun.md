@@ -822,6 +822,10 @@ capability_scope = global
 process_external_connectivity = False
 ```
 
+![img](H:\code\learnning\openstack\openstack-zun-install\企业微信截图_16421402774108.png)
+
+
+
 优化kuryr创建网络时的等待时间（可不操作）
 
  ![img](H:\code\learnning\openstack-zun-install\企业微信截图_16390289337530.png) 
