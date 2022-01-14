@@ -4,9 +4,9 @@
 
 - 环境：centos7.6   mimic版本
 - opentack-zun版本stein
-- python2.7.5/python3.6，都是系统自带python环境
+- python2.7.5/python3.6，都是系统自带python环境，**当安装组件可选时，建议选python3**
 - **默认zun数据库及zun服务密码 password: comleader123，可根据需要更改，在此环境下发现密码中有@需要修改pymysql源码进行处理，否则不能识别**
-- 设计到密码及ip地址及hostname的及
+- 设计到密码及ip地址及hostname的自行修改
 - 如需docker磁盘功能，需要开启磁盘配额的功能
 
 ### 二、controller节点zun安装
@@ -311,8 +311,7 @@ yum install -y ebtables ipset
 yum install -y openstack-neutron-openvswitch  
 修改配置文件
 安装依赖包
-yum install libibverbs -y
-yum install bridge-utils -y
+yum install libibverbs bridge-utils -y
 systemctl start neutron-openvswitch-agent
 systemctl enable neutron-openvswitch-agent
 
@@ -562,8 +561,6 @@ username = neutron
 password = comleader@123
 service_metadata_proxy = true
 metadata_proxy_shared_secret = metadata_secret
-#bility_scope = global
-#process_external_connectivity = false
 
 ```
 
@@ -604,6 +601,7 @@ systemctl status docker kuryr-libnetwork
 
 ```
 # python3安装方式，不用执行下面的操作
+
 重新安装与配置linuxbridge
 yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
 修改配置文件
@@ -700,6 +698,7 @@ python setup.py install
 # pip3 install --upgrade setuptools==44.1.1
 pip3 install -r requirements.txt
 python3 setup.py install
+
 ```
 
 ##### 3.4.5 生成示例配置文件
@@ -731,8 +730,6 @@ echo "zun ALL=(root) NOPASSWD: /usr/local/bin/zun-rootwrap /etc/zun/rootwrap.con
 vim /etc/zun/zun.conf
 
 sed -i.default -e "/^$/d" -e "/^#/d" /etc/zun/zun.conf
-
-
 
 
 
@@ -817,7 +814,7 @@ systemctl restart docker
 
 vim  /etc/kuryr/kuryr.conf
 
-可不修改改位置，测试修改后联网报错，如果没有报错，可以先不添加
+可不修改位置，测试修改后联网报错，如果没有报错，可以先不添加
 
 ```
 [DEFAULT]
@@ -843,7 +840,7 @@ systemctl restart kuryr-libnetwork
 
 ```
 containerd config default > /etc/containerd/config.toml
- chown zun:zun /etc/containerd/config.toml 
+chown zun:zun /etc/containerd/config.toml 
 
 ```
 
@@ -1011,6 +1008,7 @@ zun-compute挂载volume暂行方法
 1. 安装yum install iscsi-initiator-utils -y
 2. 修改zun-compute.service ,更改User=root
 3. 修改代码oslo_privsep/daemon.py (去掉sudo前缀)
+/usr/local/lib/python3.6/site-packages/oslo_privsep/
 
             cmd = context.helper_command(sockpath)
             if "zun-rootwrap" in str(cmd) and "privsep-helper" in str(cmd):
