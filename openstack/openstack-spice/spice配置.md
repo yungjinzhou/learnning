@@ -6,7 +6,7 @@
 
 
 
-```
+```javascript
 yum install -y spice-html5 spice-protocol spice-server openstack-nova-spicehtml5proxy
 
 #yum install -y spice-html5

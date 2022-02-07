@@ -177,7 +177,6 @@ After=syslog.target network.target
 KillSignal=SIGQUIT
 Type=notify
 User=root
-Type=notify
 NotifyAccess=all
 ExecStart=/usr/sbin/uwsgi --ini /etc/aodh/uwsgi-aodh.ini
 ExecStop=/usr/sbin/uwsgi --stop /var/run/aodh-uwsgi.pid
