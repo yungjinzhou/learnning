@@ -49,6 +49,14 @@ limit-as = 256
 harakiri = 60
 #一个请求花费的时间超过了这个harakiri超时时间，那么这个请求都会被丢弃，并且当前处理这个请求的工作进程会被回收再利用（即重启）
 
+
+http 、http-socket、socket 的区别
+http 和 http-socket 选项是完全不同的。第一个生成一个额外的进程，转发请求到一系列的worker (将它想象为一种形式的盾牌，与apache或者nginx同级)，而第二个设置worker为原生使用http协议。
+socket 模式：接收的是uwsgi 协议的数据包，前台需配合nginx 做负载均衡转发过来
+http-socket 模式： 接收的是http 协议的数据包，前台可配合nginx 转发
+http 模式： 额外启动一个http 进程（类似nginx）转发 uwsgi 协议的数据包到worker,http 模式也可只当成nginx 使用
+当使用 http 模式启动时，worker 进程会随机监听一个端口， 当curl 测试返回curl: (52) Empty reply from server， 通常可能是iptables 防火墙的原因，导致请求无法到达workerj进程；
+
 http-socket = controller:9001
 # The http-socket <bind> option will make uWSGI natively speak HTTP. If your web server does not support the uwsgi protocol but is able to speak to upstream HTTP proxies, or if you are using a service like Webfaction or Heroku to host your application, you can use http-socket. If you plan to expose your app to the world with uWSGI only, use the http option instead, as the router/proxy/load-balancer will then be your shield.
 #
