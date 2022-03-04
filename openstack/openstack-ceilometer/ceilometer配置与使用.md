@@ -387,7 +387,6 @@ After=syslog.target network.target
 KillSignal=SIGQUIT
 Type=notify
 User=root
-Type=notify
 NotifyAccess=all
 ExecStart=/usr/sbin/uwsgi --ini /etc/gnocchi/uwsgi-gnocchi.ini
 ExecStop=/usr/sbin/uwsgi --stop /var/run/gnocchi-uwsgi.pid

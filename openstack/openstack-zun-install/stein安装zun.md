@@ -111,7 +111,7 @@ vim /etc/zun/zun.conf
 
 
 
-```
+```javascript
 [DEFAULT]
 transport_url = rabbit://openstack:openstack@controller
 [api]
@@ -175,7 +175,8 @@ driver = messaging
 [websocket_proxy]
 wsproxy_host = 192.168.204.173
 wsproxy_port = 6784
-base_url = ws://controller:6784
+base_url = ws://192.168.204.173:6784
+# base_url = ws://controller:6784 console不可用
 [zun_client]
 
 ```
@@ -814,7 +815,7 @@ systemctl restart docker
 
 vim  /etc/kuryr/kuryr.conf
 
-此处如果capability_scope不设置global，网络只能在最初创建的节点上使用，其他节点使用该网络创建容器会报错
+<font color=red>此处如果capability_scope不设置global，网络只能在最初创建的节点上使用，其他节点使用该网络创建容器会报错</font>
 
 ```
 [DEFAULT]
@@ -1173,6 +1174,113 @@ https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.h
 
 
 
+
+
+### 五、配置harbor镜像
+
+#### 5.1 修改配置
+
+##### 5.1.1 修改docker
+
+在zun节点 修改docker.conf
+
+加入harbor地址，如果是http请求，ip:port
+
+增加 --insecure-registry "192.168.66.29:80"
+
+```javascript
+[Service]
+ExecStart=
+# ExecStart=/usr/bin/dockerd --group zun -H tcp://zun02:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
+ExecStart=/usr/bin/dockerd --insecure-registry "192.168.66.29:80" --group zun -H tcp://zun02:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
+```
+
+##### 5.1.2 修改zun
+
+配置zun.conf
+
+```javascript
+........
+[docker]
+# 配置harbor服务器地址
+default_registry = 192.168.66.29:80
+default_registry_username = admin
+default_registry_password = comleader@123
+# 可以增加harbor中项目参数，传参时只传镜像名称即可
+.....
+```
+
+
+
+#### 5.2  重启服务与容器
+
+```
+systemctl daemon-reload
+systemctl restart docker containerd
+docker start $(docker ps -aq)
+```
+
+
+
+#### 5.3 容器节点，上传到harbor对应项目
+
+##### 5.3.1 登录harbor
+
+输入用户名密码
+
+```
+docker login 192.168.66.29:80
+```
+
+##### 5.3.2 容器提交
+
+```
+docker commit -m="test " -a="zun02" dc5363dc932c 192.168.66.29:80/feinitaikaifa/centos7:v2
+```
+
+- **-m:** 提交的描述信息
+- **-a:** 指定镜像作者
+- **e218edb10161：**容器 ID
+- **192.168.66.29:80/feinitaikaifa/centos7:v2：** 指定要创建的目标镜像名（其中192.168.66.29:80为harbor地址，feinitaikaifa为harbor项目名称，centos7:v1为镜像名称:tag）
+
+##### 5.3.2 对已有镜像打tag
+
+其中192.168.66.29:80为harbor地址，feinitaikaifa为harbor项目名称，centos7:v1为镜像名称:tag
+
+```
+docker tag centos:latest 192.168.66.29:80/feinitaikaifa/centos7:v1
+```
+
+
+
+##### 5.3.3 推送到harbor对应项目
+
+```
+docker push 192.168.66.29:80/feinitaikaifa/centos7:v1
+```
+
+
+
+
+
+### 六、docker使用
+
+#### 6.1 容器打包
+
+```
+ docker save -o cirros.tar 192.168.66.29:80/feinitaikaifa/cirros:latest
+```
+
+#### 6.2  容器提交
+
+```
+docker commit -m="test " -a="zun02" dc5363dc932c 192.168.66.29:80/feinitaikaifa/centos7:v2
+```
+
+- **-m:** 提交的描述信息
+- **-a:** 指定镜像作者
+- **e218edb10161：**容器 ID
+- **192.168.66.29:80/feinitaikaifa/centos7:v2：** 指定要创建的目标镜像名（其中192.168.66.29:80为harbor地址，feinitaikaifa为harbor项目名称，centos7:v1为镜像名称:tag）
 
 
 
