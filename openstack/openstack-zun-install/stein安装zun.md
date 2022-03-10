@@ -1284,3 +1284,28 @@ docker commit -m="test " -a="zun02" dc5363dc932c 192.168.66.29:80/feinitaikaifa/
 
 
 
+#### 6.3 容器上传至glance
+
+打包后的容器xxx.tar文件
+
+登录到控制节点
+
+
+
+source ~./admin-xxx
+
+
+
+```
+openstack image create --disk-format raw --container-format docker  --file centos7.tar docker-centos7
+
+```
+
+
+
+
+
+
+
+
+
