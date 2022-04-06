@@ -303,7 +303,7 @@ systemctl start etcd
 
 安装一点必备的依赖
 
-```
+```javascript
 yum install -y centos-release-openstack-stein
 yum install -y python-openstackclient 
 
@@ -580,6 +580,7 @@ Description = Kuryr-libnetwork - Docker network plugin for Neutron
 
 [Service]
 # ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
+User=root
 ExecStart = /usr/local/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log 
 CapabilityBoundingSet = CAP_NET_ADMIN
 
@@ -740,7 +741,7 @@ sed -i.default -e "/^$/d" -e "/^#/d" /etc/zun/zun.conf
 
 transport_url = rabbit://openstack:openstack@controller
 state_path = /var/lib/zun
-
+image_driver_list = glance
 [database]
 connection = mysql+pymysql://zun:comleader123@controller/zun
 
@@ -1303,7 +1304,39 @@ openstack image create --disk-format raw --container-format docker  --file cento
 
 
 
+#### 6.4 容器镜像保存本地
 
+```
+docker save image_id > xxxx.tar
+```
+
+
+
+#### 6.5 本地容器镜像上传到私有仓库(harbor)
+
+```
+docker save image_id > xxxx.tar
+```
+
+
+
+#### 6.6 从dockerhub拉取镜像到上传到harbor步骤
+
+```
+# 从google或者dockerhub拉取镜像
+docker pull xxxx
+# 保存到本地
+docker save image_id > kubernetes-kubelet.tar
+# 上传到可以连接到harbor服务器的主机上
+scp  kubernetes-kubelet.tar root@192.168.230.161:/home/
+# 导入到docker image
+docker load -i kubernetes-kubelet.tar
+# 给镜像打tag
+docker tag docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+# 推送到镜像服务器
+docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+
+```
 
 
 

@@ -53,9 +53,9 @@ openstack service create --name magnum --description "OpenStack Container Infras
 controller替换为控制节点的ip地址
 
 ```
-openstack endpoint create --region RegionOne container-infra public http://192.168.204.173:9511/v1
-openstack endpoint create --region RegionOne container-infra internal http://192.168.204.173:9511/v1
-openstack endpoint create --region RegionOne container-infra admin http://192.168.204.173:9511/v1
+openstack endpoint create --region RegionOne container-infra public http://192.168.230.107:9511/v1
+openstack endpoint create --region RegionOne container-infra internal http://192.168.230.107:9511/v1
+openstack endpoint create --region RegionOne container-infra admin http://192.168.230.107:9511/v1
 ```
 
 
@@ -333,7 +333,7 @@ openstack image create \
                       --container-format=bare \
                       --file=Fedora-Atomic-27-20180419.0.x86_64.qcow2\
                       --property os_distro='fedora-atomic' \
-                      fedora-atomic-latest
+                      -latest
                       
                       
 openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='coreos' fedora-coreos-34latest       
@@ -412,8 +412,8 @@ def enforce_driver_supported():
     def wrapper(func, *args, **kwargs):
         cluster_template = args[1]
         cluster_distro = cluster_template.cluster_distro
-        if str(cluster_distro) ==  "Unset":
-            cluster_distro == None
+        if str(cluster_distro) == "Unset":
+            cluster_distro = None
         if not cluster_distro:
             try:
                 cli = clients
@@ -526,7 +526,7 @@ yum install -y openstack-magnum-ui
 到openstack-dashboard下
 
 ```
-cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1370_project_container_infra_panel_group.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1370_project_container_infra_panel_group.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
 cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1371_project_container_infra_clusters_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
 cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1372_project_container_infra_cluster_templates_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
 
