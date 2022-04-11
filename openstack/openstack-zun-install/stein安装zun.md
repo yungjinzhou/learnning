@@ -176,7 +176,12 @@ driver = messaging
 wsproxy_host = 192.168.204.173
 wsproxy_port = 6784
 base_url = ws://192.168.204.173:6784
-# base_url = ws://controller:6784 console不可用
+# 配置wss访问需要配置下面
+# base_url = wss://192.168.230.107:6784
+#cert=/etc/nova/ssl/nginx-selfsigned.crt
+#key=/etc/nova/ssl/nginx-selfsigned.key
+
+# base_url = ws://controller:6784 console不可用,需要ip地址
 [zun_client]
 
 ```
@@ -525,6 +530,25 @@ python3 setup.py install
 
 
 
+前面ovs-vsctl 需要有最大权限，kuryr才能调用，补充代码
+
+```javascript
+# vim /usr/local/lib/python3.6/site-packages/kuryr/lib/binding/drivers/veth.py
+
+def _configure_host_iface(ifname, endpoint_id, port_id, net_id, project_id,
+                          hwaddr, kind=None, details=None):
+    # 省略部分代码
+    stdout1, stderr1 = processutils.execute(
+        "chmod", "777", "/var/run/openvswitch/db.sock",run_as_root=True)
+    # 增加上面一行
+    stdout, stderr = processutils.execute(
+        binding_exec_path, constants.BINDING_SUBCOMMAND, port_id, ifname,
+        endpoint_id, hwaddr, net_id, project_id,
+        lib_utils.string_mappings(details),
+        run_as_root=True)
+    return stdout, stderr
+```
+
 
 
 ###### 3.3.2.4 生成配置文件并配置
@@ -824,13 +848,13 @@ capability_scope = global
 process_external_connectivity = False
 ```
 
-![img](H:\code\learnning\openstack\openstack-zun-install\企业微信截图_16421402774108.png)
+![img](.\企业微信截图_16421402774108.png)
 
 
 
 优化kuryr创建网络时的等待时间（可不操作）
 
- ![img](H:\code\learnning\openstack-zun-install\企业微信截图_16390289337530.png) 
+ ![img](.\企业微信截图_16390289337530.png) 
 
 https://review.opendev.org/c/openstack/zun/+/679573/2/zun/network/kuryr_network.py
 
@@ -1287,6 +1311,10 @@ docker commit -m="test " -a="zun02" dc5363dc932c 192.168.66.29:80/feinitaikaifa/
 
 #### 6.3 容器上传至glance
 
+glance使用需要是没有tag的tar包，可以从dockerhub上下载后上传，或者清除tag信息后再上传
+
+
+
 打包后的容器xxx.tar文件
 
 登录到控制节点
@@ -1325,6 +1353,7 @@ docker save image_id > xxxx.tar
 ```
 # 从google或者dockerhub拉取镜像
 docker pull xxxx
+docker pull arm64v8/centos:7 # 拉取arm64的镜像
 # 保存到本地
 docker save image_id > kubernetes-kubelet.tar
 # 上传到可以连接到harbor服务器的主机上
@@ -1341,4 +1370,28 @@ docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
 
 
 
+
+### 七、其他注意事项
+
+
+
+
+
+````
+vim /usr/lib/python2.7/site-packages/kuryr/lib/binding/drivers/veth.py
+
+def _configure_host_iface(ifname, endpoint_id, port_id, net_id, project_id,
+                          hwaddr, kind=None, details=None):
+    # 省略部分代码
+    stdout, stderr = processutils.execute(
+        "chmod", "777", "/var/run/openvswitch/db.sock",run_as_root=True)
+    # 增加上面一行
+    stdout, stderr = processutils.execute(
+        binding_exec_path, constants.BINDING_SUBCOMMAND, port_id, ifname,
+        endpoint_id, hwaddr, net_id, project_id,
+        lib_utils.string_mappings(details),
+        run_as_root=True)
+    return stdout, stderr
+
+````
 

@@ -2479,3 +2479,20 @@ gnocchi archive-policy-rule delete default-origin
 
 
 
+#### 3.6 日志处理
+
+更改启动方式后，uwsgi日志需要定期处理
+
+修改`/etc/logrotate.d/gnocchi`，
+
+```
+/var/log/gnocchi/*.log {
+    rotate 4
+    size 10M
+    missingok
+    compress
+    copytruncate  # 切割后新日志正常写入
+}
+
+```
+
