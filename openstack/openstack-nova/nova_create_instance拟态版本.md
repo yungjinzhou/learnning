@@ -34,7 +34,11 @@ def create(self, req, body):
             # ...
 ```
 
-这里的`compute_api`即前面说的`nova/compute/api.py`模块，找到该模块的`create`方法，该方法会创建数据库记录、检查参数等，然后调用`compute_task_api`的`schedule_and_build_instances`方法:
+这里的`compute_api`即前面说的`nova/compute/api.py`模块，找到该模块的`create`方法，该方法会创建数据库记录、检查参数等，
+
+调用self.compute_api.create()
+
+即nova/compute/api.py中的create方法
 
 ```
 @hooks.add_hook("create_instance")

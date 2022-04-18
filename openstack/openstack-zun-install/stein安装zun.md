@@ -1378,7 +1378,7 @@ docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
 
 
 ````
-vim /usr/lib/python2.7/site-packages/kuryr/lib/binding/drivers/veth.py
+vim /usr/local/lib/python3.6/site-packages/kuryr/lib/binding/drivers/veth.py
 
 def _configure_host_iface(ifname, endpoint_id, port_id, net_id, project_id,
                           hwaddr, kind=None, details=None):
