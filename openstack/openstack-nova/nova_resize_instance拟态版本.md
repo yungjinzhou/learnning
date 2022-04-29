@@ -235,11 +235,17 @@
 
 其中`call`表示同步调用，`migrate_server`是RPC调用的方法，`kw`是传递的参数。参数是字典类型，没有复杂对象结构，因此不需要特别的序列化操作。
 
-截至到现在，虽然目录由`api->compute->conductor`，但仍在nova-api进程中运行，直到call方法执行，该方法由于是同步调用，会等待RPC返回，。
+截至到现在，虽然目录由`api->compute->conductor`，但仍在nova-api进程中运行，直到call方法执行，该方法由于是同步调用，会等待RPC返回。
 
 ### nova-conductor
 
-由于是向nova-conductor发起的RPC调用(根据RPC_TOPIC判定)，而前面说了接收端肯定是`manager.py`，因此进程跳到`nova-conductor`服务，入口为`nova/conductor/manager.py`的`schedule_and_build_instances`方法。
+由于是向nova-conductor发起的RPC调用(根据RPC_TOPIC判定)，而前面说了接收端肯定是`manager.py`，因此进程跳到`nova-conductor`服务，入口为`nova/conductor/manager.py`的`migrate_server`方法。
+
+
+
+### <font color=red>下面流程是创建实例的流程，resize的还没有整理</font>
+
+
 
 该方法首先调用了`_schedule_instances`方法，该方法首先调用了`scheduler_client`的`select_destinations`方法:
 

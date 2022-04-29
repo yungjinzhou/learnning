@@ -530,7 +530,7 @@ python3 setup.py install
 
 
 
-前面ovs-vsctl 需要有最大权限，kuryr才能调用，补充代码
+前面ovs-vsctl 需要有最大权限，kuryr才能调用，补充代码(**代码调用权限有问题，已通过ovs配置创建db.sock的权限**)
 
 ```javascript
 # vim /usr/local/lib/python3.6/site-packages/kuryr/lib/binding/drivers/veth.py
@@ -568,7 +568,9 @@ sed -i.default -e "/^#/d" -e "/^$/d" /etc/kuryr/kuryr.conf
 
 vim /etc/kuryr/kuryr.conf
 
+安装后一定要看bindir = /usr/local/libexec/kuryr  下有没有可执行文件，负责会报失败
 
+![img](.\bind_dir.png)
 
 ```
 [DEFAULT]
@@ -588,6 +590,8 @@ service_metadata_proxy = true
 metadata_proxy_shared_secret = metadata_secret
 
 ```
+
+
 
 
 

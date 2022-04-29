@@ -1,14 +1,15 @@
-如果你想在Linux服务器上周期性地执行某个 Python 脚本，最出名的选择应该是 Crontab 脚本，但是 Crontab 具有以下缺点：
-
-1.不方便执行秒级的任务。
-
-2.当需要执行的定时任务有上百个的时候，Crontab的管理就会特别不方便。
-
-另外一个选择是 Celery，但是 Celery 的配置比较麻烦，如果你只是需要一个轻量级的调度工具，Celery 不会是一个好选择。
-
-在你想要使用一个轻量级的任务调度工具，而且希望它尽量简单、容易使用、不需要外部依赖，最好能够容纳 Crontab 的所有基本功能，那么 Schedule 模块是你的不二之选。
-
-使用它来调度任务可能只需要几行代码，感受一下：
+# -*- coding: utf-8 -*-
+# 如果你想在Linux服务器上周期性地执行某个 Python 脚本，最出名的选择应该是 Crontab 脚本，但是 Crontab 具有以下缺点：
+#
+# 1.不方便执行秒级的任务。
+#
+# 2.当需要执行的定时任务有上百个的时候，Crontab的管理就会特别不方便。
+#
+# 另外一个选择是 Celery，但是 Celery 的配置比较麻烦，如果你只是需要一个轻量级的调度工具，Celery 不会是一个好选择。
+#
+# 在你想要使用一个轻量级的任务调度工具，而且希望它尽量简单、容易使用、不需要外部依赖，最好能够容纳 Crontab 的所有基本功能，那么 Schedule 模块是你的不二之选。
+#
+# 使用它来调度任务可能只需要几行代码，感受一下：
 
 # Python 实用宝典
 import schedule
@@ -24,32 +25,32 @@ while True:
     time.sleep(1)
 
 
-上面的代码表示每10分钟执行一次 job 函数，非常简单方便。你只需要引入 schedule 模块，通过调用 scedule.every(时间数).时间类型.do(job)  发布周期任务。
-
-发布后的周期任务需要用 run_pending 函数来检测是否执行，因此需要一个 While 循环不断地轮询这个函数。
-
-下面具体讲讲Schedule模块的安装和初级、进阶使用方法。
-
-1.准备
-
-
-
-请选择以下任一种方式输入命令安装依赖：
-
-1. Windows 环境 打开 Cmd (开始-运行-CMD)。
-2. MacOS 环境 打开 Terminal (command+空格输入Terminal)。
-3. 如果你用的是 VSCode编辑器 或 Pycharm，可以直接使用界面下方的Terminal.
-
-pip install schedule
-
-
-2.基本使用
-
-
+# 上面的代码表示每10分钟执行一次 job 函数，非常简单方便。你只需要引入 schedule 模块，通过调用 scedule.every(时间数).时间类型.do(job)  发布周期任务。
+#
+# 发布后的周期任务需要用 run_pending 函数来检测是否执行，因此需要一个 While 循环不断地轮询这个函数。
+#
+# 下面具体讲讲Schedule模块的安装和初级、进阶使用方法。
+#
+# 1.准备
+#
+#
+#
+# 请选择以下任一种方式输入命令安装依赖：
+#
+# 1. Windows 环境 打开 Cmd (开始-运行-CMD)。
+# 2. MacOS 环境 打开 Terminal (command+空格输入Terminal)。
+# 3. 如果你用的是 VSCode编辑器 或 Pycharm，可以直接使用界面下方的Terminal.
+#
+# pip install schedule
+#
+#
+# 2.基本使用
 
 
 
-最基本的使用在文首已经提到过，下面给大家展示更多的调度任务例子：
+
+
+# 最基本的使用在文首已经提到过，下面给大家展示更多的调度任务例子：
 
 # Python 实用宝典
 import schedule
@@ -76,7 +77,7 @@ while True:
     time.sleep(1)
 
 
-可以看到，从月到秒的配置，上面的例子都覆盖到了。不过如果你想只运行一次任务的话，可以这么配：
+# 可以看到，从月到秒的配置，上面的例子都覆盖到了。不过如果你想只运行一次任务的话，可以这么配：
 
 # Python 实用宝典
 import schedule
@@ -93,9 +94,9 @@ while True:
     time.sleep(1)
 
 
-参数传递
-
-如果你有参数需要传递给作业去执行，你只需要这么做：
+# 参数传递
+#
+# 如果你有参数需要传递给作业去执行，你只需要这么做：
 
 # Python 实用宝典
 import schedule
@@ -107,10 +108,10 @@ def greet(name):
 schedule.every(2).seconds.do(greet, name='Alice')
 schedule.every(4).seconds.do(greet, name='Bob')
 
-
-获取目前所有的作业
-
-如果你想获取目前所有的作业：
+#
+# 获取目前所有的作业
+#
+# 如果你想获取目前所有的作业：
 
 # Python 实用宝典
 import schedule
@@ -125,9 +126,9 @@ all_jobs = schedule.get_jobs()
 
 
 
-取消所有作业
-
-如果某些机制触发了，你需要立即清除当前程序的所有作业：
+# 取消所有作业
+#
+# 如果某些机制触发了，你需要立即清除当前程序的所有作业：
 
 # Python 实用宝典
 import schedule
@@ -139,10 +140,10 @@ schedule.every().second.do(greet)
 
 schedule.clear()
 
-
-标签功能
-
-在设置作业的时候，为了后续方便管理作业，你可以给作业打个标签，这样你可以通过标签过滤获取作业或取消作业。
+#
+# 标签功能
+#
+# 在设置作业的时候，为了后续方便管理作业，你可以给作业打个标签，这样你可以通过标签过滤获取作业或取消作业。
 
 # Python 实用宝典
 import schedule
@@ -162,9 +163,9 @@ friends = schedule.get_jobs('friend')
 # 取消所有 daily-tasks 标签的任务
 schedule.clear('daily-tasks')
 
-设定作业截止时间
-
-如果你需要让某个作业到某个时间截止，你可以通过这个方法：
+# 设定作业截止时间
+#
+# 如果你需要让某个作业到某个时间截止，你可以通过这个方法：
 
 # Python 实用宝典
 import schedule
@@ -189,11 +190,11 @@ schedule.every(1).hours.until(time(11, 33, 42)).do(job)
 schedule.every(1).hours.until(datetime(2020, 5, 17, 11, 36, 20)).do(job)
 
 
-截止日期之后，该作业将无法运行。
-
-立即运行所有作业，而不管其安排如何
-
-如果某个机制触发了，你需要立即运行所有作业，可以调用 schedule.run_all() :
+# 截止日期之后，该作业将无法运行。
+#
+# 立即运行所有作业，而不管其安排如何
+#
+# 如果某个机制触发了，你需要立即运行所有作业，可以调用 schedule.run_all() :
 
 # Python 实用宝典
 import schedule
@@ -213,15 +214,10 @@ schedule.run_all()
 schedule.run_all(delay_seconds=10)
 
 
-3.高级使用
-
-
-
-
-
-装饰器安排作业
-
-如果你觉得设定作业这种形式太啰嗦了，也可以使用装饰器模式：
+# 3.高级使用
+# 装饰器安排作业
+#
+# 如果你觉得设定作业这种形式太啰嗦了，也可以使用装饰器模式：
 
 # Python 实用宝典
 from schedule import every, repeat, run_pending
@@ -239,11 +235,11 @@ while True:
 
 
 
-并行执行
-
-默认情况下，Schedule 按顺序执行所有作业。其背后的原因是，很难找到让每个人都高兴的并行执行模型。
-
-不过你可以通过多线程的形式来运行每个作业以解决此限制：
+# 并行执行
+#
+# 默认情况下，Schedule 按顺序执行所有作业。其背后的原因是，很难找到让每个人都高兴的并行执行模型。
+#
+# 不过你可以通过多线程的形式来运行每个作业以解决此限制：
 
 # Python 实用宝典
 import threading
@@ -270,9 +266,9 @@ while True:
     time.sleep(1)
 
 
-日志记录
-
-Schedule 模块同时也支持 logging 日志记录，这么使用：
+# 日志记录
+#
+# Schedule 模块同时也支持 logging 日志记录，这么使用：
 
 # Python 实用宝典
 import schedule
@@ -293,19 +289,19 @@ schedule.run_all()
 schedule.clear()
 
 
-效果如下：
-
-DEBUG:schedule:Running *all* 1 jobs with 0s delay in between
-DEBUG:schedule:Running job Job(interval=1, unit=seconds, do=job, args=(), kwargs={})
-Hello, Logs
-DEBUG:schedule:Deleting *all* jobs
-
-
-异常处理
-
-Schedule 不会自动捕捉异常，它遇到异常会直接抛出，这会导致一个严重的问题：后续所有的作业都会被中断执行，因此我们需要捕捉到这些异常。
-
-你可以手动捕捉，但是某些你预料不到的情况需要程序进行自动捕获，加一个装饰器就能做到了：
+# 效果如下：
+#
+# DEBUG:schedule:Running *all* 1 jobs with 0s delay in between
+# DEBUG:schedule:Running job Job(interval=1, unit=seconds, do=job, args=(), kwargs={})
+# Hello, Logs
+# DEBUG:schedule:Deleting *all* jobs
+#
+#
+# 异常处理
+#
+# Schedule 不会自动捕捉异常，它遇到异常会直接抛出，这会导致一个严重的问题：后续所有的作业都会被中断执行，因此我们需要捕捉到这些异常。
+#
+# 你可以手动捕捉，但是某些你预料不到的情况需要程序进行自动捕获，加一个装饰器就能做到了：
 
 # Python 实用宝典
 import functools
@@ -331,8 +327,6 @@ def bad_task():
 schedule.every(5).minutes.do(bad_task)
 
 
-这样，bad_task 在执行时遇到的任何错误，都会被 catch_exceptions  捕获，这点在保证调度任务正常运转的时候非常关键。
+# 这样，bad_task 在执行时遇到的任何错误，都会被 catch_exceptions  捕获，这点在保证调度任务正常运转的时候非常关键。
 
 
-
-我们的文章到此就结束啦，如果你喜欢今天的Python 实战教程，请持续关注Python实用宝典。
