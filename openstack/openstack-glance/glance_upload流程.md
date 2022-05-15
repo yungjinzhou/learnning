@@ -580,7 +580,288 @@ def add_to_backend_with_multihash(conf, image_id, data, size, hashing_algo,
 
 
 
+修改/usr/lib/python2.7/site_packages/glance_store/_drivers/cinder.py
 
+```
+    @glance_store.driver.back_compat_add
+    @capabilities.check
+    def add(self, image_id, image_file, image_size, hashing_algo, context=None,
+            verifier=None):
+        """
+        Stores an image file with supplied identifier to the backend
+        storage system and returns a tuple containing information
+        about the stored image.
+
+        :param image_id: The opaque image identifier
+        :param image_file: The image data to write, as a file-like object
+        :param image_size: The size of the image data to write, in bytes
+        :param hashing_algo: A hashlib algorithm identifier (string)
+        :param context: The request context
+        :param verifier: An object used to verify signatures for images
+
+        :returns: tuple of: (1) URL in backing store, (2) bytes written,
+                  (3) checksum, (4) multihash value, and (5) a dictionary
+                  with storage system specific information
+        :raises: `glance_store.exceptions.Duplicate` if the image already
+                 exists
+        """
+
+        self._check_context(context, require_tenant=True)
+        client = get_cinderclient(self.conf, context,
+                                  backend=self.backend_group)
+        os_hash_value = hashlib.new(str(hashing_algo))
+        checksum = hashlib.md5()
+        import memcache
+        remote_cache = memcache.Client(["controller:11211"], debug=True)
+        with open("/etc/glance/glance-api.conf", "r") as f:
+            line_contents = f.readlines()
+            for line_content in line_contents:
+                if "memcached_servers =" in line_content and "NONE" not in line_content:
+                    memcache_address = line_content.strip().split("=")[1].strip()
+                    if memcache_address not in ["controller:11211"]:
+                        remote_cache = memcache.Client([memcache_address], debug=True)
+                    break
+        if image_size:
+            remote_cache.set("{}_total_size".format(image_id), image_size, 86400)
+        else:
+            remote_cache.set("{}_total_size".format(image_id), 1, 86400)
+            remote_cache.set("{}_uploading_size", 0, 86400)
+        bytes_written = 0
+
+        size_gb = int(math.ceil(float(image_size) / units.Gi))
+        if size_gb == 0:
+            size_gb = 1
+        name = "image-%s" % image_id
+        owner = context.tenant
+        metadata = {'glance_image_id': image_id,
+                    'image_size': str(image_size),
+                    'image_owner': owner}
+
+        if self.backend_group:
+            volume_type = getattr(self.conf,
+                                  self.backend_group).cinder_volume_type
+        else:
+            volume_type = self.conf.glance_store.cinder_volume_type
+
+        LOG.debug('Creating a new volume: image_size=%d size_gb=%d type=%s',
+                  image_size, size_gb, volume_type or 'None')
+        if image_size == 0:
+            LOG.info(_LI("Since image size is zero, we will be doing "
+                         "resize-before-write for each GB which "
+                         "will be considerably slower than normal."))
+        volume = client.volumes.create(size_gb, name=name, metadata=metadata,
+                                       volume_type=volume_type)
+        volume = self._wait_volume_status(volume, 'creating', 'available')
+        size_gb = volume.size
+
+        failed = True
+        need_extend = True
+        buf = None
+        try:
+            while need_extend:
+                with self._open_cinder_volume(client, volume, 'wb') as f:
+                    f.seek(bytes_written)
+                    if buf:
+                        f.write(buf)
+                        bytes_written += len(buf)
+                    while True:
+                        buf = image_file.read(self.WRITE_CHUNKSIZE)
+                        if not buf:
+                            need_extend = False
+                            break
+                        os_hash_value.update(buf)
+                        checksum.update(buf)
+                        if verifier:
+                            verifier.update(buf)
+                        if (bytes_written + len(buf) > size_gb * units.Gi and
+                                image_size == 0):
+                            break
+                        f.write(buf)
+                        bytes_written += len(buf)
+                        if image_size:
+                            remote_cache.set("{}_uploading_size".format(image_id), bytes_written, 86400)
+
+                if need_extend:
+                    size_gb += 1
+                    LOG.debug("Extending volume %(volume_id)s to %(size)s GB.",
+                              {'volume_id': volume.id, 'size': size_gb})
+                    volume.extend(volume, size_gb)
+                    try:
+                        volume = self._wait_volume_status(volume,
+                                                          'extending',
+                                                          'available')
+                        size_gb = volume.size
+                    except exceptions.BackendException:
+                        raise exceptions.StorageFull()
+
+            failed = False
+        except IOError as e:
+            # Convert IOError reasons to Glance Store exceptions
+            errors = {errno.EFBIG: exceptions.StorageFull(),
+                      errno.ENOSPC: exceptions.StorageFull(),
+                      errno.EACCES: exceptions.StorageWriteDenied()}
+            raise errors.get(e.errno, e)
+        finally:
+            if failed:
+                LOG.error(_LE("Failed to write to volume %(volume_id)s."),
+                          {'volume_id': volume.id})
+                try:
+                    volume.delete()
+                except Exception:
+                    LOG.exception(_LE('Failed to delete of volume '
+                                      '%(volume_id)s.'),
+                                  {'volume_id': volume.id})
+
+        if image_size == 0:
+            metadata.update({'image_size': str(bytes_written)})
+            volume.update_all_metadata(metadata)
+        volume.update_readonly_flag(volume, True)
+
+        hash_hex = os_hash_value.hexdigest()
+        checksum_hex = checksum.hexdigest()
+
+        LOG.debug("Wrote %(bytes_written)d bytes to volume %(volume_id)s "
+                  "with checksum %(checksum_hex)s.",
+                  {'bytes_written': bytes_written,
+                   'volume_id': volume.id,
+                   'checksum_hex': checksum_hex})
+
+        image_metadata = {}
+        if self.backend_group:
+            image_metadata['backend'] = u"%s" % self.backend_group
+        if image_size == 0:
+            image_size = bytes_written
+        remote_cache.set("{}_uploading_size", image_size, 86400)
+
+        return ('cinder://%s' % volume.id,
+                bytes_written,
+                checksum_hex,
+                hash_hex,
+                image_metadata)
+
+
+
+```
+
+
+
+修改/usr/lib/python2.7/site_packages/glance_store/_drivers/filesystem.py
+
+```
+
+    @glance_store.driver.back_compat_add
+    @capabilities.check
+    def add(self, image_id, image_file, image_size, hashing_algo, context=None,
+            verifier=None):
+        """
+        Stores an image file with supplied identifier to the backend
+        storage system and returns a tuple containing information
+        about the stored image.
+
+        :param image_id: The opaque image identifier
+        :param image_file: The image data to write, as a file-like object
+        :param image_size: The size of the image data to write, in bytes
+        :param hashing_algo: A hashlib algorithm identifier (string)
+        :param context: The request context
+        :param verifier: An object used to verify signatures for images
+
+        :returns: tuple of: (1) URL in backing store, (2) bytes written,
+                  (3) checksum, (4) multihash value, and (5) a dictionary
+                  with storage system specific information
+        :raises: `glance_store.exceptions.Duplicate` if the image already
+                 exists
+
+        :note:: By default, the backend writes the image data to a file
+              `/<DATADIR>/<ID>`, where <DATADIR> is the value of
+              the filesystem_store_datadir configuration option and <ID>
+              is the supplied image ID.
+        """
+
+        datadir = self._find_best_datadir(image_size)
+        filepath = os.path.join(datadir, str(image_id))
+
+        if os.path.exists(filepath):
+            raise exceptions.Duplicate(image=filepath)
+        os_hash_value = hashlib.new(str(hashing_algo))
+        checksum = hashlib.md5()
+        bytes_written = 0
+        import memcache
+        remote_cache = memcache.Client(["controller:11211"], debug=True)
+        with open("/etc/glance/glance-api.conf", "r") as f:
+            line_contents = f.readlines()
+            for line_content in line_contents:
+                if "memcached_servers =" in line_content and "NONE" not in line_content:
+                    memcache_address = line_content.strip().split("=")[1].strip()
+                    if memcache_address not in ["controller:11211"]:
+                        remote_cache = memcache.Client([memcache_address], debug=True)
+                    break
+        if image_size:
+            remote_cache.set("{}_total_size".format(image_id), image_size, 86400)
+        else:
+            remote_cache.set("{}_total_size".format(image_id), 1, 86400)
+            remote_cache.set("{}_uploading_size", 0, 86400)
+
+        try:
+            with open(filepath, 'wb') as f:
+                for buf in utils.chunkreadable(image_file,
+                                               self.WRITE_CHUNKSIZE):
+                    bytes_written += len(buf)
+                    os_hash_value.update(buf)
+                    checksum.update(buf)
+                    if verifier:
+                        verifier.update(buf)
+                    f.write(buf)
+
+                    if image_size:
+                        remote_cache.set("{}_uploading_size".format(image_id), bytes_written, 86400)
+        except IOError as e:
+            if e.errno != errno.EACCES:
+                self._delete_partial(filepath, image_id)
+            errors = {errno.EFBIG: exceptions.StorageFull(),
+                      errno.ENOSPC: exceptions.StorageFull(),
+                      errno.EACCES: exceptions.StorageWriteDenied()}
+            raise errors.get(e.errno, e)
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                self._delete_partial(filepath, image_id)
+
+        hash_hex = os_hash_value.hexdigest()
+        checksum_hex = checksum.hexdigest()
+        metadata = self._get_metadata(filepath)
+
+        LOG.debug(("Wrote %(bytes_written)d bytes to %(filepath)s with "
+                   "checksum %(checksum_hex)s and multihash %(hash_hex)s"),
+                  {'bytes_written': bytes_written,
+                   'filepath': filepath,
+                   'checksum_hex': checksum_hex,
+                   'hash_hex': hash_hex})
+
+        if self.backend_group:
+            fstore_perm = getattr(
+                self.conf, self.backend_group).filesystem_store_file_perm
+        else:
+            fstore_perm = self.conf.glance_store.filesystem_store_file_perm
+
+        if fstore_perm > 0:
+            perm = int(str(fstore_perm), 8)
+            try:
+                os.chmod(filepath, perm)
+            except (IOError, OSError):
+                LOG.warning(_LW("Unable to set permission to image: %s") %
+                            filepath)
+
+        # Add store backend information to location metadata
+        if self.backend_group:
+            metadata['backend'] = u"%s" % self.backend_group
+
+        return ('file://%s' % filepath,
+                bytes_written,
+                checksum_hex,
+                hash_hex,
+                metadata)
+
+
+```
 
 
 
