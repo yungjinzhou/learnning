@@ -15,6 +15,18 @@ git push origin  dev_yjz:dev
 Rebase的使用命令
 RESET  REVERT区别
 
+##### 1.1 分离头指针
+
+当拉取的tag代码就是分离头指针，执行commit后，会提示新建分支
+
+此时新建分支
+
+ git branch productcloudv2 0f7d0c93
+          新分支名       头指针cmt_id
+然后推送到并新建远端分支
+git push origin productcloudv2:productcloudv2
+                本地分支     远端分支
+
 
 
 #### 2. 在github上拉master后，切换分支命令
