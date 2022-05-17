@@ -1643,7 +1643,7 @@ sources:
         - custom.hardware.cpu.util.percentage
         - custom.hardware.memory.total
         - custom.hardware.memory.used
-        - custom.hardware.memory.cache
+        - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.total
@@ -1762,7 +1762,7 @@ sources:
         - custom.hardware.disk.utilization
         - custom.hardware.memory.used
         - custom.hardware.memory.total
-        - custom.hardware.memory.cache
+        - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.avail
@@ -2067,7 +2067,7 @@ resources:
       custom.hardware.disk.write.requests:
       custom.hardware.memory.total:
       custom.hardware.memory.used:
-      custom.hardware.memory.cache:
+      custom.hardware.memory.cached:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
       custom.hardware.swap.total:
@@ -2149,7 +2149,7 @@ resources:
       custom.hardware.disk.write.requests:
       custom.hardware.memory.total:
       custom.hardware.memory.used:
-      custom.hardware.memory.cache:
+      custom.hardware.memory.cached:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
       custom.hardware.swap.avail:
@@ -2199,7 +2199,7 @@ instance:
         - custom.hardware.cpu.util.percentage
         - custom.hardware.memory.total
         - custom.hardware.memory.used
-        - custom.hardware.memory.cache
+        - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.total
