@@ -358,11 +358,7 @@ openstack image create --disk-format=qcow2 --container-format=bare --file=centos
 
 openstack coe cluster template create kubernetes-cluster-template --image atomichostv3  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
  
- 
 openstack coe cluster template create kubernetes-cluster-template --image fedora-coreos-34latest  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
- 
- 
- 
  
 openstack coe cluster template create atomic-ussuritest --image e0b3a591-e3fa-4240-8339-5dd93c3ed7e0  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
  
@@ -802,7 +798,66 @@ http://192.168.230.106:7890/932d0a1ab8e2f1404fb836427e8099f2
 
 
 
+
+
+
+
+
+
+## 部署k8s遇到的错误及解决方法
+
+
+
+1、 安装mangum, heat，需要创建文档中的用户，否则会认证 失败
+
+2、
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 部署k8s错误日志
+
+
+
+
+
+```
+[clients_magnum]
+#
+# From heat.common.config
+#
+# Type of endpoint in Identity service catalog to use for communication with
+# the OpenStack service. (string value)
+#endpoint_type = <None>
+# Optional CA cert file to use in SSL connections. (string value)
+#ca_file = <None>
+# Optional PEM-formatted certificate chain file. (string value)
+#cert_file = <None>
+# Optional PEM-formatted file that contains the private key. (string value)
+#key_file = <None>
+# If set, then the server's certificate will not be verified. (boolean value)
+#insecure = <None>
+
+```
+
+
+
+
+
+
 
 
 
@@ -1517,6 +1572,34 @@ ussuri:
 
 
 stein:
+
+
+
+
+
+使用fedoro atomic部署k8s时，拉取harobor镜像报错，gave HTTP response to HTTPS client
+
+
+
+更改docker.service ，防止报错： gave HTTP response to HTTPS client
+
+修改/etc/systemd/system/multi-user.target.wants/docker.service；修改/etc/systemd/system/docker.service
+
+systemctl status docker.service查看实际用的配置文件
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
