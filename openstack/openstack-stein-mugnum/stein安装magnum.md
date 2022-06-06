@@ -781,22 +781,119 @@ docker run -d -p 7890:8087 \
 
 curl http://127.0.0.1:7890/new?size=1
 
-http://192.168.230.106:7890/932d0a1ab8e2f1404fb836427e8099f2
+http://192.168.230.106:2379/932d0a1ab8e2f1404fb836427e8099f2
 
 
 
 #### 3.3修改value size
 
-[root@etcd3 /]# curl -X PUT http://etcd3:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size -d value=3
+[root@etcd3 /]# curl -X PUT http://192.168.230.106:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size -d value=3
 {“action”:”set”,”node”:{“key”:”/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size”,”value”:”3”,”modifiedIndex”:4,”createdIndex”:4}}
 
 
 
-创建magnum  template时写入discovery_url: http://etcd3:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size
+创建magnum  template时写入discovery_url: http://192.168.230.106:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size
 
 
 
 
+
+## 四、搭建harbor内网仓库
+
+
+
+### magnum需要的内网镜像下载及上传
+
+```javascript
+# from docker hub
+docker pull docker.io/openstackmagnum/kubernetes-controller-manager:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-proxy:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-apiserver:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-scheduler:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6
+docker pull docker.io/openstackmagnum/etcd:v3.2.7
+docker pull docker.io/openstackmagnum/cluster-autoscaler:v1.0
+docker pull docker.io/openstackmagnum/heat-container-agent:stein-dev
+
+docker pull docker.io/k8scloudprovider/octavia-ingress-controller:1.13.2-alpha
+docker pull docker.io/k8scloudprovider/k8s-keystone-auth:1.13.0
+docker pull docker.io/k8scloudprovider/openstack-cloud-controller-manager:v0.2.0
+
+
+
+docker pull docker.io/prom/prometheus:v1.8.2
+docker pull docker.io/prom/node-exporter:v0.15.2
+
+docker pull docker.io/grafana/grafana:5.1.5
+
+docker pull docker.io/coredns/coredns:1.3.0
+
+docker pull quay.io/calico/node:v2.6.7
+docker pull quay.io/calico/cni:v1.11.2
+docker pull quay.io/calico/kube-controllers:v1.0.3
+
+docker pull quay.io/coreos/flannel-cni:v0.3.0
+docker pull quay.io/coreos/flannel:v0.9.0
+
+
+docker pull quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.23.0
+docker pull k8s.gcr.io/defaultbackend:1.4
+docker pull docker.io/openstackmagnum/helm-client:dev
+docker pull quay.io/prometheus/alertmanager
+docker pull quay.io/coreos/prometheus-operator
+docker pull quay.io/coreos/configmap-reload
+docker pull quay.io/coreos/prometheus-config-reloader
+docker pull gcr.io/google-containers/hyperkube
+docker pull quay.io/prometheus/prometheus
+
+
+
+
+
+
+
+# from aliyun
+docker pull registry.aliyuncs.com/google_containers/pause:3.0
+
+
+
+# from google
+docker pull gcr.io/google_containers/pause:3.0
+
+docker pull gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.1.2
+docker pull k8s.gcr.io/node-problem-detector:v0.6.2
+# 没有Project 'project:kubernetes-helm' not found or deleted
+# docker pull gcr.io/kubernetes-helm/tiller:v2.12.3
+docker pull gcr.io/google_containers/kubernetes-dashboard-amd64:v1.8.3
+docker pull gcr.io/google_containers/heapster-amd64:v1.4.2
+docker pull gcr.io/google_containers/heapster-influxdb-amd64:v1.3.3
+docker pull gcr.io/google_containers/heapster-grafana-amd64:v4.4.3
+
+
+```
+
+
+
+
+
+上传到harbor步骤
+
+```
+# 从google或者dockerhub拉取镜像
+docker pull xxxx
+# 保存到本地
+docker save image_id > kubernetes-kubelet.tar
+# 上传到可以连接到harbor服务器的主机上
+scp  kubernetes-kubelet.tar root@192.168.230.161:/home/
+# 导入到docker image
+docker load -i kubernetes-kubelet.tar
+# 给镜像打tag
+docker tag docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+# 推送到镜像服务器
+docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+
+
+```
 
 
 

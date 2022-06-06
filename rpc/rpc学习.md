@@ -27,7 +27,7 @@ RabbitMQ和virtual host的关系也差不多，可以让多个业务线同时使
 
 ### 1.3 绑定（Binding）
 
-绑定是交换机（exchange）将消息（message）路由给队列（queue）所需遵循的规则。
+**绑定是**交换机（exchange）将消息（message）路由给队列（queue）所需遵循的**规则**。
 
 如果要指示交换机“E”将消息路由给队列“Q”，那么“Q”就需要与“E”进行绑定。绑定操作需要定义一个可选的路由键（routing key）属性给某些类型的交换机。
 
@@ -95,7 +95,7 @@ AMQP 连接通常是长连接。AMQP是一个使用TCP提供可靠投递的应�
 
 ### 1.7 通道 （channels）
 
-AMQP 提供了通道（channels）来处理多连接，可以把通道理解成共享一个TCP连接的多个轻量化连接。
+AMQP 提供了**通道**（channels）来处理多连接，可以把通道理解成**共享一个TCP连接的多个轻量化连接**。
 
 这可以应对有些应用需要建立多个连接的情形，开启多个TCP连接会消耗掉过多的系统资源。
 
@@ -128,11 +128,11 @@ exchange是一个很重要的概念。用来接收publisher发出的消息，并
 
 AMQP中定义的类型包括：direct, topic, headers and fanout。
 
-direct：消息路由到满足此条件的队列中(queue,可以有多个)： routing key = binding key 
+**direct**：消息路由到满足此条件的队列中(queue,可以有多个)： routing key = binding key 
 
 topic：消息路由到满足此条件的队列中(queue,可以有多个)：routing key 匹配 binding pattern. binding pattern是类似正则表达式的字符串，可以满足复杂的路由条件。
 
-fanout：消息路由到多有绑定到该exchange的队列中。
+fanout：消息路由到多个绑定到该exchange的队列中。
 
 Openstack RPC中主要用了这三种exchange type。
 
@@ -160,6 +160,26 @@ Openstack中服务主要以进程的形式实现。也可以以线程的形式�
 
 RCP只定义了一个通信接口，其底层的实现可以各不相同。目前Openstack中的主要采用AMQP来实现。AMQP(
 Advanced Message Queuing Protocol)是一种基于队列的可靠消息服务协议，具体可参考 http://en.wikipedia.org/wiki/Advanced_Message_Queuing_Protocol。作为一种通信协议，AMQP同样存在多个实现，如Apache Qpid, RabbitMQ等。
+
+
+
+### 1.11 binding-key 和routing-key区别
+
+binding-key应用于队列，是将哪些队列绑定到该交换机(exchange)上，或者说注册到该交换机上的队列
+routing-key应用于消息，是到交换机上的消息 通过定义的routing-key(路由规则)发送到匹配的队列
+Default Exchange，即交换机的direct模式，是将binding-key和routing-key设置成了和队列名称相同的字段
+
+
+```
+The binding-key is used with the queue. It is the key with which the queue is registered in the exchange.
+
+The routing-key is used with the message. It is the key which will decide which queue(s) does this message should be routed to. Messages can have other type of identifiers for routing, like matchers in Topic Exchange.
+
+> Every queue is automatically bound to the default exchange with a routing key which is the same as the queue name.
+
+Now, the routing-key and binding-key is not the same concept. But, here, in the case of Default Exchange, the binding key will be the same as the name of the queue. So, the messages will also have the same routing-key as the Queue name.
+
+```
 
 
 
@@ -350,7 +370,7 @@ image.png
 
 
 
-
+### 3.1 rpc扩展概念
 
 下面几个概念是RPC扩展的：
 Namespace:用来组织server中的方法(method),默认是null。
@@ -358,9 +378,12 @@ Method：及被调用的方法，和普通(本地)方法调用中的方法是一
 API version：用来标识server中方法的版本。随着时间的推移，server中的方法可能不断变化，提供版本信息可以保持对之前client的兼容。
 Transport：对RPC的底层实现机制的抽象。
 
-、RPC的使用场景
+### 3.2 RPC的使用场景
+
 Openstack中RPC的主要使用场景：
-随机调用某server上的一个方法：
+
+#### 3.2.1 随机调用某server上的一个方法
+
 Invoke Method on One of Multiple Servers
 这个应该是Openstack中最常用的一种RPC调用，每个方法都会有多个server来提供，client调用时由底层机制选择一个server来处理这个调用请求。
 像nova-scheduler, nova-conductor都可以以这种多部署方式提供服务。
@@ -368,14 +391,16 @@ Invoke Method on One of Multiple Servers
 这种场景通过AMQP的topic exchange实现。
 所有server在binding中为binding key指定一个相同的topic， client在调用时使用这个topic既可实现。
 
-调用某特定server上的一个方法：
+#### 3.2.2 调用某特定server上的一个方法
+
 Invoke Method on a Specific Server
 一般Openstack中的各种scheduler会以这种方式调用。通常scheduler都会先选定一个节点，然后调用该节点上的服务。
 
 这种场景通过AMQP的topic exchange实现。
 每个server在binding中为其binding key指定一个自己都有的topic， client在调用时使用这个topic既可实现。
 
-调用所有server上的一个方法：
+#### 3.2.3 调用所有server上的一个方法
+
 Invoke Method on all of Multiple Servers
 这种其实就是一个广播系统。就像开会议，台上的人讲话，台下的人都能听到。
 Openstack中有些rpcapi.py的某些方法带有fanout=True参数，这些都是让所有server处理某个请求的情况。
@@ -384,17 +409,20 @@ Openstack中有些rpcapi.py的某些方法带有fanout=True参数，这些都是
 这种场景通过AMQP的fanout exchange实现。
 每个server在binding中将其队列绑定到一个fanout exchange， client在调用时指定exchange类型为fanout即可。server和client使用同一个exchange。
 
-RCP的实现
+
+
+### 3.3 RPC的实现
+
 目前Openstack中有两种RPC实现，一种是在oslo messaging,一种是在openstack.common.rpc。
-openstack.common.rpc是旧的实现，oslo messaging是对openstack.common.rpc的重构。openstack.common.rpc在每个项目中都存在一份拷贝，oslo messaging即将这些公共代码抽取出来，形成一个新的项目。oslo messaging也对RPC API进行了重新设计，具体参考前文。
+openstack.common.rpc是旧的实现，**oslo messaging**是对openstack.common.rpc的重构。openstack.common.rpc在每个项目中都存在一份拷贝，oslo messaging即将这些公共代码抽取出来，形成一个新的项目。oslo messaging也对RPC API进行了重新设计，具体参考前文。
 
 
 以后的方向是各个项目都会使用oslo messaging的RPC功能，停止使用openstack.common.rpc。目前(icehouse release)nova, cinder都已经完成转变，neutron还在使用openstack.common.rpc。
 
-rpc.call和rpc.cast的区别：
+**rpc.call和rpc.cast的区别**
 从实现代码上看，他们的区别很小，就是call调用时候会带有wait_for_reply=True参数，cast不带
 
-notification
+**notification**
 
 oslo messaging中除了RPC外，还有另外一种跨进程通信方式，即消息通知(notification)。notification和前面的第三种RPC场景(广播系统)非常类似，区别就是notification的消息(message)格式是有固定格式的，而RPC中的消息并无固定格式，取决于client/server之间的约定。
 
