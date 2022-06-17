@@ -787,7 +787,7 @@ http://192.168.230.106:2379/932d0a1ab8e2f1404fb836427e8099f2
 
 #### 3.3修改value size
 
-[root@etcd3 /]# curl -X PUT http://192.168.230.106:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size -d value=3
+[root@etcd3 /]# curl -X PUT http://192.168.230.106:2379/v2/keys/discovery/0bbbf4feeddfa35d57f1d9a16c947155/_config/size -d value=1
 {“action”:”set”,”node”:{“key”:”/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size”,”value”:”3”,”modifiedIndex”:4,”createdIndex”:4}}
 
 

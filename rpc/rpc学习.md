@@ -97,11 +97,11 @@ AMQP 连接通常是长连接。AMQP是一个使用TCP提供可靠投递的应�
 
 AMQP 提供了**通道**（channels）来处理多连接，可以把通道理解成**共享一个TCP连接的多个轻量化连接**。
 
-这可以应对有些应用需要建立多个连接的情形，开启多个TCP连接会消耗掉过多的系统资源。
+信道是 “真实的” TCP连接内的虚拟连接，AMQP的命令都是通过通道发送的。在一条TCP连接上可以创建多条信道。
 
-在多线程/进程的应用中，为每个线程/进程开启一个通道（channel）是很常见的，并且这些通道不能被线程/进程共享。
-
-**通道号** 通道之间是完全隔离的，因此每个AMQP方法都需要携带一个通道号，这样客户端就可以指定此方法是为哪个通道准备的。
+- 有些应用需要与 AMQP 代理建立多个连接。同时开启多个 TCP 连接不合适，因为会消耗掉过多的系统资源并且使得防火墙的配置更加困难。AMQP 0-9-1 提供了通道（channels）来处理多连接，可以把通道理解成共享一个 TCP 连接的多个轻量化连接。
+- 在涉及多线程 / 进程的应用中，为每个线程 / 进程开启一个通道（channel）是很常见的，并且这些通道不能被线程 / 进程共享。
+- 一个特定通道上的通讯与其他通道上的通讯是**完全隔离**的，因此每个 AMQP 方法都需要携带一个通道号，这样客户端就可以指定此方法是为哪个通道准备的。
 
 ### 1.8 交换机（Exchange)
 
@@ -435,6 +435,1271 @@ notification的底层机制可以使用RPC，及driver类型为MessagingDriver�
 
 
 
+
+
+
+
+
+## 四、kombu分析
+
+
+
+### 4.1摘要
+
+本系列我们介绍消息队列 Kombu。Kombu 的定位是一个兼容 AMQP 协议的消息队列抽象。通过本文，大家可以了解 Kombu 是如何启动，以及如何搭建一个基本的架子。
+
+因为之前有一个综述，所以大家会发现，一些概念讲解文字会同时出现在后续文章和综述之中。
+
+### 示例
+
+下面使用如下代码来进行说明。
+
+本示例来自[liqiang.io/post/kombu-…](https://link.juejin.cn?target=https%3A%2F%2Fliqiang.io%2Fpost%2Fkombu-source-code-analysis-part-5%E7%B3%BB%E5%88%97%EF%BC%8C%E7%89%B9%E6%AD%A4%E6%B7%B1%E8%A1%A8%E6%84%9F%E8%B0%A2%E3%80%82)
+
+```python
+def main(arguments):
+    hub = Hub()
+    exchange = Exchange('asynt_exchange')
+    queue = Queue('asynt_queue', exchange, 'asynt_routing_key')
+
+    def send_message(conn):
+        producer = Producer(conn)
+        producer.publish('hello world', exchange=exchange, routing_key='asynt_routing_key')
+        print('message sent')
+
+    def on_message(message):
+        print('received: {0!r}'.format(message.body))
+        message.ack()
+        # hub.stop()  # <-- exit after one message
+
+    conn = Connection('redis://localhost:6379')
+    conn.register_with_event_loop(hub)
+
+    def p_message():
+        print(' kombu ')
+
+    with Consumer(conn, [queue], on_message=on_message):
+        send_message(conn)
+        hub.timer.call_repeatedly(3, p_message)
+        hub.run_forever()
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
+复制代码
+```
+
+### 4.2启动
+
+让我们顺着程序流程看看Kombu都做了些什么，也可以对 Kombu 内部有所了解。
+
+本文关注的重点是：Connection，Channel 和 Hub 是如何联系在一起的。
+
+#### 4.2.1 Hub
+
+在程序开始，我们建立了Hub。
+
+Hub的作用是建立消息Loop，但是此时尚未建立，因此只是一个静态实例。
+
+```python
+hub = Hub()
+复制代码
+```
+
+其定义如下：
+
+```python
+class Hub:
+    """Event loop object.
+    Arguments:
+        timer (kombu.asynchronous.Timer): Specify custom timer instance.
+    """
+    def __init__(self, timer=None):
+        self.timer = timer if timer is not None else Timer()
+
+        self.readers = {}
+        self.writers = {}
+        self.on_tick = set()
+        self.on_close = set()
+        self._ready = set()
+
+        self._running = False
+        self._loop = None
+
+        self.consolidate = set()
+        self.consolidate_callback = None
+
+        self.propagate_errors = ()
+        self._create_poller()
+复制代码
+```
+
+因为此时没有建立loop，所以目前重要的步骤是建立Poll，其Stack如下：
+
+```python
+_get_poller, eventio.py:321
+poll, eventio.py:328
+_create_poller, hub.py:113
+__init__, hub.py:96
+main, testUb.py:22
+<module>, testUb.py:55
+复制代码
+```
+
+在eventio.py中有如下，我们可以看到Kombu可以使用多种模型来进行内核消息处理：
+
+```python
+def _get_poller():
+    if detect_environment() != 'default':
+        # greenlet
+        return _select
+    elif epoll:
+        # Py2.6+ Linux
+        return _epoll
+    elif kqueue and 'netbsd' in sys.platform:
+        return _kqueue
+    elif xpoll:
+        return _poll
+    else:
+        return _select
+复制代码
+```
+
+因为本机情况，这里选择的是：_poll。
+
+```python
++------------------+
+| Hub              |
+|                  |
+|                  |            +-------------+
+|      poller +---------------> | _poll       |
+|                  |            |             |         +-------+
+|                  |            |    _poller+---------> |  poll |
++------------------+            |             |         +-------+
+                                +-------------+
+复制代码
+```
+
+#### 4.2.2 Exchange与Queue
+
+其次建立了Exchange与Queue。
+
+- Exchange：交换机，消息发送者将消息发至 Exchange，Exchange 负责将消息分发至 Queue；
+- Queue：消息队列，存储着即将被应用消费掉的消息，Exchange 负责将消息分发 Queue，消费者从 Queue 接收消息；
+
+因为此时也没有具体消息，所以我们暂且无法探究Exchange机制。
+
+```python
+exchange = Exchange('asynt')
+queue = Queue('asynt', exchange, 'asynt')
+复制代码
+```
+
+此时将把Exchange与Queue联系起来。图示如下：
+
+```python
++------------------+
+| Hub              |
+|                  |
+|                  |            +-------------+
+|      poller +---------------> | _poll       |
+|                  |            |             |         +-------+
+|                  |            |    _poller+---------> |  poll |
++------------------+            |             |         +-------+
+                                +-------------+
+
+
++----------------+         +-------------------+
+| Exchange       |         | Queue             |
+|                |         |                   |
+|                |         |                   |
+|     channel    | <------------+ exchange     |
+|                |         |                   |
+|                |         |                   |
++----------------+         +-------------------+
+复制代码
+```
+
+#### 4.2.3 Connection
+
+第三步就是建立Connection。
+
+Connection是对 MQ 连接的抽象，一个 Connection 就对应一个 MQ 的连接。现在就是对'redis://localhost:6379'连接进行抽象。
+
+```python
+conn = Connection('redis://localhost:6379')
+复制代码
+```
+
+##### 4.2.3.1 定义
+
+由定义注释可知，Connection是到broker的连接。从具体代码可以看出，Connection更接近是一个逻辑概念，具体功能都委托给别人完成。
+
+消息从来不直接发送给队列，甚至 Producers 都可能不知道队列的存在。 Producer如何才能将消息发送给Consumer呢？这中间需要经过 Message Broker 的处理和传递。
+
+AMQP中，承担 Message Broker 功能的就是 AMQP Server。也正是从这个角度讲，AMQP 的 Producer 和Consumer 都是 AMQP Client。
+
+在Kombu 体系中，用 transport 对所有的 broker 进行了抽象，为不同的 broker 提供了一致的解决方案。通过Kombu，开发者可以根据实际需求灵活的选择或更换broker。
+
+Connection主要成员变量是，但是此时没有赋值：
+
+- _connection：
+- _transport：就是上面提到的对 broker 的抽象。
+- cycle：与broker交互的调度策略。
+- failover_strategy：在连接失效时，选取其他hosts的策略。
+- heartbeat：用来实施心跳。
+
+代码如下：
+
+```python
+class Connection:
+    """A connection to the broker"""
+
+    port = None
+    virtual_host = '/'
+    connect_timeout = 5
+
+    _connection = None
+    _default_channel = None
+    _transport = None
+    uri_prefix = None
+
+    #: The cache of declared entities is per connection,
+    #: in case the server loses data.
+    declared_entities = None
+
+    #: Iterator returning the next broker URL to try in the event
+    #: of connection failure (initialized by :attr:`failover_strategy`).
+    cycle = None
+
+    #: Additional transport specific options,
+    #: passed on to the transport instance.
+    transport_options = None
+
+    #: Strategy used to select new hosts when reconnecting after connection
+    #: failure.  One of "round-robin", "shuffle" or any custom iterator
+    #: constantly yielding new URLs to try.
+    failover_strategy = 'round-robin'
+
+    #: Heartbeat value, currently only supported by the py-amqp transport.
+    heartbeat = None
+
+    resolve_aliases = resolve_aliases
+    failover_strategies = failover_strategies
+
+    hostname = userid = password = ssl = login_method = None
+复制代码
+```
+
+##### 4.2.3.2 init 与 transport
+
+Connection内部主要任务是建立了transport。
+
+Stack大致如下：
+
+```python
+Transport, redis.py:1039
+<module>, redis.py:1031
+import_module, __init__.py:126
+symbol_by_name, imports.py:56
+resolve_transport, __init__.py:70
+get_transport_cls, __init__.py:85
+__init__, connection.py:183
+main, testUb.py:40
+<module>, testUb.py:55
+复制代码
+```
+
+#### 4.2.4 Transport
+
+在Kombu体系中，用transport对所有的broker进行了抽象，为不同的broker提供了一致的解决方案。通过Kombu，开发者可以根据实际需求灵活的选择或更换broker。
+
+Transport：真实的 MQ 连接，也是真正连接到 MQ(redis/rabbitmq) 的实例。就是存储和发送消息的实体，用来区分底层消息队列是用amqp、Redis还是其它实现的。
+
+Transport负责具体操作，但是很多操作移交给 loop 与 MultiChannelPoller 进行。
+
+##### 4.2.4.1 定义
+
+其主要成员变量为：
+
+- 本transport的驱动类型，名字；
+- 对应的 Channel；
+- cycle：MultiChannelPoller，具体下文提到；
+
+定义如下：
+
+```python
+class Transport(virtual.Transport):
+    """Redis Transport."""
+
+    Channel = Channel
+
+    polling_interval = None  # disable sleep between unsuccessful polls.
+    default_port = DEFAULT_PORT
+    driver_type = 'redis'
+    driver_name = 'redis'
+
+    implements = virtual.Transport.implements.extend(
+        asynchronous=True,
+        exchange_type=frozenset(['direct', 'topic', 'fanout'])
+    )
+
+    def __init__(self, *args, **kwargs):
+        if redis is None:
+            raise ImportError('Missing redis library (pip install redis)')
+        super().__init__(*args, **kwargs)
+
+        # Get redis-py exceptions.
+        self.connection_errors, self.channel_errors = self._get_errors()
+        # All channels share the same poller.
+        self.cycle = MultiChannelPoller()
+复制代码
+```
+
+##### 4.2.4.2 移交操作
+
+Transport负责具体操作，但是很多操作移交给 loop 与 MultiChannelPoller 进行，具体从下面代码可见。
+
+```python
+def register_with_event_loop(self, connection, loop):
+    cycle = self.cycle
+    cycle.on_poll_init(loop.poller)
+    cycle_poll_start = cycle.on_poll_start
+    add_reader = loop.add_reader
+    on_readable = self.on_readable
+
+    def _on_disconnect(connection):
+        if connection._sock:
+            loop.remove(connection._sock)
+    cycle._on_connection_disconnect = _on_disconnect
+
+    def on_poll_start():
+        cycle_poll_start()
+        [add_reader(fd, on_readable, fd) for fd in cycle.fds]
+        
+    loop.on_tick.add(on_poll_start)
+    loop.call_repeatedly(10, cycle.maybe_restore_messages)
+    
+    health_check_interval = connection.client.transport_options.get(
+        'health_check_interval',
+        DEFAULT_HEALTH_CHECK_INTERVAL
+    )
+    
+    loop.call_repeatedly(
+        health_check_interval,
+        cycle.maybe_check_subclient_health
+    )
+复制代码
+```
+
+其中重点是MultiChannelPoller。一个Connection有一个Transport， 一个Transport有一个MultiChannelPoller，对poll操作都是由MultiChannelPoller完成，redis操作由channel完成。
+
+##### 4.2.4.3 MultiChannelPoller
+
+定义如下，可以理解为执行engine，主要作用是：
+
+- 收集channel；
+- 建立fd到channel的映射；
+- 建立channel到socks的映射；
+- 使用poll；
+
+```python
+class MultiChannelPoller:
+    """Async I/O poller for Redis transport."""
+
+    eventflags = READ | ERR
+
+    def __init__(self):
+        # active channels
+        self._channels = set()
+        # file descriptor -> channel map.
+        self._fd_to_chan = {}
+        # channel -> socket map
+        self._chan_to_sock = {}
+        # poll implementation (epoll/kqueue/select)
+        self.poller = poll()
+        # one-shot callbacks called after reading from socket.
+        self.after_read = set()
+复制代码
+```
+
+##### 4.2.4.4 获取
+
+Transport是预先生成的，若需要，则依据名字取得。
+
+```python
+TRANSPORT_ALIASES = {
+    'amqp': 'kombu.transport.pyamqp:Transport',
+    'amqps': 'kombu.transport.pyamqp:SSLTransport',
+    'pyamqp': 'kombu.transport.pyamqp:Transport',
+    'librabbitmq': 'kombu.transport.librabbitmq:Transport',
+    'memory': 'kombu.transport.memory:Transport',
+    'redis': 'kombu.transport.redis:Transport',
+	......
+    'pyro': 'kombu.transport.pyro:Transport'
+}
+
+_transport_cache = {}
+
+
+def resolve_transport(transport=None):
+    """Get transport by name. """
+    if isinstance(transport, str):
+        try:
+            transport = TRANSPORT_ALIASES[transport]
+        except KeyError:
+            if '.' not in transport and ':' not in transport:
+                from kombu.utils.text import fmatch_best
+                alt = fmatch_best(transport, TRANSPORT_ALIASES)
+        else:
+            if callable(transport):
+                transport = transport()
+        return symbol_by_name(transport)
+    return transport
+
+def get_transport_cls(transport=None):
+    """Get transport class by name.
+    """
+    if transport not in _transport_cache:
+        _transport_cache[transport] = resolve_transport(transport)
+    return _transport_cache[transport]
+复制代码
+```
+
+此时Connection数据如下，注意其部分成员变量尚且没有意义：
+
+```python
+conn = {Connection} <Connection: redis://localhost:6379// at 0x7faa910cbd68>
+ alt = {list: 0} []
+ connect_timeout = {int} 5
+ connection = {Transport} <kombu.transport.redis.Transport object at 0x7faa91277710>
+ cycle = {NoneType} None
+ declared_entities = {set: 0} set()
+ default_channel = {Channel} <kombu.transport.redis.Channel object at 0x7faa912700b8>
+ failover_strategies = {dict: 2} {'round-robin': <class 'itertools.cycle'>, 'shuffle': <function shufflecycle at 0x7faa9109a0d0>}
+ failover_strategy = {type} <class 'itertools.cycle'>
+ heartbeat = {int} 0
+ host = {str} 'localhost:6379'
+ hostname = {str} 'localhost'
+ manager = {Management} <kombu.transport.virtual.base.Management object at 0x7faa91270160>
+ port = {int} 6379
+ recoverable_channel_errors = {tuple: 0} ()
+ resolve_aliases = {dict: 2} {'pyamqp': 'amqp', 'librabbitmq': 'amqp'}
+ transport = {Transport} <kombu.transport.redis.Transport object at 0x7faa91277710>
+ transport_cls = {str} 'redis'
+ uri_prefix = {NoneType} None
+ userid = {NoneType} None
+ virtual_host = {str} '/'
+复制代码
+```
+
+至此，Kombu的基本就建立完成，但是彼此之间没有建立逻辑联系。
+
+所以此时示例如下，注意此时三者没有联系：
+
+```python
++-------------------+       +---------------------+       +--------------------+
+| Connection        |       | redis.Transport     |       | MultiChannelPoller |
+|                   |       |                     |       |                    |
+|                   |       |                     |       |     _channels      |
+|                   |       |        cycle +------------> |     _fd_to_chan    |
+|     transport +---------> |                     |       |     _chan_to_sock  |
+|                   |       |                     |       |     poller         |
++-------------------+       +---------------------+       |     after_read     |
+                                                          |                    |
+                                                          +--------------------+
++------------------+
+| Hub              |
+|                  |
+|                  |            +-------------+
+|      poller +---------------> | _poll       |
+|                  |            |             |         +-------+
+|                  |            |    _poller+---------> |  poll |
++------------------+            |             |         +-------+
+                                +-------------+
++----------------+         +-------------------+
+| Exchange       |         | Queue             |
+|                |         |                   |
+|                |         |                   |
+|     channel    | <------------+ exchange     |
+|                |         |                   |
+|                |         |                   |
++----------------+         +-------------------+
+复制代码
+```
+
+### 4.3 Connection注册hub
+
+之前我们提到，基本架子已经建立起来，但是各个模块之间彼此没有联系，下面我们就看看如何建立联系。
+
+示例代码来到：
+
+```python
+conn.register_with_event_loop(hub)
+复制代码
+```
+
+这里进行了注册，此时作用是把hub与Connection联系起来。随之调用到：
+
+```python
+def register_with_event_loop(self, loop):
+    self.transport.register_with_event_loop(self.connection, loop)
+复制代码
+```
+
+进而调用到transport类：`<kombu.transport.redis.Transport object at 0x7fd23e962dd8>`
+
+具体代码如下：
+
+```python
+def register_with_event_loop(self, connection, loop):
+    cycle = self.cycle
+    cycle.on_poll_init(loop.poller)# 这里建立联系，loop就是hub
+    cycle_poll_start = cycle.on_poll_start
+    add_reader = loop.add_reader
+    on_readable = self.on_readable
+
+    def _on_disconnect(connection):
+        if connection._sock:
+            loop.remove(connection._sock)
+    cycle._on_connection_disconnect = _on_disconnect
+
+    def on_poll_start():
+        cycle_poll_start()
+        [add_reader(fd, on_readable, fd) for fd in cycle.fds]
+        
+    loop.on_tick.add(on_poll_start)
+    loop.call_repeatedly(10, cycle.maybe_restore_messages)
+    
+    health_check_interval = connection.client.transport_options.get(
+        'health_check_interval',
+        DEFAULT_HEALTH_CHECK_INTERVAL
+    )
+    
+    loop.call_repeatedly(
+        health_check_interval,
+        cycle.maybe_check_subclient_health
+    )
+复制代码
+```
+
+#### 4.3.1 建立Channel
+
+注册最初是建立Channel。这里有一个连接的动作，就是在这里，建立了Channel。
+
+```python
+@property
+def connection(self):
+    """The underlying connection object"""
+    if not self._closed:
+        if not self.connected:
+            return self._ensure_connection(
+                max_retries=1, reraise_as_library_errors=False
+            )
+        return self._connection
+复制代码
+```
+
+具体建立是在 base.py 中完成，这是 Transport 基类。Stack 如下：
+
+```python
+create_channel, base.py:920
+establish_connection, base.py:938
+_establish_connection, connection.py:801
+_connection_factory, connection.py:866
+retry_over_time, functional.py:325
+_ensure_connection, connection.py:439
+connection, connection.py:859
+register_with_event_loop, connection.py:266
+main, testUb.py:41
+<module>, testUb.py:55
+复制代码
+```
+
+#### 4.3.2 Channel
+
+Channel：与AMQP中概念类似，可以理解成共享一个Connection的多个轻量化连接。就是真正的连接。
+
+可以认为是 redis 操作和连接的封装。每个 Channel 都可以与 redis 建立一个连接，在此连接之上对 redis 进行操作，每个连接都有一个 socket，每个 socket 都有一个 file，从这个 file 可以进行 poll。
+
+为了更好的说明，我们提前给出这个通讯流程大约如下：
+
+```java
+            +---------------------------------------------------------------------------------------------------------------------------------------+
+            |                                     +--------------+                                   6                       parse_response         |
+            |                                +--> | Linux Kernel | +---+                                                                            |
+            |                                |    +--------------+     |                                                                            |
+            |                                |                         |                                                                            |
+            |                                |                         |  event                                                                     |
+            |                                |  1                      |                                                                            |
+            |                                |                         |  2                                                                         |
+            |                                |                         |                                                                            |
+    +-------+---+    socket                  +                         |                                                                            |
+    |   redis   | <------------> port +-->  fd +--->+                  v                                                                            |
+    |           |                                   |           +------+--------+                                                                   |
+    |           |    socket                         |           |  Hub          |                                                                   |
+    |           | <------------> port +-->  fd +--->----------> |               |                                                                   |
+    | port=6379 |                                   |           |               |                                                                   |
+    |           |    socket                         |           |     readers +----->  Transport.on_readable                                        |
+    |           | <------------> port +-->  fd +--->+           |               |                     +                                             |
+    +-----------+                                               +---------------+                     |                                             |
+                                                                                                      |                                             |
+                                                        3                                             |                                             |
+             +----------------------------------------------------------------------------------------+                                             |
+             |                                                                                                                                      v
+             |                                                                                                                                                  _receive_callback
+             |                                                                                                                            5    +-------------+                      +-----------+
++------------+------+                     +-------------------------+                                    'BRPOP' = Channel._brpop_read +-----> | Channel     | +------------------> | Consumer  |
+|       Transport   |                     |  MultiChannelPoller     |      +------>  channel . handlers  'LISTEN' = Channel._receive           +-------------+                      +---+-------+
+|                   |                     |                         |      |                                                                                           8                |
+|                   | on_readable(fileno) |                         |      |                                                                         ^                                  |
+|           cycle +---------------------> |          _fd_to_chan +---------------->  channel . handlers  'BRPOP' = Channel._brpop_read               |                                  |
+|                   |        4            |                         |      |                             'LISTEN' = Channel._receive                 |                                  |
+|  _callbacks[queue]|                     |                         |      |                                                                         |                            on_m  |  9
+|          +        |                     +-------------------------+      +------>  channel . handlers  'BRPOP' = Channel._brpop_read               |                                  |
++-------------------+                                                                                    'LISTEN' = Channel._receive                 |                                  |
+           |                                                                                                                                         |                                  v
+           |                                                7           _callback                                                                    |
+           +-----------------------------------------------------------------------------------------------------------------------------------------+                            User Function
+
+复制代码
+```
+
+手机上如下：
+
+![img](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/47ad281407154fc6a84c91728609ff2f~tplv-k3u1fbpfcp-zoom-in-crop-mark:1304:0:0:0.awebp)
+
+##### 4.3.2.1 定义
+
+Channel 主要成员是：
+
+- async_pool ：redis异步连接池；
+- pool ：redis连接池；
+- channel_id ：Channel ID；
+- client ：就是StrictRedis之类的driver；
+- connection ：对应的Transport；
+- cycle = {FairCycle} <FairCycle: 0/0 []>
+- queue_order_strategy ：获取queue的策略；
+- state ：BrokerState状态；
+- subclient ：PubSub所用的client； keyprefix_queue = '{p}_kombu.binding.%s'.format(p=KEY_PREFIX) ：bing用到的key；
+
+比如_get_client可以看出来client。
+
+```python
+def _get_client(self):
+    if redis.VERSION < (3, 2, 0):
+        raise VersionMismatch(
+            'Redis transport requires redis-py versions 3.2.0 or later. '
+            'You have {0.__version__}'.format(redis))
+    return redis.StrictRedis
+复制代码
+```
+
+简化版定义如下：
+
+```python
+class Channel(virtual.Channel):
+    """Redis Channel."""
+
+    QoS = QoS
+
+    _client = None
+    _subclient = None
+    keyprefix_queue = '{p}_kombu.binding.%s'.format(p=KEY_PREFIX)
+    keyprefix_fanout = '/{db}.'
+    sep = '\x06\x16'
+    _fanout_queues = {}
+    unacked_key = '{p}unacked'.format(p=KEY_PREFIX)
+    unacked_index_key = '{p}unacked_index'.format(p=KEY_PREFIX)
+    unacked_mutex_key = '{p}unacked_mutex'.format(p=KEY_PREFIX)
+    unacked_mutex_expire = 300  # 5 minutes
+    unacked_restore_limit = None
+    visibility_timeout = 3600   # 1 hour
+    max_connections = 10
+    queue_order_strategy = 'round_robin'
+
+    _async_pool = None
+    _pool = None
+
+    from_transport_options = (
+        virtual.Channel.from_transport_options +
+        ('sep',
+         'ack_emulation',
+         'unacked_key',
+		 ......
+         'max_connections',
+         'health_check_interval',
+         'retry_on_timeout',
+         'priority_steps')  # <-- do not add comma here!
+    )
+
+    connection_class = redis.Connection if redis else None
+复制代码
+```
+
+##### 4.3.2.2 基类
+
+基类定义如下：
+
+```python
+class Channel(AbstractChannel, base.StdChannel):
+    """Virtual channel.
+
+    Arguments:
+        connection (ConnectionT): The transport instance this
+            channel is part of.
+    """
+
+    #: message class used.
+    Message = Message
+
+    #: QoS class used.
+    QoS = QoS
+
+    #: flag to restore unacked messages when channel
+    #: goes out of scope.
+    do_restore = True
+
+    #: mapping of exchange types and corresponding classes.
+    exchange_types = dict(STANDARD_EXCHANGE_TYPES)
+
+    #: flag set if the channel supports fanout exchanges.
+    supports_fanout = False
+
+    #: Binary <-> ASCII codecs.
+    codecs = {'base64': Base64()}
+
+    #: Default body encoding.
+    #: NOTE: ``transport_options['body_encoding']`` will override this value.
+    body_encoding = 'base64'
+
+    #: counter used to generate delivery tags for this channel.
+    _delivery_tags = count(1)
+
+    #: Optional queue where messages with no route is delivered.
+    #: Set by ``transport_options['deadletter_queue']``.
+    deadletter_queue = None
+
+    # List of options to transfer from :attr:`transport_options`.
+    from_transport_options = ('body_encoding', 'deadletter_queue')
+
+    # Priority defaults
+    default_priority = 0
+    min_priority = 0
+    max_priority = 9
+复制代码
+```
+
+最终具体举例如下：
+
+```python
+self = {Channel} <kombu.transport.redis.Channel object at 0x7fe61aa88cc0>
+ Client = {type} <class 'redis.client.Redis'>
+ Message = {type} <class 'kombu.transport.virtual.base.Message'>
+ QoS = {type} <class 'kombu.transport.redis.QoS'>
+ active_fanout_queues = {set: 0} set()
+ active_queues = {set: 0} set()
+ async_pool = {ConnectionPool} ConnectionPool<Connection<host=localhost,port=6379,db=0>>
+ auto_delete_queues = {set: 0} set()
+ channel_id = {int} 1
+ client = {Redis} Redis<ConnectionPool<Connection<host=localhost,port=6379,db=0>>>
+ codecs = {dict: 1} {'base64': <kombu.transport.virtual.base.Base64 object at 0x7fe61a987668>}
+ connection = {Transport} <kombu.transport.redis.Transport object at 0x7fe61aa399b0>
+ connection_class = {type} <class 'redis.connection.Connection'>
+ cycle = {FairCycle} <FairCycle: 0/0 []>
+ deadletter_queue = {NoneType} None
+ exchange_types = {dict: 3} {'direct': <kombu.transport.virtual.exchange.DirectExchange object at 0x7fe61aa53588>, 'topic': <kombu.transport.virtual.exchange.TopicExchange object at 0x7fe61aa53550>, 
+ handlers = {dict: 2} {'BRPOP': <bound method Channel._brpop_read of <kombu.transport.redis.Channel object at 0x7fe61aa88cc0>>, 'LISTEN': <bound method Channel._receive of <kombu.transport.redis.Channel object at 0x7fe61aa88cc0>>}
+ pool = {ConnectionPool} ConnectionPool<Connection<host=localhost,port=6379,db=0>>
+ qos = {QoS} <kombu.transport.redis.QoS object at 0x7fe61aa88e48>
+ queue_order_strategy = {str} 'round_robin'
+ state = {BrokerState} <kombu.transport.virtual.base.BrokerState object at 0x7fe61a987748>
+ subclient = {PubSub} <redis.client.PubSub object at 0x7fe61aa39cc0>
+复制代码
+```
+
+##### 4.3.2.3 redis消息回调函数
+
+关于上面成员变量，这里需要说明的是
+
+```python
+ handlers = {dict: 2} 
+  {
+    'BRPOP': <bound method Channel._brpop_read of <kombu.transport.redis.Channel object at 0x7fe61aa88cc0>>, 
+    'LISTEN': <bound method Channel._receive of <kombu.transport.redis.Channel object at 0x7fe61aa88cc0>>
+  }
+复制代码
+```
+
+这是redis有消息时的回调函数，即：
+
+- BPROP 有消息时候，调用 Channel._brpop_read；
+- LISTEN 有消息时候，调用 Channel._receive；
+
+##### 4.3.2.4  Redis 直接相关的主要成员
+
+与Redis 直接相关的成员定义在：redis/client.py。
+
+与 Redis 直接相关的主要成员是如下，会利用如下变量进行具体 redis操作：
+
+- async_pool ：redis异步连接池；
+- pool ：redis连接池；
+- client ：就是StrictRedis之类的driver；
+- subclient ：PubSub所用的client；
+
+分别对应如下类型：
+
+```java
+channel = {Channel} <kombu.transport.redis.Channel object at 0x7fabeea23b00>
+ Client = {type} <class 'redis.client.Redis'>
+ async_pool = {ConnectionPool} ConnectionPool<Connection<host=localhost,port=6379,db=0>>
+ client = {Redis} Redis<ConnectionPool<Connection<host=localhost,port=6379,db=0>>>
+ connection = {Transport} <kombu.transport.redis.Transport object at 0x7fabeea23940>
+ connection_class = {type} <class 'redis.connection.Connection'>
+ connection_class_ssl = {type} <class 'redis.connection.SSLConnection'>
+ pool = {ConnectionPool} ConnectionPool<Connection<host=localhost,port=6379,db=0>>
+ subclient = {PubSub} <redis.client.PubSub object at 0x7fabeea97198>
+复制代码
+```
+
+具体代码如下：
+
+```python
+def _create_client(self, asynchronous=False):
+    if asynchronous:
+        return self.Client(connection_pool=self.async_pool)
+    return self.Client(connection_pool=self.pool)
+
+def _get_pool(self, asynchronous=False):
+    params = self._connparams(asynchronous=asynchronous)
+    self.keyprefix_fanout = self.keyprefix_fanout.format(db=params['db'])
+    return redis.ConnectionPool(**params)
+
+def _get_client(self):
+    if redis.VERSION < (3, 2, 0):
+        raise VersionMismatch(
+            'Redis transport requires redis-py versions 3.2.0 or later. '
+            'You have {0.__version__}'.format(redis))
+    return redis.StrictRedis
+
+@property
+def pool(self):
+    if self._pool is None:
+        self._pool = self._get_pool()
+    return self._pool
+
+@property
+def async_pool(self):
+    if self._async_pool is None:
+        self._async_pool = self._get_pool(asynchronous=True)
+    return self._async_pool
+
+@cached_property
+def client(self):
+    """Client used to publish messages, BRPOP etc."""
+    return self._create_client(asynchronous=True)
+
+@cached_property
+def subclient(self):
+    """Pub/Sub connection used to consume fanout queues."""
+    client = self._create_client(asynchronous=True)
+    return client.pubsub()
+复制代码
+```
+
+因为添加了Channel，所以此时如下：
+
+```python
++-----------------+
+| Channel         |
+|                 |      +-----------------------------------------------------------+
+|    client  +---------> | Redis<ConnectionPool<Connection<host=localhost,port=6379> |
+|                 |      +-----------------------------------------------------------+
+|                 |
+|                 |      +---------------------------------------------------+-+
+|    pool  +---------->  |ConnectionPool<Connection<host=localhost,port=6379 > |
+|                 |      +---------------------------------------------------+-+
+|                 |
+|                 |
+|                 |
+|    connection   |
+|                 |
++-----------------+
+
++-------------------+       +---------------------+       +--------------------+
+| Connection        |       | redis.Transport     |       | MultiChannelPoller |
+|                   |       |                     |       |                    |
+|                   |       |                     |       |     _channels      |
+|                   |       |        cycle +------------> |     _fd_to_chan    |
+|     transport +---------> |                     |       |     _chan_to_sock  |
+|                   |       |                     |       |     poller         |
++-------------------+       +---------------------+       |     after_read     |
+                                                          |                    |
++------------------+                                      +--------------------+
+| Hub              |
+|                  |
+|                  |            +-------------+
+|      poller +---------------> | _poll       |
+|                  |            |             |         +-------+
+|                  |            |    _poller+---------> |  poll |
++------------------+            |             |         +-------+
+                                +-------------+
++----------------+         +-------------------+
+| Exchange       |         | Queue             |
+|                |         |                   |
+|                |         |                   |
+|     channel    | <------------+ exchange     |
+|                |         |                   |
+|                |         |                   |
++----------------+         +-------------------+
+
+复制代码
+```
+
+#### 4.3.3 channel 与 Connection 联系
+
+讲到这里，基本道理大家都懂，但是具体两者之间如何联系，我们需要再剖析下。
+
+##### 4.3.3.1 从Connection得到channel
+
+在Connection定义中有如下，原来 Connection 是通过 transport 来得到 channel：
+
+```python
+def channel(self):
+    """Create and return a new channel."""
+    self._debug('create channel')
+    chan = self.transport.create_channel(self.connection)
+    return chan
+复制代码
+```
+
+##### 4.3.3.2 Transport具体创建
+
+在Transport之中有：
+
+```python
+def create_channel(self, connection):
+    try:
+        return self._avail_channels.pop()
+    except IndexError:
+        channel = self.Channel(connection)
+        self.channels.append(channel)
+        return channel
+复制代码
+```
+
+原来在 Transport 有两个channels 列表：
+
+```python
+self._avail_channels
+self.channels
+复制代码
+```
+
+如果_avail_channels 有内容则直接获取，否则生成一个新的Channel。
+
+在真正连接时候，会调用 establish_connection 放入self._avail_channels。
+
+```python
+def establish_connection(self):
+    # creates channel to verify connection.
+    # this channel is then used as the next requested channel.
+    # (returned by ``create_channel``).
+    self._avail_channels.append(self.create_channel(self))
+    return self     # for drain events
+复制代码
+```
+
+其堆栈如下：
+
+```python
+__init__, redis.py:557
+create_channel, base.py:921
+establish_connection, base.py:939
+_establish_connection, connection.py:801
+_connection_factory, connection.py:866
+retry_over_time, functional.py:313
+_ensure_connection, connection.py:439
+connection, connection.py:859
+channel, connection.py:283
+<module>, node.py:11
+复制代码
+```
+
+##### 4.3.3.3 建立联系
+
+在init中有：
+
+```python
+def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
+    if not self.ack_emulation:  # disable visibility timeout
+        self.QoS = virtual.QoS
+
+    self._queue_cycle = cycle_by_name(self.queue_order_strategy)()
+    self.Client = self._get_client()
+    self.ResponseError = self._get_response_error()
+    self.active_fanout_queues = set()
+    self.auto_delete_queues = set()
+    self._fanout_to_queue = {}
+    self.handlers = {'BRPOP': self._brpop_read, 'LISTEN': self._receive}
+ 
+    ......
+
+    self.connection.cycle.add(self)  # add to channel poller.
+
+    if register_after_fork is not None:
+        register_after_fork(self, _after_fork_cleanup_channel)
+复制代码
+```
+
+重点是：
+
+```python
+self.connection.cycle.add(self)  # add to channel poller.
+复制代码
+```
+
+这就是把 Channel与Transport 中的 poller 联系起来，这样Transport可以利用Channel去与真实的redis进行交互。
+
+堆栈如下：
+
+```python
+add, redis.py:277
+__init__, redis.py:531
+create_channel, base.py:920
+establish_connection, base.py:938
+_establish_connection, connection.py:801
+_connection_factory, connection.py:866
+retry_over_time, functional.py:325
+_ensure_connection, connection.py:439
+connection, connection.py:859
+register_with_event_loop, connection.py:266
+main, testUb.py:41
+复制代码
+```
+
+因为已经联系起来，所以此时如下：
+
+```python
++-----------------+
+| Channel         |
+|                 |      +-----------------------------------------------------------+
+|    client  +---------> | Redis<ConnectionPool<Connection<host=localhost,port=6379> |
+|                 |      +-----------------------------------------------------------+
+|                 |
+|                 |      +---------------------------------------------------+-+
+|    pool  +---------->  |ConnectionPool<Connection<host=localhost,port=6379 > |
+|                 |      +---------------------------------------------------+-+
+|                 |
+|                 |   <------------------------------------------------------------+
+|                 |                                                                |
+|    connection +---------------+                                                  |
+|                 |             |                                                  |
++-----------------+             |                                                  |
+                                v                                                  |
++-------------------+       +---+-----------------+       +--------------------+   |
+| Connection        |       | redis.Transport     |       | MultiChannelPoller |   |
+|                   |       |                     |       |                    |   |
+|                   |       |                     |       |     _channels +--------+
+|                   |       |        cycle +------------> |     _fd_to_chan    |
+|     transport +---------> |                     |       |     _chan_to_sock  |
+|                   |       |                     |       |     poller         |
++-------------------+       +---------------------+       |     after_read     |
+                                                          |                    |
++------------------+                                      +--------------------+
+| Hub              |
+|                  |
+|                  |            +-------------+
+|      poller +---------------> | _poll       |
+|                  |            |             |         +-------+
+|                  |            |    _poller+---------> |  poll |
++------------------+            |             |         +-------+
+                                +-------------+
++----------------+         +-------------------+
+| Exchange       |         | Queue             |
+|                |         |                   |
+|                |         |                   |
+|     channel    | <------------+ exchange     |
+|                |         |                   |
+|                |         |                   |
++----------------+         +-------------------+
+
+复制代码
+```
+
+#### 4.3.4 Transport 与 Hub 联系
+
+on_poll_init 这里就是把 kombu.transport.redis.Transport 与 Hub 联系起来。
+
+用`self.poller = poller`把Transport与Hub的poll联系起来。这样 Transport 就可以利用 poll。
+
+```python
+def on_poll_init(self, poller):
+    self.poller = poller
+    for channel in self._channels:
+        return channel.qos.restore_visible(
+            num=channel.unacked_restore_limit,
+        )
+复制代码
+```
+
+此时变量如下：
+
+```python
+poller = {_poll} <kombu.utils.eventio._poll object at 0x7fb9bcd87240>
+self = {MultiChannelPoller} <kombu.transport.redis.MultiChannelPoller object at 0x7fb9bcdd6a90>
+ after_read = {set: 0} set()
+ eventflags = {int} 25
+ fds = {dict: 0} {}
+ poller = {_poll} <kombu.utils.eventio._poll object at 0x7fb9bcd87240>
+复制代码
+```
+
+因此，我们最终如下：
+
+```python
++-----------------+
+| Channel         |
+|                 |      +-----------------------------------------------------------+
+|    client  +---------> | Redis<ConnectionPool<Connection<host=localhost,port=6379> |
+|                 |      +-----------------------------------------------------------+
+|                 |
+|                 |      +---------------------------------------------------+-+
+|    pool  +---------->  |ConnectionPool<Connection<host=localhost,port=6379 > |
+|                 |      +---------------------------------------------------+-+
+|                 |
+|                 |   <------------------------------------------------------------+
+|                 |                                                                |
+|    connection +---------------+                                                  |
+|                 |             |                                                  |
++-----------------+             |                                                  |
+                                v                                                  |
++-------------------+       +---+-----------------+       +--------------------+   |
+| Connection        |       | redis.Transport     |       | MultiChannelPoller |   |
+|                   |       |                     |       |                    |   |
+|                   |       |                     |       |     _channels +--------+
+|                   |       |        cycle +------------> |     _fd_to_chan    |
+|     transport +---------> |                     |       |     _chan_to_sock  |
+|                   |       |                     |    +<----+  poller         |
++-------------------+       +---------------------+    |  |     after_read     |
+                                                       |  |                    |
++------------------+                    +--------------+  +--------------------+
+| Hub              |                    |
+|                  |                    v
+|                  |            +-------+-----+
+|      poller +---------------> | _poll       |
+|                  |            |             |         +-------+
+|                  |            |    _poller+---------> |  poll |
++------------------+            |             |         +-------+
+                                +-------------+
++----------------+         +-------------------+
+| Exchange       |         | Queue             |
+|                |         |                   |
+|                |         |                   |
+|     channel    | <------------+ exchange     |
+|                |         |                   |
+|                |         |                   |
++----------------+         +-------------------+
+
+复制代码
+```
+
+
+
+### 4.4 Poll系列模型
+
+Kombu 利用了 Poll 模型，所以我们有必要介绍下。这就是IO多路复用。
+
+IO多路复用是指内核一旦发现进程指定的一个或者多个IO条件准备读取，它就通知该进程。IO多路复用适用比如当客户处理多个描述字时（一般是交互式输入和网络套接口）。
+
+与多进程和多线程技术相比，I/O多路复用技术的最大优势是系统开销小，系统不必创建进程/线程，也不必维护这些进程/线程，从而大大减小了系统的开销。
+
+#### 4.4.1 select
+
+select 通过一个select()系统调用来监视多个文件描述符的数组（在linux中一切事物皆文件，块设备，socket连接等）。
+
+当select()返回后，该数组中就绪的文件描述符便会被内核修改标志位（变成ready），使得进程可以获得这些文件描述符从而进行后续的读写操作（select会不断监视网络接口的某个目录下有多少文件描述符变成ready状态【在网络接口中，过来一个连接就会建立一个'文件'】，变成ready状态后，select就可以操作这个文件描述符了）。
+
+#### 4.4.2 poll
+
+poll 和select在本质上没有多大差别，但是poll没有最大文件描述符数量的限制。
+
+poll和select同样存在一个缺点就是，包含大量文件描述符的数组被整体复制于用户态和内核的地址空间之间，而不论这些文件描述符是否就绪，它的开销随着文件描述符数量的增加而线性增大。
+
+select()和poll()将就绪的文件描述符告诉进程后，如果进程没有对其进行IO操作，那么下次调用select()和poll() 的时候将再次报告这些文件描述符，所以它们一般不会丢失就绪的消息，这种方式称为水平触发（Level Triggered）。
+
+#### 4.4.2.3 epoll
+
+epoll由内核直接支持，可以同时支持水平触发和边缘触发（Edge Triggered，只告诉进程哪些文件描述符刚刚变为就绪状态，它只说一遍，如果我们没有采取行动，那么它将不会再次告知，这种方式称为边缘触发），理论上边缘触发的性能要更高一些。
+
+epoll同样只告知那些就绪的文件描述符，而且当我们调用epoll_wait()获得就绪文件描述符时，返回的不是实际的描述符，而是一个代表 就绪描述符数量的值，你只需要去epoll指定的一个数组中依次取得相应数量的文件描述符即可，这里也使用了内存映射（mmap）技术，这样便彻底省掉了 这些文件描述符在系统调用时复制的开销。
+
+另一个本质的改进在于epoll采用基于事件的就绪通知方式。在select/poll中，进程只有在调用一定的方法后，内核才对所有监视的文件描 述符进行扫描，而epoll事先通过epoll_ctl()来注册一个文件描述符，一旦基于某个文件描述符就绪时，内核会采用类似callback的回调 机制，迅速激活这个文件描述符，当进程调用epoll_wait()时便得到通知。
+
+#### 4.4.2.4 通俗理解
+
+##### 4.4.2.4.1 阻塞I/O模式
+
+阻塞I/O模式下，内核对于I/O事件的处理是阻塞或者唤醒，一个线程只能处理一个流的I/O事件。如果想要同时处理多个流，要么多进程(fork)，要么多线程(pthread_create)，很不幸这两种方法效率都不高。
+
+##### 4.4.2.4.2 非阻塞模式
+
+非阻塞忙轮询的I/O方式可以同时处理多个流。我们只要不停的把所有流从头到尾问一遍，又从头开始。这样就可以处理多个流了，但这样的做法显然不好，因为如果所有的流都没有数据，那么只会白白浪费CPU。
+
+###### 4.4.2.4.2.1 代理模式
+
+非阻塞模式下可以把I/O事件交给其他对象（select以及epoll）处理甚至直接忽略。
+
+为了避免CPU空转，可以引进一个代理（一开始有一位叫做select的代理，后来又有一位叫做poll的代理，不过两者的本质是一样的）。这个代理比较厉害，可以同时观察许多流的I/O事件，在空闲的时候，会把当前线程阻塞掉，当有一个或多个流有I/O事件时，就从阻塞态中醒来，于是我们的程序就会轮询一遍所有的流（于是我们可以把“忙”字去掉了）。代码长这样:
+
+```python
+ while true {  
+       select(streams[])  
+       for i in streams[] {  
+             if i has data  
+             read until unavailable  
+        }  
+ }  
+```
+
+于是，如果没有I/O事件产生，我们的程序就会阻塞在select处。但是依然有个问题，我们从select那里仅仅知道了，有I/O事件发生了，但却并不知道是那几个流（可能有一个，多个，甚至全部），我们只能无差别轮询所有流，找出能读出数据，或者写入数据的流，对他们进行操作。
+
+###### 4.4.2.4.2.2 epoll
+
+epoll可以理解为event poll，**不同于忙轮询和无差别轮询，epoll只会把哪个流发生了怎样的I/O事件通知我们**。此时我们对这些流的操作都是有意义的（复杂度降低到了O(1)）。
+
+epoll版服务器实现原理类似于select版服务器，都是通过某种方式对套接字进行检验其是否能收发数据等。但是epoll版的效率要更高，同时没有上限。
+
+在select、poll中的检验，是一种被动的轮询检验，而epoll中的检验是一种主动地事件通知检测，即：当有套接字符合检验的要求，便会主动通知，从而进行操作。这样的机制自然效率会高一点。
+
+同时在epoll中要用到文件描述符，所谓文件描述符实质上是数字。
+
+epoll的主要用处在于：
+
+```python
+epoll_list = epoll.epoll()
+```
+
+如果进程在处理while循环中的代码时，一些套接字对应的客户端如果发来了数据，那么操作系统底层会自动的把这些套接字对应的文件描述符写入该列表中，当进程再次执行到epoll时，就会得到了这个列表，此时这个列表中的信息就表示着哪些套接字可以进行收发了。**因为epoll没有去依次的查看，而是直接拿走已经可以收发的fd，所以效率高！**
+
+
+
+
+
+### 4.5 总结
+
+具体如图，可以看出来，上面三个基本模块已经联系到了一起。
+
+可以看到，
+
+- 目前是以Transport为中心，把 Channel代表的真实 redis 与 Hub其中的poll联系起来，但是具体如何使用则尚未得知。
+- 用户是通过Connection来作为API入口，connection可以得到Transport。
+
+既然基本架构已经搭好，所以从下文开始，我们看看 Consumer 是如何运作的。
+
+
+本节链接：https://juejin.cn/post/6937559898045546527
 
 
 
