@@ -402,7 +402,8 @@ WantedBy=multi-user.target
 
 
 ```
-systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  
+systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
 ```
 ###### 5.4. 为gnocchi创建聚合策略
    ```
@@ -2452,8 +2453,7 @@ ln -s /usr/bin/supermin5 /usr/bin/supermin
 **aarch64**  （安装有问题，待确认）
 
 ```
-apt install -y gperf flex bison libncurses5-dev libpcre3-dev  pkg-config python3-augeas  libaugeas-dev libmagic-dev libjansson-dev libhivex-dev supermin ocaml libwin-hivex-perl  
-libhivex-ocaml libhivex-ocaml-dev libguestfs-ocaml
+apt install -y gperf flex bison libncurses5-dev libpcre3-dev  pkg-config python3-augeas  libaugeas-dev libmagic-dev libjansson-dev libhivex-dev supermin ocaml libwin-hivex-perl libhivex-ocaml libhivex-ocaml-dev libguestfs-ocaml
 ./configure
 make
 
