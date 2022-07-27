@@ -37,9 +37,9 @@ Aodh根据Gnocchi和Panko中存储的计量和事件数据，提供告警通知�
 创建endpoints：
 
 ```
-# openstack endpoint create --region RegionOne alarming public http://controller:8042
-# openstack endpoint create --region RegionOne alarming internal http://controller:8042
-# openstack endpoint create --region RegionOne alarming admin http://controller:8042
+openstack endpoint create --region RegionOne alarming public http://controller:8042
+openstack endpoint create --region RegionOne alarming internal http://controller:8042
+openstack endpoint create --region RegionOne alarming admin http://controller:8042
 ```
 
 #### 1.2.2 配置MySQL
@@ -49,7 +49,7 @@ Aodh根据Gnocchi和Panko中存储的计量和事件数据，提供告警通知�
 [![复制代码](https://common.cnblogs.com/images/copycode.gif)](javascript:void(0);)
 
 ```
-# mysql -u root -p
+mysql -u root -p
 mysql> CREATE DATABASE aodh;
 mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'localhost' \
   IDENTIFIED BY 'comleader@123';
@@ -62,7 +62,7 @@ mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'%' \
 #### 1.2.3 安装Aodh
 
 ```
-# yum install openstack-aodh-api openstack-aodh-evaluator openstack-aodh-notifier openstack-aodh-listener openstack-aodh-expirer python-aodhclient
+yum install openstack-aodh-api openstack-aodh-evaluator openstack-aodh-notifier openstack-aodh-listener openstack-aodh-expirer python-aodhclient
 ```
 
 #### 1.2.4 编辑配置
@@ -177,7 +177,6 @@ After=syslog.target network.target
 KillSignal=SIGQUIT
 Type=notify
 User=root
-Type=notify
 NotifyAccess=all
 ExecStart=/usr/sbin/uwsgi --ini /etc/aodh/uwsgi-aodh.ini
 ExecStop=/usr/sbin/uwsgi --stop /var/run/aodh-uwsgi.pid
@@ -199,15 +198,15 @@ systemctl daemon-reload
 #### 1.2.7. 启动服务
 
 ```
-# systemctl enable openstack-aodh-api.service   openstack-aodh-evaluator.service  openstack-aodh-notifier.service   openstack-aodh-listener.service
-# systemctl start openstack-aodh-api.service   openstack-aodh-evaluator.service  openstack-aodh-notifier.service   openstack-aodh-listener.service
+systemctl enable openstack-aodh-api.service   openstack-aodh-evaluator.service  openstack-aodh-notifier.service   openstack-aodh-listener.service
+systemctl start openstack-aodh-api.service   openstack-aodh-evaluator.service  openstack-aodh-notifier.service   openstack-aodh-listener.service
 ```
 
 
 
 ```systemctl stop openstack-aodh-api.service```
 
-更改为uwsgi启动（如果前面已经用新方式修改，忽略这个）
+更改为uwsgi启动（**如果前面已经用新方式修改，忽略这个**）
 
 ```
 [uwsgi]

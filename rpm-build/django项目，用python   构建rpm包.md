@@ -72,7 +72,11 @@ setup(name='test',
 
 
 
-在该目录下执行python3 setup.py bdist_rpm，在本目录下会生成
+在该目录下执行python3 setup.py bdist_rpm，
+
+（或者  python3  setup.py bdist_rpm --force-arch x86_64，具体原因看后面）
+
+在本目录下会生成
 
 ./makerpmfile/setup.py
 
@@ -119,7 +123,7 @@ rpmbuild -bs test1.spec
 
 
 
-  
+
 
 
 

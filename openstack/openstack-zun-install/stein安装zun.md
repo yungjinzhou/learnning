@@ -4,9 +4,9 @@
 
 - 环境：centos7.6   mimic版本
 - opentack-zun版本stein
-- python2.7.5/python3.6，都是系统自带python环境
+- python2.7.5/python3.6，都是系统自带python环境，**当安装组件可选时，建议选python3**
 - **默认zun数据库及zun服务密码 password: comleader123，可根据需要更改，在此环境下发现密码中有@需要修改pymysql源码进行处理，否则不能识别**
-- 设计到密码及ip地址及hostname的及
+- 设计到密码及ip地址及hostname的自行修改
 - 如需docker磁盘功能，需要开启磁盘配额的功能
 
 ### 二、controller节点zun安装
@@ -111,7 +111,7 @@ vim /etc/zun/zun.conf
 
 
 
-```
+```javascript
 [DEFAULT]
 transport_url = rabbit://openstack:openstack@controller
 [api]
@@ -175,7 +175,13 @@ driver = messaging
 [websocket_proxy]
 wsproxy_host = 192.168.204.173
 wsproxy_port = 6784
-base_url = ws://controller:6784
+base_url = ws://192.168.204.173:6784
+# 配置wss访问需要配置下面
+# base_url = wss://192.168.230.107:6784
+#cert=/etc/nova/ssl/nginx-selfsigned.crt
+#key=/etc/nova/ssl/nginx-selfsigned.key
+
+# base_url = ws://controller:6784 console不可用,需要ip地址
 [zun_client]
 
 ```
@@ -302,7 +308,7 @@ systemctl start etcd
 
 安装一点必备的依赖
 
-```
+```javascript
 yum install -y centos-release-openstack-stein
 yum install -y python-openstackclient 
 
@@ -311,8 +317,7 @@ yum install -y ebtables ipset
 yum install -y openstack-neutron-openvswitch  
 修改配置文件
 安装依赖包
-yum install libibverbs -y
-yum install bridge-utils -y
+yum install libibverbs bridge-utils -y
 systemctl start neutron-openvswitch-agent
 systemctl enable neutron-openvswitch-agent
 
@@ -329,7 +334,7 @@ chmod 777 /var/run/openvswitch/db.sock
 yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
 修改配置文件
 启动代理
-systemctl start neutron-linuxbridge-agent
+systemctl restart neutron-linuxbridge-agent
 systemctl enable neutron-linuxbridge-agent
 
 ```
@@ -525,6 +530,25 @@ python3 setup.py install
 
 
 
+前面ovs-vsctl 需要有最大权限，kuryr才能调用，补充代码(**代码调用权限有问题，已通过ovs配置创建db.sock的权限**)
+
+```javascript
+# vim /usr/local/lib/python3.6/site-packages/kuryr/lib/binding/drivers/veth.py
+
+def _configure_host_iface(ifname, endpoint_id, port_id, net_id, project_id,
+                          hwaddr, kind=None, details=None):
+    # 省略部分代码
+    stdout1, stderr1 = processutils.execute(
+        "chmod", "777", "/var/run/openvswitch/db.sock",run_as_root=True)
+    # 增加上面一行
+    stdout, stderr = processutils.execute(
+        binding_exec_path, constants.BINDING_SUBCOMMAND, port_id, ifname,
+        endpoint_id, hwaddr, net_id, project_id,
+        lib_utils.string_mappings(details),
+        run_as_root=True)
+    return stdout, stderr
+```
+
 
 
 ###### 3.3.2.4 生成配置文件并配置
@@ -533,6 +557,7 @@ python3 setup.py install
 su -s /bin/sh -c "./tools/generate_config_file_samples.sh" kuryr
 
 su -s /bin/sh -c "cp etc/kuryr.conf.sample /etc/kuryr/kuryr.conf" kuryr
+
 ```
 
 
@@ -543,12 +568,14 @@ sed -i.default -e "/^#/d" -e "/^$/d" /etc/kuryr/kuryr.conf
 
 vim /etc/kuryr/kuryr.conf
 
+安装后一定要看bindir = /usr/local/libexec/kuryr  下有没有可执行文件，负责会报失败
 
+![img](.\bind_dir.png)
 
 ```
 [DEFAULT]
-bindir = /usr/libexec/kuryr  # py2
-# bindir = /usr/local/libexec/kuryr  # py3
+# bindir = /usr/libexec/kuryr  # py2
+bindir = /usr/local/libexec/kuryr  # py3
 [binding]
 [neutron]
 www_authenticate_uri = http://controller:5000
@@ -561,10 +588,10 @@ username = neutron
 password = comleader@123
 service_metadata_proxy = true
 metadata_proxy_shared_secret = metadata_secret
-#bility_scope = global
-#process_external_connectivity = false
 
 ```
+
+
 
 
 
@@ -575,12 +602,14 @@ metadata_proxy_shared_secret = metadata_secret
 
 
 ```
+
 [Unit]
 Description = Kuryr-libnetwork - Docker network plugin for Neutron
 
 [Service]
-ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
-# ExecStart = /usr/local/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log 
+# ExecStart = /usr/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log
+User=root
+ExecStart = /usr/local/bin/kuryr-server --config-file /etc/kuryr/kuryr.conf --log-file /var/log/kuryr/kuryr-server.log 
 CapabilityBoundingSet = CAP_NET_ADMIN
 
 [Install]
@@ -602,6 +631,7 @@ systemctl status docker kuryr-libnetwork
 
 ```
 # python3安装方式，不用执行下面的操作
+
 重新安装与配置linuxbridge
 yum install -y openstack-neutron-linuxbridge ebtables ipset  conntrack-tools bridge-utils
 修改配置文件
@@ -648,6 +678,7 @@ Error response from daemon: This node is not a swarm manager. Use "docker swarm 
 ```
 groupadd --system zun
 useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g zun zun
+
 ```
 
 ##### 3.4.2 创建目录
@@ -655,6 +686,7 @@ useradd --home-dir "/var/lib/zun" --create-home --system --shell /bin/false -g z
 ```
 mkdir -p /etc/zun
 chown zun:zun /etc/zun
+
 ```
 
 
@@ -692,10 +724,11 @@ python setup.py install
 
 
 # python36安装
-pip3 install --upgrade pip==21.3.1
-pip3 install --upgrade setuptools==44.1.1
+# pip3 install --upgrade pip==21.3.1 #前面安装过了
+# pip3 install --upgrade setuptools==44.1.1
 pip3 install -r requirements.txt
 python3 setup.py install
+
 ```
 
 ##### 3.4.5 生成示例配置文件
@@ -730,14 +763,13 @@ sed -i.default -e "/^$/d" -e "/^#/d" /etc/zun/zun.conf
 
 
 
-
-
 ```
+
 [DEFAULT]
 
 transport_url = rabbit://openstack:openstack@controller
 state_path = /var/lib/zun
-
+image_driver_list = glance
 [database]
 connection = mysql+pymysql://zun:comleader123@controller/zun
 
@@ -795,6 +827,7 @@ vim /etc/systemd/system/docker.service.d/docker.conf
 **此处把zun:2375和controller:2379替换成对应的能解析到ip地址的host名称或者ip地址(比如zun2:2379, 1.1.1.1:2379)，group后根据前面配置的实际用户名修改**
 
 ```
+
 [Service]
 ExecStart=
 ExecStart=/usr/bin/dockerd --group zun -H tcp://zun:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
@@ -811,7 +844,7 @@ systemctl restart docker
 
 vim  /etc/kuryr/kuryr.conf
 
-可不修改改位置，测试修改后联网报错，如果没有报错，可以先不添加
+<font color=red>此处如果capability_scope不设置global，网络只能在最初创建的节点上使用，其他节点使用该网络创建容器会报错</font>
 
 ```
 [DEFAULT]
@@ -819,16 +852,21 @@ capability_scope = global
 process_external_connectivity = False
 ```
 
+![img](.\企业微信截图_16421402774108.png)
+
+
+
 优化kuryr创建网络时的等待时间（可不操作）
 
- ![img](H:\code\learnning\openstack-zun-install\企业微信截图_16390289337530.png) 
+ ![img](.\企业微信截图_16390289337530.png) 
 
 https://review.opendev.org/c/openstack/zun/+/679573/2/zun/network/kuryr_network.py
 
 ###### 3.4.8.5 重启kuryr
 
 ```
-systemctl restart kuryr-libnetwork
+systemctl restart kuryr-libnetwork  
+systemctl restart docker containerd
 ```
 
 
@@ -837,9 +875,9 @@ systemctl restart kuryr-libnetwork
 
 ```
 containerd config default > /etc/containerd/config.toml
-```
+chown zun:zun /etc/containerd/config.toml 
 
- chown zun:zun /etc/containerd/config.toml 
+```
 
 
 
@@ -1005,6 +1043,7 @@ zun-compute挂载volume暂行方法
 1. 安装yum install iscsi-initiator-utils -y
 2. 修改zun-compute.service ,更改User=root
 3. 修改代码oslo_privsep/daemon.py (去掉sudo前缀)
+/usr/local/lib/python3.6/site-packages/oslo_privsep/
 
             cmd = context.helper_command(sockpath)
             if "zun-rootwrap" in str(cmd) and "privsep-helper" in str(cmd):
@@ -1166,4 +1205,197 @@ https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0015.h
 
 
 
+### 五、配置harbor镜像
+
+#### 5.1 修改配置
+
+##### 5.1.1 修改docker
+
+在zun节点 修改docker.conf
+
+加入harbor地址，如果是http请求，ip:port
+
+增加 --insecure-registry "192.168.66.29:80"
+
+```javascript
+[Service]
+ExecStart=
+# ExecStart=/usr/bin/dockerd --group zun -H tcp://zun02:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
+ExecStart=/usr/bin/dockerd --insecure-registry "192.168.66.29:80" --group zun -H tcp://zun02:2375 -H unix:///var/run/docker.sock --cluster-store etcd://controller:2379
+```
+
+##### 5.1.2 修改zun
+
+配置zun.conf
+
+```javascript
+........
+[docker]
+# 配置harbor服务器地址
+default_registry = 192.168.66.29:80
+default_registry_username = admin
+default_registry_password = comleader@123
+# 可以增加harbor中项目参数，传参时只传镜像名称即可
+.....
+```
+
+
+
+#### 5.2  重启服务与容器
+
+```
+systemctl daemon-reload
+systemctl restart docker containerd
+docker start $(docker ps -aq)
+```
+
+
+
+#### 5.3 容器节点，上传到harbor对应项目
+
+##### 5.3.1 登录harbor
+
+输入用户名密码
+
+```
+docker login 192.168.66.29:80
+```
+
+##### 5.3.2 容器提交
+
+```
+docker commit -m="test " -a="zun02" dc5363dc932c 192.168.66.29:80/feinitaikaifa/centos7:v2
+```
+
+- **-m:** 提交的描述信息
+- **-a:** 指定镜像作者
+- **e218edb10161：**容器 ID
+- **192.168.66.29:80/feinitaikaifa/centos7:v2：** 指定要创建的目标镜像名（其中192.168.66.29:80为harbor地址，feinitaikaifa为harbor项目名称，centos7:v1为镜像名称:tag）
+
+##### 5.3.2 对已有镜像打tag
+
+其中192.168.66.29:80为harbor地址，feinitaikaifa为harbor项目名称，centos7:v1为镜像名称:tag
+
+```
+docker tag centos:latest 192.168.66.29:80/feinitaikaifa/centos7:v1
+```
+
+
+
+##### 5.3.3 推送到harbor对应项目
+
+```
+docker push 192.168.66.29:80/feinitaikaifa/centos7:v1
+```
+
+
+
+
+
+### 六、docker使用
+
+#### 6.1 容器打包
+
+```
+ docker save -o cirros.tar 192.168.66.29:80/feinitaikaifa/cirros:latest
+```
+
+#### 6.2  容器提交
+
+```
+docker commit -m="test " -a="zun02" dc5363dc932c 192.168.66.29:80/feinitaikaifa/centos7:v2
+```
+
+- **-m:** 提交的描述信息
+- **-a:** 指定镜像作者
+- **e218edb10161：**容器 ID
+- **192.168.66.29:80/feinitaikaifa/centos7:v2：** 指定要创建的目标镜像名（其中192.168.66.29:80为harbor地址，feinitaikaifa为harbor项目名称，centos7:v1为镜像名称:tag）
+
+
+
+#### 6.3 容器上传至glance
+
+glance使用需要是没有tag的tar包，可以从dockerhub上下载后上传，或者清除tag信息后再上传
+
+
+
+打包后的容器xxx.tar文件
+
+登录到控制节点
+
+
+
+source ~./admin-xxx
+
+
+
+```
+openstack image create --disk-format raw --container-format docker  --file centos7.tar docker-centos7
+
+```
+
+
+
+#### 6.4 容器镜像保存本地
+
+```
+docker save image_id > xxxx.tar
+```
+
+
+
+#### 6.5 本地容器镜像上传到私有仓库(harbor)
+
+```
+docker save image_id > xxxx.tar
+```
+
+
+
+#### 6.6 从dockerhub拉取镜像到上传到harbor步骤
+
+```
+# 从google或者dockerhub拉取镜像
+docker pull xxxx
+docker pull arm64v8/centos:7 # 拉取arm64的镜像
+# 保存到本地
+docker save image_id > kubernetes-kubelet.tar
+# 上传到可以连接到harbor服务器的主机上
+scp  kubernetes-kubelet.tar root@192.168.230.161:/home/
+# 导入到docker image
+docker load -i kubernetes-kubelet.tar
+# 给镜像打tag
+docker tag docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+# 推送到镜像服务器
+docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+
+```
+
+
+
+
+
+### 七、其他注意事项
+
+
+
+
+
+````
+vim /usr/local/lib/python3.6/site-packages/kuryr/lib/binding/drivers/veth.py
+
+def _configure_host_iface(ifname, endpoint_id, port_id, net_id, project_id,
+                          hwaddr, kind=None, details=None):
+    # 省略部分代码
+    stdout, stderr = processutils.execute(
+        "chmod", "777", "/var/run/openvswitch/db.sock",run_as_root=True)
+    # 增加上面一行
+    stdout, stderr = processutils.execute(
+        binding_exec_path, constants.BINDING_SUBCOMMAND, port_id, ifname,
+        endpoint_id, hwaddr, net_id, project_id,
+        lib_utils.string_mappings(details),
+        run_as_root=True)
+    return stdout, stderr
+
+````
 

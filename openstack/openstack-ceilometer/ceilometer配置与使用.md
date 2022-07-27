@@ -387,7 +387,6 @@ After=syslog.target network.target
 KillSignal=SIGQUIT
 Type=notify
 User=root
-Type=notify
 NotifyAccess=all
 ExecStart=/usr/sbin/uwsgi --ini /etc/gnocchi/uwsgi-gnocchi.ini
 ExecStop=/usr/sbin/uwsgi --stop /var/run/gnocchi-uwsgi.pid
@@ -403,7 +402,8 @@ WantedBy=multi-user.target
 
 
 ```
-systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  
+systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
 ```
 ###### 5.4. 为gnocchi创建聚合策略
    ```
@@ -1644,7 +1644,7 @@ sources:
         - custom.hardware.cpu.util.percentage
         - custom.hardware.memory.total
         - custom.hardware.memory.used
-        - custom.hardware.memory.cache
+        - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.total
@@ -1763,7 +1763,7 @@ sources:
         - custom.hardware.disk.utilization
         - custom.hardware.memory.used
         - custom.hardware.memory.total
-        - custom.hardware.memory.cache
+        - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.avail
@@ -2068,7 +2068,7 @@ resources:
       custom.hardware.disk.write.requests:
       custom.hardware.memory.total:
       custom.hardware.memory.used:
-      custom.hardware.memory.cache:
+      custom.hardware.memory.cached:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
       custom.hardware.swap.total:
@@ -2150,7 +2150,7 @@ resources:
       custom.hardware.disk.write.requests:
       custom.hardware.memory.total:
       custom.hardware.memory.used:
-      custom.hardware.memory.cache:
+      custom.hardware.memory.cached:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
       custom.hardware.swap.avail:
@@ -2200,7 +2200,7 @@ instance:
         - custom.hardware.cpu.util.percentage
         - custom.hardware.memory.total
         - custom.hardware.memory.used
-        - custom.hardware.memory.cache
+        - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
         - custom.hardware.swap.total
@@ -2265,7 +2265,7 @@ instance:
 
 **<font color=red>增加memory.util为例</font>**
 
-```
+```python
     @libvirt_utils.raise_nodata_if_unsupported
     @libvirt_utils.retry_on_disconnect
     def inspect_instance(self, instance, duration=None):
@@ -2319,6 +2319,7 @@ instance:
             cpu_time=cpu_time / stats.get('vcpu.current'),
             memory_usage=memory_used,
             memory_util=memory_util,
+            memory=memory, # 增加
             memory_resident=memory_resident,
             memory_swap_in=memory_swap_in,
             memory_swap_out=memory_swap_out,
@@ -2360,6 +2361,7 @@ class InstanceStats(object):
         'cpu_util',                # util: CPU utilization in percentage
         'cpu_l3_cache_usage',      # cachesize: Amount of CPU L3 cache used
         'memory_usage',            # usage: Amount of memory used
+        'memory',                  # memory: total Amount of memory
         'memory_util',            # memory_util: memory utilization in percentage
         'memory_resident',         #
         'memory_swap_in',          # memory swap in
@@ -2400,6 +2402,96 @@ vim /usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/entry_poin
 
 - 同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加对应metric
 - 重启openstack-ceilometer-compute服务，gnocchi查询对应resource的对应metric，看是否新增，数据是否正常收集
+
+
+
+## 三、虚拟机磁盘获取
+
+
+
+##### libguest使用
+
+**centos intel**
+
+```
+https://libguestfs.org/guestfs-building.1.html
+https://download.libguestfs.org/1.40-stable/
+下载源码包libguestfs-1.40.2.tar.gz
+解压后进入目录
+./configure
+ 发现缺少依赖包
+ 安装
+ yum install -y pcre2-devel  augeas augeas-devel file-libs file-devel  jansson jansson-devel libcap libcap-devel hivex hivex-devel  supermin5 supermin5-devel supermin ocaml ocaml-findlib-devel  ocaml-findlib  ocaml-hivex.x86_64 ocaml-hivex-devel.x86_64 erlang-erl_interface.x86_64 gperf ncurses ncurses-devel
+rm -rf  /usr/bin/supermin
+ln -s /usr/bin/supermin5 /usr/bin/supermin
+./configure --disable-erlang# 有提示，根据提示禁用erlang就行
+make
+运行 ./run virt-df -d instance-uuid
+
+
+
+
+
+```
+
+**hg**
+
+```
+yum install -y pcre2-devel  augeas augeas-devel file-libs file-devel  jansson jansson-devel libcap libcap-devel hivex hivex-devel  supermin5 supermin5-devel supermin ocaml ocaml-findlib-devel  ocaml-findlib  ocaml-hivex.x86_64 ocaml-hivex-devel.x86_64 erlang-erl_interface.x86_64 gperf ncurses ncurses-devel 
+rm -rf  /usr/bin/supermin
+ln -s /usr/bin/supermin5 /usr/bin/supermin
+
+运行 ./run virt-df -d instance-uuid
+
+
+
+
+```
+
+
+
+**aarch64**  （安装有问题，待确认）
+
+```
+apt install -y gperf flex bison libncurses5-dev libpcre3-dev  pkg-config python3-augeas  libaugeas-dev libmagic-dev libjansson-dev libhivex-dev supermin ocaml libwin-hivex-perl libhivex-ocaml libhivex-ocaml-dev libguestfs-ocaml
+./configure
+make
+
+如果编译错误
+ apt install -y erlang-guestfs, gir1.2-guestfs-1.0, golang-guestfs-dev, guestfsd, libguestfs-dev, libguestfs-gfs2, libguestfs-gobject-1.0-0, libguestfs-gobject-dev, libguestfs-hfsplus, libguestfs-java, libguestfs-jfs, libguestfs-nilfs, libguestfs-ocaml, libguestfs-ocaml-dev, libguestfs-perl, libguestfs-reiserfs, libguestfs-rescue, libguestfs-rsync, libguestfs-tools, libguestfs-xfs, libguestfs-zfs, libguestfs0, lua-guestfs, php-guestfs, python-guestfs, python3-guestfs, ruby-guestfs
+
+```
+
+
+
+
+
+## 四、日志切割
+
+
+
+更改启动方式后，uwsgi日志需要定期处理
+
+修改`/etc/logrotate.d/gnocchi`，
+
+```
+/var/log/gnocchi/*.log {
+    rotate 4
+    size 10M
+    missingok
+    compress
+    copytruncate  # 切割后新日志正常写入
+}
+
+```
+
+
+
+
+
+
+
+
 
 ## 注意事项
 
@@ -2479,4 +2571,21 @@ gnocchi archive-policy-rule delete default-origin
 #### 3.5 stein版本取消了pipeline中transfomer的配置功能
 
 
+
+#### 3.6 日志处理
+
+更改启动方式后，uwsgi日志需要定期处理
+
+修改`/etc/logrotate.d/gnocchi`，
+
+```
+/var/log/gnocchi/*.log {
+    rotate 4
+    size 10M
+    missingok
+    compress
+    copytruncate  # 切割后新日志正常写入
+}
+
+```
 

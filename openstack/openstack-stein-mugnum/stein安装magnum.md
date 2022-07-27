@@ -1,4 +1,4 @@
-## 					stein安装magnum
+## 					一、stein安装magnum
 
 
 
@@ -53,9 +53,9 @@ openstack service create --name magnum --description "OpenStack Container Infras
 controller替换为控制节点的ip地址
 
 ```
-openstack endpoint create --region RegionOne container-infra public http://192.168.204.173:9511/v1
-openstack endpoint create --region RegionOne container-infra internal http://192.168.204.173:9511/v1
-openstack endpoint create --region RegionOne container-infra admin http://192.168.204.173:9511/v1
+openstack endpoint create --region RegionOne container-infra public http://192.168.230.107:9511/v1
+openstack endpoint create --region RegionOne container-infra internal http://192.168.230.107:9511/v1
+openstack endpoint create --region RegionOne container-infra admin http://192.168.230.107:9511/v1
 ```
 
 
@@ -310,10 +310,10 @@ openstack coe service list
 ### 创建集群实例
 
 - 如果没有外部网络，创建一个外部网络
-
 - 创建密钥对，magnum集群需要
 - 创建规格
-- 创建符合条件的镜像
+- 创建符合条件的镜像（修改os_distro属性为可匹配的（fedora-atomic））
+- <font color=red>**内网环境下要搭建本地etcd集群及discovery ，参考三**</font>
 
 #### 上传集群需要的镜像
 
@@ -333,7 +333,7 @@ openstack image create \
                       --container-format=bare \
                       --file=Fedora-Atomic-27-20180419.0.x86_64.qcow2\
                       --property os_distro='fedora-atomic' \
-                      fedora-atomic-latest
+                      -latest
                       
                       
 openstack image create --disk-format=qcow2 --container-format=bare --file=fedora-coreos-34.qcow2 --property os_distro='coreos' fedora-coreos-34latest       
@@ -358,11 +358,7 @@ openstack image create --disk-format=qcow2 --container-format=bare --file=centos
 
 openstack coe cluster template create kubernetes-cluster-template --image atomichostv3  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
  
- 
 openstack coe cluster template create kubernetes-cluster-template --image fedora-coreos-34latest  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
- 
- 
- 
  
 openstack coe cluster template create atomic-ussuritest --image e0b3a591-e3fa-4240-8339-5dd93c3ed7e0  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
  
@@ -412,8 +408,8 @@ def enforce_driver_supported():
     def wrapper(func, *args, **kwargs):
         cluster_template = args[1]
         cluster_distro = cluster_template.cluster_distro
-        if str(cluster_distro) ==  "Unset":
-            cluster_distro == None
+        if str(cluster_distro) == "Unset":
+            cluster_distro = None
         if not cluster_distro:
             try:
                 cli = clients
@@ -509,7 +505,7 @@ nginx-701339712-tb5lp   1/1       Running   0          15s
 
 
 
-## magnum-ui安装
+## 二、magnum-ui安装
 
 
 
@@ -526,9 +522,9 @@ yum install -y openstack-magnum-ui
 到openstack-dashboard下
 
 ```
-cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1370_project_container_infra_panel_group.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
-cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1371_project_container_infra_clusters_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
-cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1372_project_container_infra_cluster_templates_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1370_project_container_infra_panel_group.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1371_project_container_infra_clusters_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1372_project_container_infra_cluster_templates_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
 
 ```
 
@@ -538,6 +534,11 @@ cp /usrlib/python2.7/site-packages/magnum_ui/enabled/_1372_project_container_inf
 ```
 chown -R apache:apache /usr/share/openstack-dashboard/
 systemctl restart httpd.service memcached.service
+
+$ ./manage.py collectstatic
+$ ./manage.py compress
+
+systemctl restart nginx.service uwsgi.service
 ```
 
 如果界面显示异常
@@ -562,9 +563,398 @@ magnum-ui安装参考链接：https://github.com/openstack/magnum-ui
 
 
 
+## 三、搭建etcd discovery
+
+参考链接： http://zengxiaoran.com/2020/12/04/etcd_cluster_discovery/
+
+### 1先搭建etcd集群
+
+#### 1.1安装etcd
+
+`yum install etcd -y`
 
 
-### 部署k8s错误日志
+
+#### 1.2修改配置文件
+
+##### 1.2.1 修改配置etcd文件
+
+> 这里的集群模式是指完全集群模式，当然也可以在单机上通过不同的端口，部署伪集群模式，只是那样做只适合测试环境，生产环境考虑到可用性的话需要将etcd实例分布到不同的主机上，这里集群搭建有三种方式，分布是静态配置，etcd发现，dns发现。默认配置运行etcd，监听本地的2379端口，用于与client端交互，监听2380用于etcd内部交互。etcd启动时，集群模式下会用到的参数如下：
+>
+> 1. –name
+> 2. etcd集群中的节点名，这里可以随意，可区分且不重复就行
+> 3. –listen-peer-urls
+> 4. 监听的用于节点之间通信的url，可监听多个，集群内部将通过这些url进行数据交互(如选举，数据同步等)
+> 5. –initial-advertise-peer-urls
+> 6. 建议用于节点之间通信的url，节点间将以该值进行通信。
+> 7. –listen-client-urls
+> 8. 监听的用于客户端通信的url,同样可以监听多个。
+> 9. –advertise-client-urls
+> 10. 建议使用的客户端通信url,该值用于etcd代理或etcd成员与etcd节点通信。
+> 11. –initial-cluster-token etcd-cluster-1
+> 12. 节点的token值，设置该值后集群将生成唯一id,并为每个节点也生成唯一id,当使用相同配置文件再启动一个集群时，只要该token值不一样，etcd集群就不会相互影响。
+> 13. –initial-cluster
+> 14. 也就是集群中所有的initial-advertise-peer-urls 的合集
+> 15. –initial-cluster-state new
+> 16. 新建集群的标志，初始化状态使用 new，建立之后改此值为 existing
+
+
+
+
+
+[root@etcd1 /]# vim /etc/etcd/etcd.conf
+
+```javascript
+[root@compute-intel ~]# cat /etc/etcd/etcd.conf
+#[Member]
+#ETCD_CORS=""
+ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+#ETCD_WAL_DIR=""
+ETCD_LISTEN_PEER_URLS="http://192.168.230.106:2380"
+ETCD_LISTEN_CLIENT_URLS="http://192.168.230.106:2379,http://127.0.0.1:2379"
+#ETCD_MAX_SNAPSHOTS="5"
+#ETCD_MAX_WALS="5"
+ETCD_NAME="Master"
+#ETCD_SNAPSHOT_COUNT="100000"
+#ETCD_HEARTBEAT_INTERVAL="100"
+#ETCD_ELECTION_TIMEOUT="1000"
+#ETCD_QUOTA_BACKEND_BYTES="0"
+#ETCD_MAX_REQUEST_BYTES="1572864"
+#ETCD_GRPC_KEEPALIVE_MIN_TIME="5s"
+#ETCD_GRPC_KEEPALIVE_INTERVAL="2h0m0s"
+#ETCD_GRPC_KEEPALIVE_TIMEOUT="20s"
+#
+#[Clustering]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.230.106:2380"
+ETCD_ADVERTISE_CLIENT_URLS="http://192.168.230.106:2379"
+#ETCD_DISCOVERY=""
+#ETCD_DISCOVERY_FALLBACK="proxy"
+#ETCD_DISCOVERY_PROXY=""
+#ETCD_DISCOVERY_SRV=""
+ETCD_INITIAL_CLUSTER="Master=http://192.168.230.106:2380,Slave01=http://192.168.230.101:2380,Slave02=http://192.168.230.102:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
+ETCD_INITIAL_CLUSTER_STATE="new"
+#ETCD_STRICT_RECONFIG_CHECK="true"
+#ETCD_ENABLE_V2="true"
+#
+#[Proxy]
+#ETCD_PROXY="off"
+#ETCD_PROXY_FAILURE_WAIT="5000"
+#ETCD_PROXY_REFRESH_INTERVAL="30000"
+#ETCD_PROXY_DIAL_TIMEOUT="1000"
+#ETCD_PROXY_WRITE_TIMEOUT="5000"
+#ETCD_PROXY_READ_TIMEOUT="0"
+#
+#[Security]
+#ETCD_CERT_FILE=""
+#ETCD_KEY_FILE=""
+#ETCD_CLIENT_CERT_AUTH="false"
+#ETCD_TRUSTED_CA_FILE=""
+#ETCD_AUTO_TLS="false"
+#ETCD_PEER_CERT_FILE=""
+#ETCD_PEER_KEY_FILE=""
+#ETCD_PEER_CLIENT_CERT_AUTH="false"
+#ETCD_PEER_TRUSTED_CA_FILE=""
+#ETCD_PEER_AUTO_TLS="false"
+#
+#[Logging]
+#ETCD_DEBUG="false"
+#ETCD_LOG_PACKAGE_LEVELS=""
+#ETCD_LOG_OUTPUT="default"
+#
+#[Unsafe]
+#ETCD_FORCE_NEW_CLUSTER="false"
+#
+#[Version]
+#ETCD_VERSION="false"
+#ETCD_AUTO_COMPACTION_RETENTION="0"
+#
+#[Profiling]
+#ETCD_ENABLE_PPROF="false"
+#ETCD_METRICS="basic"
+#
+#[Auth]
+#ETCD_AUTH_TOKEN="simple"
+
+```
+
+
+
+
+
+以上是yum安装etcd集群的配置模板，待理解下面所用的二进制包etcd discovery方法后再自行实验。
+
+**推荐二进制包安装etcd*（option）**
+
+**yum虽然也能用，还是二进制包的方法操作简单些。**
+
+下载稳定版本的etcd二进制包
+
+```
+mkdir /var/lib/etcd;mkdir /etc/etcd; groupadd -r etcd; useradd -r -g etcd -d /var/lib/etcd -s /sbin/nologin -c "etcd user" etcd;chown -R etcd:etcd /var/lib/etcd`
+ETCD_VERSION=`curl -s -L https://github.com/coreos/etcd/releases/latest | grep linux-amd64\.tar\.gz | grep href | cut -f 6 -d '/' | sort -u`; ETCD_DIR=/opt/etcd-$ETCD_VERSION; mkdir $ETCD_DIR;curl -L https://github.com/coreos/etcd/releases/download/$ETCD_VERSION/etcd-$ETCD_VERSION-linux-amd64.tar.gz | tar xz --strip-components=1 -C $ETCD_DIR; ln -sf $ETCD_DIR/etcd /usr/bin/etcd && ln -sf $ETCD_DIR/etcdctl /usr/bin/etcdctl; etcd --version
+```
+
+##### 1.2.2 修改配置service文件
+
+新建etcd服务启动脚本
+
+```
+[root@etcd1 /]# vim /usr/lib/systemd/system/etcd.service
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/
+EnvironmentFile=-/etc/etcd/etcd.conf
+User=etcd
+# set GOMAXPROCS to number of processors
+ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/bin/etcd --name=\"${ETCD_NAME}\" --data-dir=\"${ETCD_DATA_DIR}\" --listen-client-urls=\"${ETCD_LISTEN_CLIENT_URLS}\""
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+
+```
+
+
+
+
+
+可能遇到的问题及其他使用方法（可跳过该步骤，直接看务三.2启动服务
+
+
+
+正常情况可以查看到成员列表`etcdctl member list`
+
+```
+[root@etcd1 etcd]# etcdctl member list
+5c5384ee2a68922d: name=etcd01 peerURLs=http://192.168.0.5:2380 clientURLs=http://etcd1:2379 isLeader=true
+b22b4d8949724d9b: name=etcd04 peerURLs=http://etcd4:2380 clientURLs=http://etcd4:2379 isLeader=false
+c373b2eb6d13eb35: name=etcd02 peerURLs=http://192.168.0.6:2380 clientURLs=http://etcd2:2379 isLeader=false
+```
+
+
+
+### 2. 启动服务
+
+```
+[root@etcd3 /]# systemctl start etcd
+```
+
+
+
+### 3.构建discovery
+
+由于每次构建k8s集群需要不一样的token来区分，临时在代码中生成token（测试时使用etcd）
+
+生成token的集群，等搭建完成时需要优化为自动生成token，此处手动生成
+
+#### 3.1基本集群
+
+```
+docker run -d -p 2479:2379 \
+              -p 2480:2380 \
+              -p 4401:4001 \
+              -p 7401:7001 \
+              --name etcd-discovery \
+              192.168.66.29:80/openstack_magnum/elcolio/etcd
+```
+
+
+
+discovery
+
+```
+docker run -d -p 7890:8087 \
+           -e DISC_ETCD=http://192.168.230.106:2379 \
+           -e DISC_HOST=http://192.168.230.106:7890 \
+           --name discovery 192.168.66.29:80/openstack_magnum/quay.io/coreos/discovery.etcd.io:latest
+```
+
+#### 3.2生成token
+
+curl http://127.0.0.1:7890/new?size=1
+
+http://192.168.230.106:2379/932d0a1ab8e2f1404fb836427e8099f2
+
+
+
+#### 3.3修改value size
+
+[root@etcd3 /]# curl -X PUT http://192.168.230.106:2379/v2/keys/discovery/0bbbf4feeddfa35d57f1d9a16c947155/_config/size -d value=1
+{“action”:”set”,”node”:{“key”:”/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size”,”value”:”3”,”modifiedIndex”:4,”createdIndex”:4}}
+
+
+
+创建magnum  template时写入discovery_url: http://192.168.230.106:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size
+
+
+
+
+
+## 四、搭建harbor内网仓库
+
+
+
+### magnum需要的内网镜像下载及上传
+
+```javascript
+# from docker hub
+docker pull docker.io/openstackmagnum/kubernetes-controller-manager:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-proxy:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-apiserver:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-scheduler:v1.11.6
+docker pull docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6
+docker pull docker.io/openstackmagnum/etcd:v3.2.7
+docker pull docker.io/openstackmagnum/cluster-autoscaler:v1.0
+docker pull docker.io/openstackmagnum/heat-container-agent:stein-dev
+
+docker pull docker.io/k8scloudprovider/octavia-ingress-controller:1.13.2-alpha
+docker pull docker.io/k8scloudprovider/k8s-keystone-auth:1.13.0
+docker pull docker.io/k8scloudprovider/openstack-cloud-controller-manager:v0.2.0
+
+
+
+docker pull docker.io/prom/prometheus:v1.8.2
+docker pull docker.io/prom/node-exporter:v0.15.2
+
+docker pull docker.io/grafana/grafana:5.1.5
+
+docker pull docker.io/coredns/coredns:1.3.0
+
+docker pull quay.io/calico/node:v2.6.7
+docker pull quay.io/calico/cni:v1.11.2
+docker pull quay.io/calico/kube-controllers:v1.0.3
+
+docker pull quay.io/coreos/flannel-cni:v0.3.0
+docker pull quay.io/coreos/flannel:v0.9.0
+
+
+docker pull quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.23.0
+docker pull k8s.gcr.io/defaultbackend:1.4
+docker pull docker.io/openstackmagnum/helm-client:dev
+docker pull quay.io/prometheus/alertmanager
+docker pull quay.io/coreos/prometheus-operator
+docker pull quay.io/coreos/configmap-reload
+docker pull quay.io/coreos/prometheus-config-reloader
+docker pull gcr.io/google-containers/hyperkube
+docker pull quay.io/prometheus/prometheus
+
+
+
+
+
+
+
+# from aliyun
+docker pull registry.aliyuncs.com/google_containers/pause:3.0
+
+
+
+# from google
+docker pull gcr.io/google_containers/pause:3.0
+
+docker pull gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.1.2
+docker pull k8s.gcr.io/node-problem-detector:v0.6.2
+# 没有Project 'project:kubernetes-helm' not found or deleted
+# docker pull gcr.io/kubernetes-helm/tiller:v2.12.3
+docker pull gcr.io/google_containers/kubernetes-dashboard-amd64:v1.8.3
+docker pull gcr.io/google_containers/heapster-amd64:v1.4.2
+docker pull gcr.io/google_containers/heapster-influxdb-amd64:v1.3.3
+docker pull gcr.io/google_containers/heapster-grafana-amd64:v4.4.3
+
+
+```
+
+
+
+
+
+上传到harbor步骤
+
+```
+# 从google或者dockerhub拉取镜像
+docker pull xxxx
+# 保存到本地
+docker save image_id > kubernetes-kubelet.tar
+# 上传到可以连接到harbor服务器的主机上
+scp  kubernetes-kubelet.tar root@192.168.230.161:/home/
+# 导入到docker image
+docker load -i kubernetes-kubelet.tar
+# 给镜像打tag
+docker tag docker.io/openstackmagnum/kubernetes-kubelet:v1.11.6 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+# 推送到镜像服务器
+docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+
+
+```
+
+
+
+
+
+
+
+## 部署k8s遇到的错误及解决方法
+
+
+
+1、 安装mangum, heat，需要创建文档中的用户，否则会认证 失败
+
+2、
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 部署k8s错误日志
+
+
+
+
+
+```
+[clients_magnum]
+#
+# From heat.common.config
+#
+# Type of endpoint in Identity service catalog to use for communication with
+# the OpenStack service. (string value)
+#endpoint_type = <None>
+# Optional CA cert file to use in SSL connections. (string value)
+#ca_file = <None>
+# Optional PEM-formatted certificate chain file. (string value)
+#cert_file = <None>
+# Optional PEM-formatted file that contains the private key. (string value)
+#key_file = <None>
+# If set, then the server's certificate will not be verified. (boolean value)
+#insecure = <None>
+
+```
+
+
+
+
+
+
 
 
 
@@ -1279,6 +1669,34 @@ ussuri:
 
 
 stein:
+
+
+
+
+
+使用fedoro atomic部署k8s时，拉取harobor镜像报错，gave HTTP response to HTTPS client
+
+
+
+更改docker.service ，防止报错： gave HTTP response to HTTPS client
+
+修改/etc/systemd/system/multi-user.target.wants/docker.service；修改/etc/systemd/system/docker.service
+
+systemctl status docker.service查看实际用的配置文件
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

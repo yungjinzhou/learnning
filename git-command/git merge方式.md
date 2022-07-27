@@ -1,42 +1,42 @@
-1.  github  merge
+
+
+## github上三种merge的区别
 
 
 
+### merge
 
+直接merge后前后对比
 
-![merge_request](C:\Users\lenovo\Desktop\merge_request.png)
-
-
-
-
-
+把当前commit直接合并到目标分支
 
 
 
-
-2.  squarsh and merge
-
+![origin_and_merge](.\origin_and_merge.png)
 
 
 
+### squarsh and merge
 
-![squarsh_and_merge](C:\Users\lenovo\Desktop\squarsh_and_merge.png)
+通过squarsh后在merge与最初对比
 
-
-
-3.  rebase and merge
-
+Squash Merge其实很简单，它就是在merge分支的时候把分支上的所有commit合并为一个commit后再merge到目标分支。
 
 
 
-
-![rebase_and_merge](C:\Users\lenovo\Desktop\rebase_and_merge.png)
-
+![origin_and_squarsh&merge](.\origin_and_squarsh&merge.png)
 
 
 
+### rebase and merge
+
+通过rebase后在merge与最初对比
+
+rebase就是在merge分支的时候把分支上的所有commit都merge到目标分支。
 
 
+
+![origin_and_rebase&merge](.\origin_and_rebase&merge.png)
 
 
 

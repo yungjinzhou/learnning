@@ -1,0 +1,1605 @@
+## 实践案例：stein版本Nova  调整虚拟机规格过程分析
+
+
+
+###  nova-api
+
+虚拟机的入口为`nova/api/openstack/compute/servers.py`的`_action_resize`方法，调用self._resize后调用`compute_api`的`resize`方法。
+
+```
+    def _resize(self, req, instance_id, flavor_id, **kwargs):
+        """Begin the resize process with given instance/flavor."""
+        context = req.environ["nova.context"]
+        .......
+        try:
+            self.compute_api.resize(context, instance, flavor_id, **kwargs)
+        except exception.InstanceUnknownCell as e:
+        ......
+```
+
+调用self.compute_api.resize()
+
+即nova/compute/api.py中的resize方法
+
+```javascript
+    @check_instance_lock
+    @check_instance_cell
+    @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED])
+    def resize(self, context, instance, flavor_id=None, clean_shutdown=True,
+               host_name=None, **extra_instance_updates):
+        """Resize (ie, migrate) a running instance.
+
+        If flavor_id is None, the process is considered a migration, keeping
+        the original flavor_id. If flavor_id is not None, the instance should
+        be migrated to a new host and resized to the new flavor_id.
+        host_name is always None in the resize case.
+        host_name can be set in the cold migration case only.
+        """
+        if host_name is not None:
+            # 不能迁移到相同计算节点上
+            if host_name == instance.host:
+                raise exception.CannotMigrateToSameHost()
+
+            #检查host是否存在
+            node = objects.ComputeNode.get_first_node_by_host_for_old_compat(
+                context, host_name, use_slave=True)
+
+        self._check_auto_disk_config(instance, **extra_instance_updates)
+
+        current_instance_type = instance.get_flavor()
+
+        # 如果flavor_id没有，只迁移实例
+        volume_backed = None
+        if not flavor_id:
+            LOG.debug("flavor_id is None. Assuming migration.",
+                      instance=instance)
+            new_instance_type = current_instance_type
+        else:
+            new_instance_type = flavors.get_flavor_by_flavor_id(
+                    flavor_id, read_deleted="no")
+            # 检查是否是resize一个卷作为后端的flavor磁盘大小为零的实例
+            if (new_instance_type.get('root_gb') == 0 and
+                    current_instance_type.get('root_gb') != 0):
+                volume_backed = compute_utils.is_volume_backed_instance(
+                        context, instance)
+                if not volume_backed:
+                    reason = _('Resize to zero disk flavor is not allowed.')
+                    raise exception.CannotResizeDisk(reason=reason)
+
+        if not new_instance_type:
+            raise exception.FlavorNotFound(flavor_id=flavor_id)
+
+        current_instance_type_name = current_instance_type['name']
+        new_instance_type_name = new_instance_type['name']
+        LOG.debug("Old instance type %(current_instance_type_name)s, "
+                  "new instance type %(new_instance_type_name)s",
+                  {'current_instance_type_name': current_instance_type_name,
+                   'new_instance_type_name': new_instance_type_name},
+                  instance=instance)
+
+        same_instance_type = (current_instance_type['id'] ==
+                              new_instance_type['id'])
+
+        # NOTE(sirp): We don't want to force a customer to change their flavor
+        # when Ops is migrating off of a failed host.
+        if not same_instance_type and new_instance_type.get('disabled'):
+            raise exception.FlavorNotFound(flavor_id=flavor_id)
+
+        if same_instance_type and flavor_id and self.cell_type != 'compute':
+            raise exception.CannotResizeToSameFlavor()
+
+        # 确保有足够的配额来实现实例的新大规格
+        if flavor_id:
+            self._check_quota_for_upsize(context, instance,
+                                         current_instance_type,
+                                         new_instance_type)
+
+        if not same_instance_type:
+            image = utils.get_image_from_system_metadata(
+                instance.system_metadata)
+            # Figure out if the instance is volume-backed but only if we didn't
+            # already figure that out above (avoid the extra db hit).
+            if volume_backed is None:
+                volume_backed = compute_utils.is_volume_backed_instance(
+                    context, instance)
+            # If the server is volume-backed, we still want to validate numa
+            # and pci information in the new flavor, but we don't call
+            # _validate_flavor_image_nostatus because how it handles checking
+            # disk size validation was not intended for a volume-backed
+            # resize case.
+            if volume_backed:
+                self._validate_flavor_image_numa_pci(
+                    image, new_instance_type, validate_pci=True)
+            else:
+                self._validate_flavor_image_nostatus(
+                    context, image, new_instance_type, root_bdm=None,
+                    validate_pci=True)
+
+        filter_properties = {'ignore_hosts': []}
+
+        if not CONF.allow_resize_to_same_host:
+            filter_properties['ignore_hosts'].append(instance.host)
+
+        request_spec = objects.RequestSpec.get_by_instance_uuid(
+            context, instance.uuid)
+        request_spec.ignore_hosts = filter_properties['ignore_hosts']
+
+
+        instance.task_state = task_states.RESIZE_PREP
+        instance.progress = 0
+        instance.update(extra_instance_updates)
+        judge_result,result = judge.proxy(context,{'instance_task_state':instance.task_state},False)
+        if judge_result:
+            # 写入数据库
+            instance.save(expected_task_state=[None])
+
+        if self.cell_type == 'api':
+            # 创建迁移记录，写入数据库
+            self._resize_cells_support(context, instance,
+                                       current_instance_type,
+                                       new_instance_type)
+
+
+        if not flavor_id:
+            self._record_action_start(context, instance,
+                                      instance_actions.MIGRATE)
+        else:
+            self._record_action_start(context, instance,
+                                      instance_actions.RESIZE)
+
+        # TODO(melwitt): We're not rechecking for strict quota here to guard
+        # against going over quota during a race at this time because the
+        # resource consumption for this operation is written to the database
+        # by compute.
+        scheduler_hint = {'filter_properties': filter_properties}
+
+        if host_name is None:
+            # If 'host_name' is not specified,
+            # clear the 'requested_destination' field of the RequestSpec.
+            request_spec.requested_destination = None
+        else:
+            # Set the host and the node so that the scheduler will
+            # validate them.
+            request_spec.requested_destination = objects.Destination(
+                host=node.host, node=node.hypervisor_hostname)
+
+
+		# self.compute_task_api = conductor.ComputeTaskAPI()
+        self.compute_task_api.resize_instance(context, instance,
+                extra_instance_updates, scheduler_hint=scheduler_hint,
+                flavor=new_instance_type,
+                clean_shutdown=clean_shutdown,
+                request_spec=request_spec)
+
+            
+            
+```
+
+`compute_task_api`即conductor的`api.py`。conductor的api并没有执行什么操作，直接调用了`conductor_compute_rpcapi`的`migrate_server`方法:
+
+```
+      def resize_instance(self, context, instance, extra_instance_updates,
+                        scheduler_hint, flavor, reservations=None,
+                        clean_shutdown=True, request_spec=None,
+                        host_list=None):
+        # NOTE(comstud): 'extra_instance_updates' is not used here but is
+        # needed for compatibility with the cells_rpcapi version of this
+        # method.
+        self.conductor_compute_rpcapi.migrate_server(
+            context, instance, scheduler_hint, live=False, rebuild=False,
+            flavor=flavor, block_migration=None, disk_over_commit=None,
+            reservations=reservations, clean_shutdown=clean_shutdown,
+            request_spec=request_spec, host_list=host_list)
+```
+
+该方法即conductor RPC调用api，即`nova/conductor/rpcapi.py`模块，该方法除了一堆的版本检查，剩下的就是对RPC调用的封装，:
+
+```
+    # TODO(melwitt): Remove the reservations parameter in version 2.0 of the
+    # RPC API.
+    # TODO(mriedem): Make request_spec required *and* a RequestSpec object
+    # rather than a legacy dict in version 2.0 of the RPC API.
+    def migrate_server(self, context, instance, scheduler_hint, live, rebuild,
+                  flavor, block_migration, disk_over_commit,
+                  reservations=None, clean_shutdown=True, request_spec=None,
+                  host_list=None):
+        kw = {'instance': instance, 'scheduler_hint': scheduler_hint,
+              'live': live, 'rebuild': rebuild, 'flavor': flavor,
+              'block_migration': block_migration,
+              'disk_over_commit': disk_over_commit,
+              'reservations': reservations,
+              'clean_shutdown': clean_shutdown,
+              'request_spec': request_spec,
+              'host_list': host_list,
+              }
+        version = '1.20'
+        if not self.client.can_send_version(version):
+            del kw['host_list']
+            version = '1.13'
+        if not self.client.can_send_version(version):
+            del kw['request_spec']
+            version = '1.11'
+        if not self.client.can_send_version(version):
+            del kw['clean_shutdown']
+            version = '1.10'
+        if not self.client.can_send_version(version):
+            kw['flavor'] = objects_base.obj_to_primitive(flavor)
+            version = '1.6'
+        if not self.client.can_send_version(version):
+            kw['instance'] = jsonutils.to_primitive(
+                    objects_base.obj_to_primitive(instance))
+            version = '1.4'
+        cctxt = self.client.prepare(version=version)
+        return cctxt.call(context, 'migrate_server', **kw)
+```
+
+其中`call`表示同步调用，`migrate_server`是RPC调用的方法，`kw`是传递的参数。参数是字典类型，没有复杂对象结构，因此不需要特别的序列化操作。
+
+截至到现在，虽然目录由`api->compute->conductor`，但仍在nova-api进程中运行，直到call方法执行，该方法由于是同步调用，会等待RPC返回。
+
+### nova-conductor
+
+由于是向nova-conductor发起的RPC调用(根据RPC_TOPIC判定)，而前面说了接收端肯定是`manager.py`，因此进程跳到`nova-conductor`服务，入口为`nova/conductor/manager.py`的`migrate_server`方法。
+
+
+
+### <font color=red>下面流程是创建实例的流程，resize的还没有整理</font>
+
+
+
+该方法首先调用了`_schedule_instances`方法，该方法首先调用了`scheduler_client`的`select_destinations`方法:
+
+```
+def schedule_and_build_instances(...):
+    # Add all the UUIDs for the instances     instance_uuids = [spec.instance_uuid for spec in request_specs]
+    try:
+        host_lists = self._schedule_instances(context, request_specs[0],
+                instance_uuids, return_alternates=True)
+    except Exception as exc:
+        ...
+        
+def _schedule_instances(self, context, request_spec,
+                        instance_uuids=None, return_alternates=False):
+    scheduler_utils.setup_instance_group(context, request_spec)
+    with timeutils.StopWatch() as timer:
+        host_lists = self.query_client.select_destinations(
+            context, request_spec, instance_uuids, return_objects=True,
+            return_alternates=return_alternates)
+    LOG.debug('Took %0.2f seconds to select destinations for %s '
+              'instance(s).', timer.elapsed(), len(instance_uuids))
+    return host_lists
+```
+
+`scheduler_client`和`compute_api`以及`compute_task_api`都是一样对服务的client封装调用，不过scheduler没有`api.py`模块，而是有个单独的client目录，实现在`nova/scheduler/client`目录的`query.py`模块，`select_destinations`方法又很直接的调用了`scheduler_rpcapi`的`select_destinations`方法，终于又到了RPC调用环节。
+
+```
+def select_destinations(...):
+    return self.scheduler_rpcapi.select_destinations(context, ...)
+```
+
+毫无疑问，RPC封装同样是在`nova/scheduler`的`rpcapi.py`中实现。该方法RPC调用代码如下:
+
+```
+def select_destinations(self, ...):
+    # Modify the parameters if an older version is requested     # ...     cctxt = self.client.prepare(
+        version=version,
+        call_monitor_timeout=CONF.rpc_response_timeout,
+        timeout=CONF.long_rpc_timeout)
+    return cctxt.call(ctxt, 'select_destinations', **msg_args)
+```
+
+注意这里调用的是`call`方法，说明这是同步RPC调用，此时`nova-conductor`并不会退出，而是等待直到`nova-scheduler`返回。因此当前nova-conductor为堵塞状态，等待`nova-scheduler`返回，此时`nova-scheduler`接管任务。
+
+### nova-scheduler
+
+同理找到scheduler的manager.py模块的`select_destinations`方法，该方法会调用driver方法:
+
+```
+@messaging.expected_exceptions(exception.NoValidHost)
+def select_destinations(self, ctxt, ...):
+    # ...     selections = self.driver.select_destinations(ctxt, spec_obj,...)
+    return selections
+```
+
+这里的`driver`其实就是调度驱动，在配置文件中`scheduler`配置组指定，默认为`filter_scheduler`，对应`nova/scheduler/filter_scheduler.py`模块，该算法根据指定的filters过滤掉不满足条件的计算节点，然后通过`weigh`方法计算权值，最后选择权值高的作为候选计算节点返回。调度算法实现这里不展开，感兴趣的可以阅读。
+
+最后nova-scheduler返回调度的`hosts`集合，任务结束。由于nova-conductor通过同步方法调用的该方法，因此nova-scheduler会把结果返回给nova-conductor服务。
+
+### nova-condutor
+
+nova-conductor等待nova-scheduler返回后，拿到调度的计算节点列表，回到`scheduler/manager.py`的`schedule_and_build_instances`方法。
+
+因为可能同时启动多个虚拟机，因此循环调用了`compute_rpcapi`的`build_and_run_instance`方法：
+
+```
+for (build_request, request_spec, host_list, instance) in zipped:
+    # ...     with obj_target_cell(instance, cell) as cctxt:
+        # ...         with obj_target_cell(instance, cell) as cctxt:
+            self.compute_rpcapi.build_and_run_instance(
+                    cctxt, ..., host_list=host_list)
+```
+
+看到xxxrpc立即想到对应的代码位置，位于`nova/compute/rpcapi`模块，该方法向nova-compute发起RPC请求:
+
+```
+def build_and_run_instance(self, ctxt, ...):
+    # ...     client = self.router.client(ctxt)
+    version = '5.0'
+    cctxt = client.prepare(server=host, version=version)
+    cctxt.cast(ctxt, 'build_and_run_instance', **kwargs)
+```
+
+由于是`cast`调用，因此发起的是异步RPC，因此nova-conductor任务结束，紧接着终于轮到nova-compute服务登场了。
+
+### nova-compute
+
+终于等到nova-compute服务，服务入口为`nova/compute/manager.py`，找到`build_and_run_instance`方法，该方法调用关系如下：
+
+```
+build_and_run_instance()
+  -> _locked_do_build_and_run_instance()
+  -> _do_build_and_run_instance()
+  -> _build_and_run_instance()
+  -> driver.spawn()
+```
+
+这里的`driver`就是compute driver，通过`compute`配置组的`compute_driver`指定，这里为`libvirt.LibvirtDriver`，代码位于`nova/virt/libvirt/driver.py`，找到`spawn()`方法，该方法调用Libvirt创建虚拟机，并等待虚拟机状态为`Active`,nova-compute服务结束,整个创建虚拟机流程也到此结束。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## todo: 分析api路径请求流程
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 分析nova组件启动流程
+
+以nova-conductor为例
+
+根据服务启动代码
+
+ /usr/bin/nova-conducotor
+
+```
+#!/usr/bin/python2
+# PBR Generated from u'console_scripts'
+
+import sys
+
+from nova.cmd.conductor import main
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+```
+
+启动入口在nova/cmd/conductor.py的main函数中，看下主要做了什么
+
+```
+
+def main():
+    config.parse_args(sys.argv)
+    logging.setup(CONF, "nova")
+    objects.register_all()
+    gmr_opts.set_defaults(CONF)
+    objects.Service.enable_min_version_cache()
+
+    gmr.TextGuruMeditation.setup_autorun(version, conf=CONF)
+
+    server = service.Service.create(binary='nova-conductor',
+                                    topic=rpcapi.RPC_TOPIC)
+    workers = CONF.conductor.workers or processutils.get_worker_count()
+    service.serve(server, workers=workers)
+    service.wait()
+
+```
+
+server行上面，加载参数，加载配置，加载；server对象创建如下
+
+```
+# nova/nova/service.py
+
+class Service(service.Service):
+    """Service object for binaries running on hosts.
+
+    A service takes a manager and enables rpc by listening to queues based
+    on topic. It also periodically runs tasks on the manager and reports
+    its state to the database services table.
+    """
+
+    def __init__(self, host, binary, topic, manager, report_interval=None,
+                 periodic_enable=None, periodic_fuzzy_delay=None,
+                 periodic_interval_max=None, *args, **kwargs):
+        super(Service, self).__init__()
+        self.host = host
+        self.binary = binary
+        self.topic = topic
+        self.manager_class_name = manager
+        self.servicegroup_api = servicegroup.API()
+        manager_class = importutils.import_class(self.manager_class_name)
+        if objects_base.NovaObject.indirection_api:
+            conductor_api = conductor.API()
+            conductor_api.wait_until_ready(context.get_admin_context())
+        self.manager = manager_class(host=self.host, *args, **kwargs)
+        self.rpcserver = None
+        self.report_interval = report_interval
+        self.periodic_enable = periodic_enable
+        self.periodic_fuzzy_delay = periodic_fuzzy_delay
+        self.periodic_interval_max = periodic_interval_max
+        self.saved_args, self.saved_kwargs = args, kwargs
+        self.backdoor_port = None
+        setup_profiler(binary, self.host)
+	# ... 省略代码
+
+    @classmethod
+    def create(cls, host=None, binary=None, topic=None, manager=None,
+               report_interval=None, periodic_enable=None,
+               periodic_fuzzy_delay=None, periodic_interval_max=None):
+        """Instantiates class and passes back application object.
+
+        :param host: defaults to CONF.host
+        :param binary: defaults to basename of executable
+        :param topic: defaults to bin_name - 'nova-' part
+        :param manager: defaults to CONF.<topic>_manager
+        :param report_interval: defaults to CONF.report_interval
+        :param periodic_enable: defaults to CONF.periodic_enable
+        :param periodic_fuzzy_delay: defaults to CONF.periodic_fuzzy_delay
+        :param periodic_interval_max: if set, the max time to wait between runs
+
+        """
+        if not host:
+            host = CONF.host
+        if not binary:
+            binary = os.path.basename(sys.argv[0])
+        if not topic:
+            topic = binary.rpartition('nova-')[2]
+        if not manager:
+            manager = SERVICE_MANAGERS.get(binary)
+        if report_interval is None:
+            report_interval = CONF.report_interval
+        if periodic_enable is None:
+            periodic_enable = CONF.periodic_enable
+        if periodic_fuzzy_delay is None:
+            periodic_fuzzy_delay = CONF.periodic_fuzzy_delay
+
+        debugger.init()
+
+        service_obj = cls(host, binary, topic, manager,
+                          report_interval=report_interval,
+                          periodic_enable=periodic_enable,
+                          periodic_fuzzy_delay=periodic_fuzzy_delay,
+                          periodic_interval_max=periodic_interval_max)
+
+        return service_obj
+```
+
+
+
+__init__ 方法中有两个地方需要注意：
+
+一是根据 manager_name 动态导入 manager 类。每一个 service 都用 manager 对象干 一些特定的工作！通过 importutils.import_class 实现。
+
+ 二是 `self.conductor_api.wait_until_ready(context.get_admin_context())`， 这处代码的功能是：根据 db_allowed 的值，确定组件是否被允许直接访问数据库。 假如允许，函数直接返回；假如不允许直接访问数据库，那么一直等待，等到 nova-conductor 服务启动。 
+
+
+
+```
+# nova/conductor/api.py
+
+
+
+class API(object):
+    """Conductor API that does updates via RPC to the ConductorManager."""
+
+    def __init__(self):
+        self.conductor_rpcapi = rpcapi.ConductorAPI()
+        self.base_rpcapi = baserpc.BaseAPI(topic=rpcapi.RPC_TOPIC)
+
+    def object_backport_versions(self, context, objinst, object_versions):
+        return self.conductor_rpcapi.object_backport_versions(context, objinst,
+                                                              object_versions)
+
+    def wait_until_ready(self, context, early_timeout=10, early_attempts=10):
+        '''Wait until a conductor service is up and running.
+
+        This method calls the remote ping() method on the conductor topic until
+        it gets a response.  It starts with a shorter timeout in the loop
+        (early_timeout) up to early_attempts number of tries.  It then drops
+        back to the globally configured timeout for rpc calls for each retry.
+        '''
+        attempt = 0
+        timeout = early_timeout
+        # if we show the timeout message, make sure we show a similar
+        # message saying that everything is now working to avoid
+        # confusion
+        has_timedout = False
+        while True:
+            # NOTE(danms): Try ten times with a short timeout, and then punt
+            # to the configured RPC timeout after that
+            if attempt == early_attempts:
+                timeout = None
+            attempt += 1
+
+            # NOTE(russellb): This is running during service startup. If we
+            # allow an exception to be raised, the service will shut down.
+            # This may fail the first time around if nova-conductor wasn't
+            # running when this service started.
+            try:
+                self.base_rpcapi.ping(context, '1.21 GigaWatts',
+                                      timeout=timeout)
+                if has_timedout:
+                    LOG.info('nova-conductor connection '
+                             'established successfully')
+                break
+            except messaging.MessagingTimeout:
+                has_timedout = True
+                LOG.warning('Timed out waiting for nova-conductor.  '
+                            'Is it running? Or did this service start '
+                            'before nova-conductor?  '
+                            'Reattempting establishment of '
+                            'nova-conductor connection...')
+
+```
+
+
+
+LocalAPI 的 wait_until_ready 方法直接返回，所以不需要等待 nova-conductor 服务启动。 而 API.wait_until_ready() 方法会发起 RPC 调用并阻塞等待结果！ self.base_rpcapi对象 topic 值为 “conductor” , 利用call() 方法发送消息时， 只有 topic 值也是 “conductor” ，并且 version 不低于 “1.0” 的 rpcserver 才会处理！
+
+后面分析服务启动的start方法时，能看到，每一个rpcserver 服务的 endpoints 都 包括 `BaseRPCAPI` 对象！nova-conductor 服务的 BaseRPCAPI 实例化对象 topic 值刚好是 “conductor”， 我们可以从代码中看到这一点。所以，只有 nova-conductor 服务启动了，**并 处理 base_rpcapi 发起的 call 请求**，才会退出 while 循环！
+
+初始化调用baserpc的BaseAPI
+
+```
+# nova/baserpc.py
+class BaseAPI(object):
+    """Client side of the base rpc API.
+
+    API version history:
+
+        1.0 - Initial version.
+        1.1 - Add get_backdoor_port
+    """
+
+    VERSION_ALIASES = {
+        # baseapi was added in havana
+    }
+
+    def __init__(self, topic):
+        super(BaseAPI, self).__init__()
+        target = messaging.Target(topic=topic,
+                                  namespace=_NAMESPACE,
+                                  version='1.0')
+        version_cap = self.VERSION_ALIASES.get(CONF.upgrade_levels.baseapi,
+                                               CONF.upgrade_levels.baseapi)
+        self.client = rpc.get_client(target, version_cap=version_cap)
+
+    def ping(self, context, arg, timeout=None):
+        arg_p = jsonutils.to_primitive(arg)
+        cctxt = self.client.prepare(timeout=timeout)
+        return cctxt.call(context, 'ping', arg=arg_p)
+
+    def get_backdoor_port(self, context, host):
+        cctxt = self.client.prepare(server=host, version='1.1')
+        return cctxt.call(context, 'get_backdoor_port')
+        
+        
+class BaseRPCAPI(object):
+    """Server side of the base RPC API."""
+
+    target = messaging.Target(namespace=_NAMESPACE, version='1.1')
+
+    def __init__(self, service_name, backdoor_port):
+        self.service_name = service_name
+        self.backdoor_port = backdoor_port
+
+    def ping(self, context, arg):
+        resp = {'service': self.service_name, 'arg': arg}
+        return jsonutils.to_primitive(resp)
+
+    def get_backdoor_port(self, context):
+        return self.backdoor_port
+  
+```
+
+
+
+生成的service_obj对象`<Service: host=controller, binary=nova-conductor, manager_class_name=nova.conductor.manager.ConductorManager>`, 
+
+> 后面分析服务启动的start方法时，能看到，每一个rpcserver 服务的 endpoints 都 包括 `BaseRPCAPI` 对象！nova-conductor 服务的 BaseRPCAPI 实例化对象 topic 值刚好是 “conductor”， 我们可以从代码中看到这一点。所以，只有 nova-conductor 服务启动了，并 处理 base_rpcapi 发起的 call 请求，才会退出 while 循环！ 
+
+
+
+所以会调用ConductorManager初始化，该类位置在nova/conductor/manger.py中
+
+```
+# nova/conductor/manager.py
+
+class ConductorManager(manager.Manager):
+    """Mission: Conduct things.
+
+    The methods in the base API for nova-conductor are various proxy operations
+    performed on behalf of the nova-compute service running on compute nodes.
+    Compute nodes are not allowed to directly access the database, so this set
+    of methods allows them to get specific work done without locally accessing
+    the database.
+
+    The nova-conductor service also exposes an API in the 'compute_task'
+    namespace.  See the ComputeTaskManager class for details.
+    """
+
+    target = messaging.Target(version='3.0')
+
+    def __init__(self, *args, **kwargs):
+        super(ConductorManager, self).__init__(service_name='conductor',
+                                               *args, **kwargs)
+        self.compute_task_mgr = ComputeTaskManager()
+        self.additional_endpoints.append(self.compute_task_mgr)
+
+```
+
+
+
+ConductorManager 实例化设置 service_name， BaseRPCAPI实例化时会根据 service_name 设置 topic！ 然后组成 endpoints 创建 rpcserver！
+
+```
+# nova/service.py
+
+
+class Service(service.Service):
+    """Service object for binaries running on hosts.
+
+    A service takes a manager and enables rpc by listening to queues based
+    on topic. It also periodically runs tasks on the manager and reports
+    its state to the database services table.
+    """
+
+    def __init__(self, host, binary, topic, manager, report_interval=None,
+                 periodic_enable=None, periodic_fuzzy_delay=None,
+                 periodic_interval_max=None, *args, **kwargs):
+        super(Service, self).__init__()
+        self.host = host
+        self.binary = binary
+        self.topic = topic
+        self.manager_class_name = manager
+        self.servicegroup_api = servicegroup.API()
+        manager_class = importutils.import_class(self.manager_class_name)
+        if objects_base.NovaObject.indirection_api:
+            conductor_api = conductor.API()
+            conductor_api.wait_until_ready(context.get_admin_context())
+        self.manager = manager_class(host=self.host, *args, **kwargs)
+        self.rpcserver = None
+        self.report_interval = report_interval
+        self.periodic_enable = periodic_enable
+        self.periodic_fuzzy_delay = periodic_fuzzy_delay
+        self.periodic_interval_max = periodic_interval_max
+        self.saved_args, self.saved_kwargs = args, kwargs
+        self.backdoor_port = None
+        setup_profiler(binary, self.host)
+
+    def __repr__(self):
+        return "<%(cls_name)s: host=%(host)s, binary=%(binary)s, " \
+               "manager_class_name=%(manager)s>" % {
+                 'cls_name': self.__class__.__name__,
+                 'host': self.host,
+                 'binary': self.binary,
+                 'manager': self.manager_class_name
+                }
+
+    def start(self):
+        """Start the service.
+
+        This includes starting an RPC service, initializing
+        periodic tasks, etc.
+        """
+        # NOTE(melwitt): Clear the cell cache holding database transaction
+        # context manager objects. We do this to ensure we create new internal
+        # oslo.db locks to avoid a situation where a child process receives an
+        # already locked oslo.db lock when it is forked. When a child process
+        # inherits a locked oslo.db lock, database accesses through that
+        # transaction context manager will never be able to acquire the lock
+        # and requests will fail with CellTimeout errors.
+        # See https://bugs.python.org/issue6721 for more information.
+        # With python 3.7, it would be possible for oslo.db to make use of the
+        # os.register_at_fork() method to reinitialize its lock. Until we
+        # require python 3.7 as a mininum version, we must handle the situation
+        # outside of oslo.db.
+        context.CELL_CACHE = {}
+
+        assert_eventlet_uses_monotonic_clock()
+
+        verstr = version.version_string_with_package()
+        LOG.info(_LI('Starting %(topic)s node (version %(version)s)'),
+                  {'topic': self.topic, 'version': verstr})
+        self.basic_config_check()
+        self.manager.init_host()
+        self.model_disconnected = False
+        ctxt = context.get_admin_context()
+        self.service_ref = objects.Service.get_by_host_and_binary(
+            ctxt, self.host, self.binary)
+        if self.service_ref:
+            _update_service_ref(self.service_ref)
+
+        else:
+            try:
+                self.service_ref = _create_service_ref(self, ctxt)
+            except (exception.ServiceTopicExists,
+                    exception.ServiceBinaryExists):
+                # NOTE(danms): If we race to create a record with a sibling
+                # worker, don't fail here.
+                self.service_ref = objects.Service.get_by_host_and_binary(
+                    ctxt, self.host, self.binary)
+
+        self.manager.pre_start_hook()
+
+        if self.backdoor_port is not None:
+            self.manager.backdoor_port = self.backdoor_port
+
+        LOG.debug("Creating RPC server for service %s", self.topic)
+
+        target = messaging.Target(topic=self.topic, server=self.host)
+
+        endpoints = [
+            self.manager,
+            baserpc.BaseRPCAPI(self.manager.service_name, self.backdoor_port)
+        ]
+        endpoints.extend(self.manager.additional_endpoints)
+		# [<nova.conductor.manager.ConductorManager object at 0x7f85fb2be210>, <nova.baserpc.BaseRPCAPI object at 0x7f8606617d50>, <nova.conductor.manager.ComputeTaskManager object at 0x7f85fb265050>]
+        serializer = objects_base.NovaObjectSerializer()
+
+        self.rpcserver = rpc.get_server(target, endpoints, serializer)
+        self.rpcserver.start()
+
+        self.manager.post_start_hook()
+
+        LOG.debug("Join ServiceGroup membership for this service %s",
+                  self.topic)
+        # Add service to the ServiceGroup membership group.
+        self.servicegroup_api.join(self.host, self.topic, self)
+
+        if self.periodic_enable:
+            if self.periodic_fuzzy_delay:
+                initial_delay = random.randint(0, self.periodic_fuzzy_delay)
+            else:
+                initial_delay = None
+
+            self.tg.add_dynamic_timer(self.periodic_tasks,
+                                     initial_delay=initial_delay,
+                                     periodic_interval_max=
+                                        self.periodic_interval_max)
+
+
+```
+
+
+
+经过上面这么多步骤，还只是创建了一个服务对象，服务并没有运行。我们接下来看下面的代码
+
+
+
+```
+# nova/nova/service.py
+
+def serve(server, workers=None):
+    global _launcher
+    if _launcher:
+        raise RuntimeError(_('serve() can only be called once'))
+
+    _launcher = service.launch(CONF, server, workers=workers,
+                               restart_method='mutate')
+     # <oslo_service.service.ProcessLauncher object at 0x7f8167c90ed0>
+
+
+def wait():
+    _launcher.wait()
+
+
+```
+
+
+
+其中serve调用oslo.service/service的launch方法，
+
+```
+# oslo_service/service.py
+
+def launch(conf, service, workers=1, restart_method='reload'):
+    """Launch a service with a given number of workers.
+
+    :param conf: an instance of ConfigOpts
+    :param service: a service to launch, must be an instance of
+           :class:`oslo_service.service.ServiceBase`
+    :param workers: a number of processes in which a service will be running
+    :param restart_method: Passed to the constructed launcher. If 'reload', the
+        launcher will call reload_config_files on SIGHUP. If 'mutate', it will
+        call mutate_config_files on SIGHUP. Other values produce a ValueError.
+    :returns: instance of a launcher that was used to launch the service
+    """
+
+    if workers is not None and workers <= 0:
+        raise ValueError(_("Number of workers should be positive!"))
+
+    if workers is None or workers == 1:
+        launcher = ServiceLauncher(conf, restart_method=restart_method)
+    else:
+        launcher = ProcessLauncher(conf, restart_method=restart_method)
+    launcher.launch_service(service, workers=workers)
+
+    return launcher
+
+```
+
+launcher.launch_service
+
+```
+# oslo_service/service.py
+
+class ProcessLauncher(object):
+    """Launch a service with a given number of workers."""
+     
+     # ... 省略代码
+    def launch_service(self, service, workers=1):
+        """Launch a service with a given number of workers.
+
+       :param service: a service to launch, must be an instance of
+              :class:`oslo_service.service.ServiceBase`
+       :param workers: a number of processes in which a service
+              will be running
+        """
+        _check_service_base(service)
+        wrap = ServiceWrapper(service, workers)
+
+        # Hide existing objects from the garbage collector, so that most
+        # existing pages will remain in shared memory rather than being
+        # duplicated between subprocesses in the GC mark-and-sweep. (Requires
+        # Python 3.7 or later.)
+        if hasattr(gc, 'freeze'):
+            gc.freeze()
+
+        LOG.info('Starting %d workers', wrap.workers)
+        while self.running and len(wrap.children) < wrap.workers:
+            self._start_child(wrap)
+```
+
+
+
+最终是调用service.py的start方法启动
+
+```
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(781)wait()
+-> for service in self.services:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(783)wait()
+-> self.tg.wait()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(170)start()
+-> context.CELL_CACHE = {}
+
+```
+
+
+
+
+
+
+
+所以会调用ConductorManager运行，该类位置在nova/conductor/manger.py中
+
+```
+# nova/conductor/manager.py
+
+class ConductorManager(manager.Manager):
+    """Mission: Conduct things.
+
+    The methods in the base API for nova-conductor are various proxy operations
+    performed on behalf of the nova-compute service running on compute nodes.
+    Compute nodes are not allowed to directly access the database, so this set
+    of methods allows them to get specific work done without locally accessing
+    the database.
+
+    The nova-conductor service also exposes an API in the 'compute_task'
+    namespace.  See the ComputeTaskManager class for details.
+    """
+
+    target = messaging.Target(version='3.0')
+
+    def __init__(self, *args, **kwargs):
+        super(ConductorManager, self).__init__(service_name='conductor',
+                                               *args, **kwargs)
+        self.compute_task_mgr = ComputeTaskManager()
+        self.additional_endpoints.append(self.compute_task_mgr)
+
+```
+
+
+
+ConductorManager 实例化设置 service_name， BaseRPCAPI实例化时会根据 service_name 设置 topic！ 然后组成 endpoints 创建 rpcserver！
+
+
+
+conductor调用ComputeTaskManager，conductor实际处理发送过来rpc函数名称来处理的类，即namespace='compute_task'的实际处理函数的位置，
+
+```
+# nova/conductor/manager.py
+
+@profiler.trace_cls("rpc")
+class ComputeTaskManager(base.Base):
+    """Namespace for compute methods.
+
+    This class presents an rpc API for nova-conductor under the 'compute_task'
+    namespace.  The methods here are compute operations that are invoked
+    by the API service.  These methods see the operation to completion, which
+    may involve coordinating activities on multiple compute nodes.
+    """
+
+    target = messaging.Target(namespace='compute_task', version='1.20')
+
+    def __init__(self):
+        super(ComputeTaskManager, self).__init__()
+        self.compute_rpcapi = compute_rpcapi.ComputeAPI()
+        self.volume_api = cinder.API()
+        self.image_api = image.API()
+        self.network_api = network.API()
+        self.servicegroup_api = servicegroup.API()
+        self.query_client = query.SchedulerQueryClient()
+        self.report_client = report.SchedulerReportClient()
+        self.notifier = rpc.get_notifier('compute', CONF.host)
+        # Help us to record host in EventReporter
+        self.host = CONF.host
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+nova-conductor  pdb定位启动流程
+
+```
+> /usr/lib/python2.7/site-packages/nova/service.py(260)create()
+-> if not host:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(261)create()
+-> host = CONF.host
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(262)create()
+-> if not binary:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(264)create()
+-> if not topic:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(266)create()
+-> if not manager:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(267)create()
+-> manager = SERVICE_MANAGERS.get(binary)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(268)create()
+-> if report_interval is None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(269)create()
+-> report_interval = CONF.report_interval
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(270)create()
+-> if periodic_enable is None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(271)create()
+-> periodic_enable = CONF.periodic_enable
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(272)create()
+-> if periodic_fuzzy_delay is None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(273)create()
+-> periodic_fuzzy_delay = CONF.periodic_fuzzy_delay
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(275)create()
+-> debugger.init()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(277)create()
+-> service_obj = cls(host, binary, topic, manager,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(278)create()
+-> report_interval=report_interval,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(279)create()
+-> periodic_enable=periodic_enable,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(280)create()
+-> periodic_fuzzy_delay=periodic_fuzzy_delay,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(281)create()
+-> periodic_interval_max=periodic_interval_max)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(123)__init__()
+-> self.host = host
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(124)__init__()
+-> self.binary = binary
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(125)__init__()
+-> self.topic = topic
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(126)__init__()
+-> self.manager_class_name = manager
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(127)__init__()
+-> self.servicegroup_api = servicegroup.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(128)__init__()
+-> manager_class = importutils.import_class(self.manager_class_name)
+(Pdb) n
+n
+> /usr/lib/python2.7/site-packages/nova/service.py(129)__init__()
+-> if objects_base.NovaObject.indirection_api:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(132)__init__()
+-> self.manager = manager_class(host=self.host, *args, **kwargs)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(118)__init__()
+-> self.compute_task_mgr = ComputeTaskManager()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(238)__init__()
+-> super(ComputeTaskManager, self).__init__()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(239)__init__()
+-> self.compute_rpcapi = compute_rpcapi.ComputeAPI()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(240)__init__()
+-> self.volume_api = cinder.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(241)__init__()
+-> self.image_api = image.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(242)__init__()
+-> self.network_api = network.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(243)__init__()
+-> self.servicegroup_api = servicegroup.API()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(244)__init__()
+-> self.query_client = query.SchedulerQueryClient()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(245)__init__()
+-> self.report_client = report.SchedulerReportClient()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(246)__init__()
+-> self.notifier = rpc.get_notifier('compute', CONF.host)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(248)__init__()
+-> self.host = CONF.host
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(248)__init__()->None
+-> self.host = CONF.host
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(119)__init__()
+-> self.additional_endpoints.append(self.compute_task_mgr)
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/conductor/manager.py(119)__init__()->None
+-> self.additional_endpoints.append(self.compute_task_mgr)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(133)__init__()
+-> self.rpcserver = None
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(134)__init__()
+-> self.report_interval = report_interval
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(135)__init__()
+-> self.periodic_enable = periodic_enable
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(136)__init__()
+-> self.periodic_fuzzy_delay = periodic_fuzzy_delay
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(137)__init__()
+-> self.periodic_interval_max = periodic_interval_max
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(138)__init__()
+-> self.saved_args, self.saved_kwargs = args, kwargs
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(139)__init__()
+-> self.backdoor_port = None
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(140)__init__()
+-> setup_profiler(binary, self.host)
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(140)__init__()->None
+-> setup_profiler(binary, self.host)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(283)create()
+-> return service_obj
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(283)create()-><Service...rManager>
+-> return service_obj
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(46)main()
+-> workers = CONF.conductor.workers or processutils.get_worker_count()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(47)main()
+-> workers = 1
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(48)main()
+-> import pdb; pdb.set_trace()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(49)main()
+-> service.serve(server, workers=workers)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(497)serve()
+-> if _launcher:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(500)serve()
+-> _launcher = service.launch(CONF, server, workers=workers,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(501)serve()
+-> restart_method='mutate')
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(833)launch()
+-> if workers is not None and workers <= 0:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(836)launch()
+-> if workers is None or workers == 1:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(837)launch()
+-> launcher = ServiceLauncher(conf, restart_method=restart_method)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(331)__init__()
+-> super(ServiceLauncher, self).__init__(
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(332)__init__()
+-> conf, restart_method=restart_method)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(263)__init__()
+-> self.conf = conf
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(264)__init__()
+-> conf.register_opts(_options.service_opts)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(265)__init__()
+-> self.services = Services(restart_method=restart_method)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(267)__init__()
+-> eventlet_backdoor.initialize_if_enabled(self.conf))
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(268)__init__()
+-> self.restart_method = restart_method
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(268)__init__()->None
+-> self.restart_method = restart_method
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(333)__init__()
+-> self.signal_handler = SignalHandler()
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(333)__init__()->None
+-> self.signal_handler = SignalHandler()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(840)launch()
+-> launcher.launch_service(service, workers=workers)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(842)launch()
+-> return launcher
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(842)launch()-><oslo_se...32d36f50>
+-> return launcher
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(501)serve()->None
+-> restart_method='mutate')
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/cmd/conductor.py(50)main()
+-> service.wait()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(170)start()
+-> context.CELL_CACHE = {}
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(172)start()
+-> assert_eventlet_uses_monotonic_clock()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(174)start()
+-> verstr = version.version_string_with_package()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(175)start()
+-> LOG.info(_LI('Starting %(topic)s node (version %(version)s)'),
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(176)start()
+-> {'topic': self.topic, 'version': verstr})
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(177)start()
+-> self.basic_config_check()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(178)start()
+-> self.manager.init_host()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(179)start()
+-> self.model_disconnected = False
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(180)start()
+-> ctxt = context.get_admin_context()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(181)start()
+-> self.service_ref = objects.Service.get_by_host_and_binary(
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(182)start()
+-> ctxt, self.host, self.binary)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(183)start()
+-> if self.service_ref:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(184)start()
+-> _update_service_ref(self.service_ref)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(196)start()
+-> self.manager.pre_start_hook()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(198)start()
+-> if self.backdoor_port is not None:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(201)start()
+-> LOG.debug("Creating RPC server for service %s", self.topic)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(203)start()
+-> target = messaging.Target(topic=self.topic, server=self.host)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(207)start()
+-> self.manager,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(208)start()
+-> baserpc.BaseRPCAPI(self.manager.service_name, self.backdoor_port)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/baserpc.py(73)__init__()
+-> self.service_name = service_name
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/baserpc.py(74)__init__()
+-> self.backdoor_port = backdoor_port
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/baserpc.py(74)__init__()->None
+-> self.backdoor_port = backdoor_port
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(210)start()
+-> endpoints.extend(self.manager.additional_endpoints)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(216)start()
+-> serializer = objects_base.NovaObjectSerializer()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(218)start()
+-> self.rpcserver = rpc.get_server(target, endpoints, serializer)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(219)start()
+-> self.rpcserver.start()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(221)start()
+-> self.manager.post_start_hook()
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(223)start()
+-> LOG.debug("Join ServiceGroup membership for this service %s",
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(224)start()
+-> self.topic)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(226)start()
+-> self.servicegroup_api.join(self.host, self.topic, self)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(228)start()
+-> if self.periodic_enable:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(229)start()
+-> if self.periodic_fuzzy_delay:
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(230)start()
+-> initial_delay = random.randint(0, self.periodic_fuzzy_delay)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(234)start()
+-> self.tg.add_dynamic_timer(self.periodic_tasks,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(235)start()
+-> initial_delay=initial_delay,
+(Pdb) n
+> /usr/lib/python2.7/site-packages/nova/service.py(237)start()
+-> self.periodic_interval_max)
+(Pdb) n
+--Return--
+> /usr/lib/python2.7/site-packages/nova/service.py(237)start()->None
+-> self.periodic_interval_max)
+(Pdb) n
+> /usr/lib/python2.7/site-packages/oslo_service/service.py(817)run_service()
+-> done.wait()
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+## 分析call和cast方法具体流程
+
+以nova创建实例过程中，`schedule_and_build_instances`RPC调用的方法进行分析，rpc的namespace是compute_task，从nova/conductor/rpcapi.py 的ComputeTaskAPI类中调用rpc发送的
+
+
+
+```
+
+        cctxt = self.client.prepare(version=version)
+        cctxt.cast(context, 'schedule_and_build_instances', **kw)
+```
+
+先来看cctxt对象
+
+```
+        self.client = rpc.get_client(target, serializer=serializer)
+```
+
+
+
+```
+# nova/nova/rpc.py
+
+def get_client(target, version_cap=None, serializer=None,
+               call_monitor_timeout=None):
+    assert TRANSPORT is not None
+
+    if profiler:
+        serializer = ProfilerRequestContextSerializer(serializer)
+    else:
+        serializer = RequestContextSerializer(serializer)
+
+    return messaging.RPCClient(TRANSPORT,
+                               target,
+                               version_cap=version_cap,
+                               serializer=serializer,
+                               call_monitor_timeout=call_monitor_timeout)
+
+```
+
+
+
+RPCClient的prepare方法
+
+```
+    def prepare(self, exchange=_marker, topic=_marker, namespace=_marker,
+                version=_marker, server=_marker, fanout=_marker,
+                timeout=_marker, version_cap=_marker, retry=_marker,
+                call_monitor_timeout=_marker):
+        """Prepare a method invocation context.
+
+        Use this method to override client properties for an individual method
+        invocation. For example::
+
+            def test(self, ctxt, arg):
+                cctxt = self.prepare(version='2.5')
+                return cctxt.call(ctxt, 'test', arg=arg)
+
+        :param exchange: see Target.exchange
+        :type exchange: str
+        :param topic: see Target.topic
+        :type topic: str
+        :param namespace: see Target.namespace
+        :type namespace: str
+        :param version: requirement the server must support, see Target.version
+        :type version: str
+        :param server: send to a specific server, see Target.server
+        :type server: str
+        :param fanout: send to all servers on topic, see Target.fanout
+        :type fanout: bool
+        :param timeout: an optional default timeout (in seconds) for call()s
+        :type timeout: int or float
+        :param version_cap: raise a RPCVersionCapError version exceeds this cap
+        :type version_cap: str
+        :param retry: an optional connection retries configuration:
+                      None or -1 means to retry forever.
+                      0 means no retry is attempted.
+                      N means attempt at most N retries.
+        :type retry: int
+        :param call_monitor_timeout: an optional timeout (in seconds) for
+                                     active call heartbeating. If specified,
+                                     requires the server to heartbeat
+                                     long-running calls at this interval
+                                     (less than the overall timeout
+                                     parameter).
+        :type call_monitor_timeout: int
+        """
+        return _CallContext._prepare(self,
+                                     exchange, topic, namespace,
+                                     version, server, fanout,
+                                     timeout, version_cap, retry,
+                                     call_monitor_timeout)
+
+```
+
+
+
+然后调用RPCClient的cast方法`self.prepare().cast(ctxt, method, **kwargs)`，继而调用oslo_messaging/rpc/client.py的_BaseCallContext的cast方法，call方法也是在这里被调用
+
+```
+    def cast(self, ctxt, method, **kwargs):
+        """Invoke a method and return immediately. See RPCClient.cast()."""
+        msg = self._make_message(ctxt, method, kwargs)
+        msg_ctxt = self.serializer.serialize_context(ctxt)
+
+        self._check_version_cap(msg.get('version'))
+
+        try:
+            self.transport._send(self.target, msg_ctxt, msg, retry=self.retry)
+        except driver_base.TransportDriverError as ex:
+            raise ClientSendError(self.target, ex)
+```
+
+
+
+```
+    # oslo_messaging/transport.py
+    def _send(self, target, ctxt, message, wait_for_reply=None, timeout=None,
+              call_monitor_timeout=None, retry=None):
+        if not target.topic:
+            raise exceptions.InvalidTarget('A topic is required to send',
+                                           target)
+        return self._driver.send(target, ctxt, message,
+                                 wait_for_reply=wait_for_reply,
+                                 timeout=timeout,
+                                 call_monitor_timeout=call_monitor_timeout,
+                                 retry=retry)
+```
+
+此处用的driver是amqpdriver
+
+```
+    # oslo_messaging/_drivers/amqpdriver.py
+    def send(self, target, ctxt, message, wait_for_reply=None, timeout=None,
+             call_monitor_timeout=None, retry=None):
+        return self._send(target, ctxt, message, wait_for_reply, timeout,
+                          call_monitor_timeout, retry=retry)
+                          
+                          
+                      
+
+    def _send(self, target, ctxt, message,
+              wait_for_reply=None, timeout=None, call_monitor_timeout=None,
+              envelope=True, notify=False, retry=None):
+
+        msg = message
+
+        if wait_for_reply:
+            msg_id = uuid.uuid4().hex
+            msg.update({'_msg_id': msg_id})
+            msg.update({'_reply_q': self._get_reply_q()})
+            msg.update({'_timeout': call_monitor_timeout})
+
+        rpc_amqp._add_unique_id(msg)
+        unique_id = msg[rpc_amqp.UNIQUE_ID]
+
+        rpc_amqp.pack_context(msg, ctxt)
+
+        if envelope:
+            msg = rpc_common.serialize_msg(msg)
+
+        if wait_for_reply:
+            self._waiter.listen(msg_id)
+            log_msg = "CALL msg_id: %s " % msg_id
+        else:
+            log_msg = "CAST unique_id: %s " % unique_id
+
+        try:
+            with self._get_connection(rpc_common.PURPOSE_SEND) as conn:
+                if notify:
+                    exchange = self._get_exchange(target)
+                    log_msg += "NOTIFY exchange '%(exchange)s'" \
+                               " topic '%(topic)s'" % {
+                                   'exchange': exchange,
+                                   'topic': target.topic}
+                    LOG.debug(log_msg)
+                    conn.notify_send(exchange, target.topic, msg, retry=retry)
+                elif target.fanout:
+                    log_msg += "FANOUT topic '%(topic)s'" % {
+                        'topic': target.topic}
+                    LOG.debug(log_msg)
+                    conn.fanout_send(target.topic, msg, retry=retry)
+                else:
+                    topic = target.topic
+                    exchange = self._get_exchange(target)
+                    if target.server:
+                        topic = '%s.%s' % (target.topic, target.server)
+                    log_msg += "exchange '%(exchange)s'" \
+                               " topic '%(topic)s'" % {
+                                   'exchange': exchange,
+                                   'topic': topic}
+                    LOG.debug(log_msg)
+                    conn.topic_send(exchange_name=exchange, topic=topic,
+                                    msg=msg, timeout=timeout, retry=retry)
+
+            if wait_for_reply:
+                result = self._waiter.wait(msg_id, timeout,
+                                           call_monitor_timeout)
+                if isinstance(result, Exception):
+                    raise result
+                return result
+        finally:
+            if wait_for_reply:
+                self._waiter.unlisten(msg_id)
+```
+
+调用impl_rabbit.py的notify_send方法
+
+```
+    def notify_send(self, exchange_name, topic, msg, retry=None, **kwargs):
+        """Send a notify message on a topic."""
+        exchange = kombu.entity.Exchange(
+            name=exchange_name,
+            type='topic',
+            durable=self.amqp_durable_queues,
+            auto_delete=self.amqp_auto_delete)
+
+        self._ensure_publishing(self._publish_and_creates_default_queue,
+                                exchange, msg, routing_key=topic, retry=retry)
+```
+
+
+
+
+
+
+
+
+
+
+
+实例创建参考链接：https://www.jingh.top/2019/04/29/%E5%A6%82%E4%BD%95%E9%98%85%E8%AF%BBOpenStack%E6%BA%90%E7%A0%81(%E6%9B%B4%E6%96%B0%E7%89%88)/
+
+rpc流程参考链接：https://rootdeep.github.io/posts/rpc-call-procedure-in-oslo-messaging/
+
+nova-conductor服务启动流程参考链接：https://gtcsq.readthedocs.io/en/latest/openstack/nova_rpcserver_start.html

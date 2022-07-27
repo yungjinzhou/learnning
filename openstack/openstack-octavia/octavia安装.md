@@ -37,7 +37,7 @@ yum install openstack-octavia-worker openstack-octavia-api python2-octavia opens
 
 ```
 
-### 4 导入镜像 镜像
+### 4 导入镜像
 
 是从devstack 生成的系统中导出来的
 
@@ -51,8 +51,8 @@ yum install openstack-octavia-worker openstack-octavia-api python2-octavia opens
 
 ```javascript
 openstack image create --disk-format qcow2 --container-format bare  --private --tag amphora --file amphora-x64-haproxy.qcow2 amphora-x64-haproxy
-# image_id: 8546902d-c84c-489d-a8bb-0d2235d3e187
-# image_owner_id: 
+# image_id:  d6d3c84d-685f-4927-85ac-ce7594a14a20
+# image_owner_id: 9b97026dba004226973f47c1a5565b63
 ```
 
 ### 5 创建管理网络
@@ -97,7 +97,7 @@ chown octavia:octavia /etc/octavia/certs -R
 ```javascript
 openstack network create lb-mgmt-net 
 openstack subnet create --subnet-range 19.178.0.0/24 --allocation-pool start=19.178.0.2,end=19.178.0.200 --network lb-mgmt-net lb-mgmt-subnet
-# network_id: 7551834d-fbc9-45e6-833c-18aaa83dac41
+# network_id: 7b42197a-97a9-4ad2-ae4c-82c3dfee0e3e
 
 ```
 
@@ -108,7 +108,7 @@ openstack subnet create --subnet-range 19.178.0.0/24 --allocation-pool start=19.
 ```javascript
 
 openstack security group create lb-mgmt-sec-grp  --project service 
-# security group id:  43416fd9-bf78-465c-8c4a-d03d2c908429
+# security group id:  484e9029-fac6-458a-9f8e-75610948494f
 # 把udp和tcp端口全部放开方便调试 
 openstack security group rule create --protocol udp --dst-port 1:65535 lb-mgmt-sec-grp
 openstack security group rule create --protocol icmp lb-mgmt-sec-grp
@@ -126,14 +126,14 @@ openstack security group rule create --protocol tcp --dst-port 1:65535 lb-mgmt-s
 用于连接[宿主机](https://cloud.tencent.com/product/cdh?from=10680)中的octavia health_manager
 
 ```javascript
-neutron port-create --name octavia-health-manager-listen-port --security-group lb-mgmt-sec-grp --device-owner Octavia:health-mgr --binding:host_id=controller lb-mgmt-net --tenant-id 6b7d50b49e1d4dc99001444b015e4731 (service的id)
+neutron port-create --name octavia-health-manager-listen-port --security-group lb-mgmt-sec-grp --device-owner Octavia:health-mgr --binding:host_id=controller lb-mgmt-net --tenant-id 1e38230edf564bc3ad81b51f5c24f523 (项目名称为service的id)
 
 
-# port_id: 8bf3d486-77c8-46b8-9163-b19e383221db
+# port_id: e51985e2-6030-4bab-a4b5-f203a0bb5b7e
 # iface_id: port_id
-#subnet_id: cf838067-db3c-4a80-af71-c4a38ee4fa82
-# port_mac_address: fa:16:3e:5a:4b:c4
-# port_ip : 19.178.0.194
+#subnet_id: d125188e-78ae-416f-acbe-105758e16c92
+# port_mac_address: fa:16:3e:99:c9:17
+# port_ip : 19.178.0.178
 
 ```
 
@@ -146,7 +146,7 @@ neutron port-create --name octavia-health-manager-listen-port --security-group l
 
 
 # for ovs
-ovs-vsctl --may-exist add-port br-int o-hm0 -- set Interface o-hm0 type=internal -- set Interface o-hm0 external-ids:iface-status=active -- set Interface o-hm0 external-ids:attached-mac=fa:16:3e:5a:4b:c4 -- set Interface o-hm0 external-ids:iface-id=8bf3d486-77c8-46b8-9163-b19e383221db
+ovs-vsctl --may-exist add-port br-int o-hm0 -- set Interface o-hm0 type=internal -- set Interface o-hm0 external-ids:iface-status=active -- set Interface o-hm0 external-ids:attached-mac=fa:16:3e:99:c9:17 -- set Interface o-hm0 external-ids:iface-id=e51985e2-6030-4bab-a4b5-f203a0bb5b7e
 
 
 
@@ -161,7 +161,7 @@ ocatvia_mgmt_br=brq$(openstack network show lb-mgmt-net -c id -f value|cut -c 1-
 **其中iface-id 和attached-mac 为 5.3生成的port的属性**
 
 ```javascript
-ip link set dev o-hm0 address fa:16:3e:5a:4b:c4
+ip link set dev o-hm0 address fa:16:3e:99:c9:17
 ```
 
 ####  5.5 在宿主机上创建dhcp 
@@ -312,7 +312,7 @@ rabbit_password = openstack
 同步数据库
 
 ```javascript
-octavia-db-manage   upgrade head
+octavia-db-manage  upgrade head
 ```
 
 启动octavia
