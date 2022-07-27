@@ -10,7 +10,7 @@
 def create_polling_service(worker_id, conf):
     return manager.AgentManager(worker_id,
                                 conf,
-                                conf.polling_namespaces)
+                        conf.polling_namespaces)
 
 # conf.polling_namespaces # 即是你在命令行中传入的参数，compute或者是central，分别代表两个服务
 
