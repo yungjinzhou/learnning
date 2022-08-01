@@ -1,3 +1,7 @@
+## 一、linux相关
+
+
+
 ### 1. 常用linux系统调用
 
 系统调用（System Call）是操作系统为在用户态运行的进程与**硬件设备（如CPU、磁盘、打印机等）进行交互**提供的一组接口。当用户进程需要发生系统调用时，CPU 通过软中断切换到内核态开始执行内核系统调用函数
@@ -49,3 +53,394 @@ socket控制：socket/bind/connect/accept/send/listen/select/shutdown/setsockopt
 
 
 参考连接：https://www.cnblogs.com/shijiaqi1066/p/5749030.html
+
+
+
+
+
+### 2. 进程、线程、协程
+
+
+
+
+
+
+
+### 3. poll/epoll/select
+
+
+
+
+
+常见进程调度算法
+
+
+
+
+
+操作系统如何申请及管理内存
+
+
+
+
+
+同步、阻塞、异步、并发、非阻塞、并行
+
+
+
+
+
+
+
+
+
+
+
+## 二、网络相关
+
+
+
+
+
+### 2.1. 三次握手、四次挥手
+
+为什么是三次握手、不是两次握手，
+
+参考-learnning\jike_qutanwangluoxieyi/网络学习
+
+
+
+
+
+http与https
+
+
+
+
+
+tcp与udp特点，区别
+
+
+
+http网页，从请求到响应。 都走了那些步骤、（dns）
+
+
+
+
+
+dns
+
+
+
+http keepalive 和 tcp  keepalive
+
+
+
+
+
+syn攻击、半连接
+
+
+
+进程间如何通信
+
+
+
+python的底层网络交互模块有哪些
+
+
+
+OSI七层协议
+
+
+
+## 三、数据库相关
+
+##### mysql
+
+
+
+mysql引擎，各个引擎之间有什么区别
+
+
+
+数据库事务，及其特性
+
+
+
+数据库事务隔离级别有哪些、区别与特点
+
+
+
+死锁发生的情况，如何解决
+
+
+
+索引的原理
+
+mysql  B+索引、优缺点
+
+mysql索引类型
+
+聚簇索引和非聚簇索引
+
+唯一索引和普通索引区别，使用索引有哪些优缺点
+
+myql索引什么情况下会失效
+
+
+
+
+
+mysql主从同步机制
+
+
+
+数据库的ACID
+
+
+
+如何开启慢查询日志
+
+
+
+数据库的脏读、幻读、幻行的原理、发生场景，及解决方式
+
+
+
+
+
+serializable 序列化、最好的事务级别
+
+
+
+乐观锁、悲观锁
+
+
+
+sql注入原理，如何在代码层面防止sql注入
+
+
+
+数据库的优化
+
+
+
+
+
+
+
+
+
+
+
+
+
+##### redis
+
+redis单进程？多个客户端是多进程么
+
+
+
+redis如何解决雪崩、缓存击穿、
+
+
+
+redis 持久化中rdb和 aof方案的优缺点
+
+
+
+
+
+
+
+
+
+
+
+## 四、python相关
+
+restfull和rpc区别与联系
+
+
+
+xreadlines（底层迭代原理）  readline ()
+
+
+
+is 和 ==区别
+
+
+
+字典按值排序（sorted(dict.iterms(), key=lambda x: x[1],）
+
+
+
+翻转字符串  s = "w3423", s[::-1]
+
+
+
+list1中age按由大到小排序（list1=[{"age": 5}, {"age": 67}, {"age": 56}],    sorted(list1, key=lambda x:x['age'], reverse=True)）
+
+
+
+lista=[1,2,43,7],  lista[10:]
+
+
+
+两个列表，找出相同元素和不同元素
+
+list1= [1,2 ,4,6, 67],  list2=[3, 2, 43, 76]
+
+set1=set(list1) , set2=set(list2), set1&set2,  set1^set2
+
+
+
+什么是反射，反射应用场景
+
+
+
+
+
+深拷贝和浅拷贝
+
+
+
+简述`__new__和————init--`的区别
+
+
+
+GIL对python性能的影响
+
+
+
+双下划线和单下划线的区别
+
+
+
+
+
+with语句，如何构造，原理
+
+
+
+单例模式，优缺点，如何实现
+
+
+
+json序列化时，会遇到中文转unicode，想保留中文如何做（json.dumps({"dd", "你好"}， ensure_ascii=False)）
+
+
+
+mro
+
+
+
+C3算法
+
+
+
+判断邮箱合法，re使用
+
+
+
+python函数调用时候参数的传递是值传递还是引用传递
+
+
+
+递归函数停止的条件
+
+
+
+python递归的最大层数
+
+
+
+列表推导式和生成器表达式 输出结果分别是什么
+
+```
+[i % 2 for i in range(10)]
+
+(i % 2 for i in range(10))
+```
+
+
+
+什么是闭包
+
+
+
+## 五、框架相关（django）
+
+
+
+python三大框架各自应用场景
+
+
+
+uWSGI 和nginx的理解
+
+uwsgi  区别uWSGI
+
+
+
+### 5.1 django
+
+
+
+手动删除了表，导致，django迁移失败原因及解决办法
+
+django中 Model    ForeignKey字段的on_delete参数作用
+
+
+
+基于django使用ajax发送post请求时，有哪种方法携带csrftoken
+
+
+
+django  FBV  CBV
+
+
+
+django的request对象是什么时候创建的
+
+
+
+django请求的生命周期
+
+
+
+django中如何在model保存前做一定的固定操作，比如写一句日志（signal Dispatcher）
+
+
+
+django中间件的使用
+
+
+
+django  ORM查询中  select_related和prefetch_related的区别
+
+
+
+
+
+cookie和session的区别
+
+
+
+
+
+celery分布式队列
+
+
+
+
+
+## 六、其他
+
+
+
+自学python最大的困难
+
+
+
