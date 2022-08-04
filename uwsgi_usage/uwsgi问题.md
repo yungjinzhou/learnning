@@ -1,4 +1,14 @@
-# [uwsgi listen queue of socket full 及 broken pipe 错误排查及解决方法](http://www.beiliangshizi.com/?p=822)
+
+
+
+
+
+
+## 1. uwsgi满的问题
+
+
+
+### [uwsgi listen queue of socket full 及 broken pipe 错误排查及解决方法](http://www.beiliangshizi.com/?p=822)
 
 
 
@@ -173,3 +183,34 @@ number：最大文件句柄数
 修改完成保存后，退出ssh再次登录，使用ulimit -n 就可以看到open files 参数已经改变成功了。
 
 \2. uwsgi的配置中，listen从1000直接上调到2W。uwsgi是同步阻塞的，单纯提高并发的话可以将listen的值设得高一些（一般1024），listen是指排队的请求。这里要将参数net.core.somaxconn 设得比listen高。其实listen参数变高只能提高并发，并不能提高你的生产效率。
+
+
+
+## 2. uwsgi死锁，进程杀死重启
+
+deadlock-detector,  process holding o robust mutex died, recovering
+
+```
+he "problem" is in the multiple threads usage, you spawn multiple of
+them, so the max_requests check could happens in multiple threads once.
+
+The thunder-lock is a performance-only measure, so even if it does not
+work flawlessly for a single request, it will not hurt for sure and the
+deadlock detector will fix it in time for the next request.
+
+The right fix will be acquiring the thunder lock before destroying the
+proces but, wait, we are about to destroy it so we will not be able to
+release the lock as we are dead :)
+
+At this point i think following an optimistic approach, and letting the
+deadlock-detector clearing the situation, is the best thing we can do.
+
+So yes, you are safe.
+```
+
+是由于 uwsgi.ini中的thunder-lock的配置，该配置是为了解决进程的惊群效应，
+
+
+
+
+

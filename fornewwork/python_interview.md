@@ -237,6 +237,47 @@ tcp三种工作模式
 
 
 
+### 6. ifconfig参数解释
+
+```
+ifconfig
+ens33: flags=4163<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500
+inet 192.168.1.63 netmask 255.255.255.0 broadcast 192.168.1.255
+inet6 fe80::c09d:975d:89cd:fd3f prefixlen 64 scopeid 0x20
+ether 00:0c:29:02:83:db txqueuelen 1000 (Ethernet)
+RX packets 3255 bytes 4458479 (4.2 MiB)
+RX errors 0 dropped 26 overruns 0 frame 0
+TX packets 1130 bytes 81645 (79.7 KiB)
+TX errors 0 dropped 0 overruns 0 carrier 0 collisions 0
+
+上图信息大概说明：
+第一行：up–>网卡开启状态
+RUNNING–>网线处理连接状态
+MULTICAST–>支持组播
+mtu 1500–>（Maximum Transmission Unit）最大传输单元大小为1500字节
+第二行：该网卡的IP地址，子网掩码，广播地址
+第三行：IPV6的配置信息
+第四行：网卡的MAC地址
+ether表示连接类型为以太网
+txqueuelen 1000 --》传输队列的长度
+第五六行：网卡接收数据包的统计信息和接收错误的统计信息
+第七八行：网卡发送数据包的统计信息和发送错误的统计信息
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 常见进程调度算法
