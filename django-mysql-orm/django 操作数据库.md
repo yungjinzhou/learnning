@@ -1,8 +1,10 @@
-# django 操作数据库
+# Django-orm
 
 
 
 
+
+### Django orm操作
 
 ```
 1. 取具体数据值
@@ -26,6 +28,45 @@ data_dict[t] = {data.source_tag: data.source_usage for data in d.all()}
 
 http://www.chenxm.cc/article/350.html
 ```
+
+
+
+### django处理migrations
+
+项目开发一段时间后，在每次部署迁移时候，会遇到多次执行迁移文件的问题，会发生迁移失败的情况，执行下面步骤可以解决。
+
+可以先删除每个app下migrations文件夹下除了`__init__.py`之外的文件，还要删除`__pycache__`文件夹
+
+执行命令，重新生成各个app的initial文件，并同步数据库（针对空数据库）
+
+```
+python3 manager.py makemigrations
+python3 manager.py migrate
+```
+
+如果要进一步清理admin、auth等django自带app的迁移文件，可以执行如下
+
+```
+python manage.py makemigrations --empty admin
+python manage.py makemigrations --empty auth
+
+python manage.py makemigrations
+python manage.py migrate
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
