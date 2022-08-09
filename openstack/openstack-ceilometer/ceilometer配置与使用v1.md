@@ -1,4 +1,4 @@
-## 一、ceilometer-stein版配置与使用
+## 一、ceilometer-stein版配置与使用(dms-2.0.0)
 
 参考链接：https://support.huaweicloud.com/dpmg-kunpengcpfs/kunpengopenstackstein_04_0013.html
 
@@ -98,83 +98,87 @@
 
    
 
-   ***配置文件分解解释，可以跳过这部分，看后面完成配置***
+   ***配置文件分解解释，可以跳过这部分，看后面完整配置***
+   
+   
+   
+   ##### 配置文件分解配置与解释
    
    1. 配置Gnocchi功能参数，log地址以及对接redis url端口。
    
-      ```
+   ```
       [DEFAULT]
-      debug = true
+   debug = true
       verbose = true
    log_dir = /var/log/gnocchi
       parallel_operations = 4
-   coordination_url = redis://controller:6379
+      coordination_url = redis://controller:6379
       ```
-
+   
       
    
    1. 配置Gnocchi工作端口信息,host为控制节点管理IP
    
-      ```
+   ```
       [api]
-      auth_mode = keystone
+   auth_mode = keystone
       host = 192.168.21.1
    port = 8041
       uwsgi_mode = http-socket
-   max_limit = 1000
+      max_limit = 1000
       ```
-
-      
    
-   1. 配置元数据默认存储方式。
+   
+   
+1. 配置元数据默认存储方式。
    
    ```
       [archive_policy]
-   default_aggregation_methods = mean,min,max,sum,std,count,rate:mean
+      default_aggregation_methods = mean,min,max,sum,std,count,rate:mean
       ```
-
-      *注意增加的**rate:mean***
    
-   4. 配置允许的访问来源。
+   *注意增加的**rate:mean***
+   
+4. 配置允许的访问来源。
    
    ```
       [cors]
-   allowed_origin = http://controller:3000
+      allowed_origin = http://controller:3000
       ```
-
-      
    
-   5. 配置数据库检索。
+   
+   
+5. 配置数据库检索。
    
    ```
       [indexer]
-   url = mysql+pymysql://gnocchi:<PASSWORD>@controller/gnocchi
+      url = mysql+pymysql://gnocchi:<PASSWORD>@controller/gnocchi
       ```
-
+   
       
    
    6. 配置ceilometer测试指标。
    
-      ```
+   ```
       [metricd]
-      workers = 4
+   workers = 4
       metric_processing_delay = 60
    greedy = true
       metric_reporting_delay = 120
-   metric_cleanup_delay = 300
+      metric_cleanup_delay = 300
       ```
-
+   
       
    
-   7. 配置Gnocchi存储方式以及位置，在这种配置下将其存储到本地文件系统。
+7. 配置Gnocchi存储方式以及位置，在这种配置下将其存储到本地文件系统。
    
-      ```
+   ```
       [storage]
    coordination_url = redis://controller:6379
       file_basepath = /var/lib/gnocchi
-   driver = redis
+      driver = redis
       ```
-
+   
       
    
    8. 配置Keystone认证信息，该模块需要另外添加。
@@ -185,11 +189,11 @@
       www_authenticate_uri = http://controller:5000
       auth_url = http://controller:5000/v3
       memcached_servers = controller:11211
-      auth_type = password
+   auth_type = password
       project_domain_name = default
       user_domain_name = default
       project_name = service
-   username = gnocchi
+      username = gnocchi
       password = <PASSWORD>
       service_token_roles_required = true
       ```
@@ -357,7 +361,6 @@ service_token_roles_required = true
 ```
 [uwsgi]
 http-socket = controller:8041
-#http-socket = controller:8071
 wsgi-file = /usr/bin/gnocchi-api
 master = true
 die-on-term = true
@@ -376,7 +379,7 @@ pidfile = /var/run/gnocchi-uwsgi.pid
 
 
 
-**下面配置待开发与验证（为解决gnocchi pool is closed问题）**
+**下面配置(gevent设置)待开发与验证（为解决gnocchi pool is closed问题）**
 
 配置/etc/gnocchi/uwsgi-gnocchi.ini，(问题产生原因， gevent启动，启动后是否能解决)
 
@@ -508,7 +511,6 @@ sources:
       meters:
         - cpu
         - vcpus
-        - cpu_util
         - memory
         - memory.util
         - memory.usage
@@ -527,7 +529,6 @@ sources:
         - disk.device.usage
         - disk.device.capacity
         - disk.device.allocation
-        - disk.root.size
       sinks:
         - instance_sink
     
@@ -545,18 +546,23 @@ sources:
         - custom.hardware.cpu.guest.percentage
         - custom.hardware.cpu.guestnice.percentage
         - custom.hardware.cpu.util.percentage
+        
         - custom.hardware.disk.size.total
         - custom.hardware.disk.size.used
         - custom.hardware.disk.utilization
+        
         - custom.hardware.memory.used
         - custom.hardware.memory.total
         - custom.hardware.memory.cached
         - custom.hardware.memory.buffer
         - custom.hardware.memory.utilization
+        
         - custom.hardware.swap.avail
         - custom.hardware.swap.total
         - custom.hardware.swap.utilization
+        
         - custom.hardware.network.interface.status
+        
         - custom.hardware.disk.read.bytes.average
         - custom.hardware.disk.write.bytes.average
         - custom.hardware.disk.read.requests.average
@@ -612,9 +618,9 @@ sources:
       meters:
         - cpu
         - vcpus
-        - cpu_util
         - memory
         - memory.usage
+        - memory.util
         - network.incoming.bytes
         - network.incoming.packets
         - network.outgoing.bytes
@@ -653,7 +659,11 @@ sources:
         - custom.hardware.cpu.steal.percentage
         - custom.hardware.cpu.softinterrupt.percentage
         - custom.hardware.cpu.interrupt.percentage
+        - custom.hardware.cpu.kernel.percentage
+        - custom.hardware.cpu.guest.percentage
+        - custom.hardware.cpu.guestnice.percentage
         - custom.hardware.cpu.util.percentage
+        
         - custom.hardware.memory.used
         - custom.hardware.memory.total
         - custom.hardware.memory.cached
@@ -735,25 +745,7 @@ resources:
       memory.usage:
       memory.util:
       vcpus:
-      cpu_util:
       cpu:
-      disk.root.size:
-      disk.capacity:
-      disk.allocation:
-      disk.usage:
-      disk.device.read.requests:
-      disk.device.write.requests:
-      disk.device.read.bytes:
-      disk.device.write.bytes:
-      disk.device.capacity:
-      disk.device.allocation:
-      disk.device.usage:
-      disk.root.size:
-      compute.instance.booting.time:
-      perf.cpu.cycles:
-      perf.instructions:
-      perf.cache.references:
-      perf.cache.misses:
     attributes:
       host: resource_metadata.(instance_host|host)
       image_ref: resource_metadata.image_ref
@@ -794,73 +786,13 @@ resources:
       disk.device.capacity:
       disk.device.allocation:
       disk.device.usage:
-      disk.root.size:
     attributes:
       name: resource_metadata.disk_name
       instance_id: resource_metadata.instance_id
 
-
-  - resource_type: compute_host
-    metrics:
-      hardware.cpu.load.1min:
-      hardware.cpu.load.5min:
-      hardware.cpu.load.15min:
-      hardware.cpu.util:
-      hardware.cpu.user:
-      hardware.cpu.nice:
-      hardware.cpu.system:
-      hardware.cpu.idle:
-      hardware.cpu.wait:
-      hardware.cpu.kernel:
-      hardware.cpu.interrupt:
-      custom.hardware.cpu.user.percentage:
-      custom.hardware.cpu.system.percentage:
-      custom.hardware.cpu.idle.percentage:
-      custom.hardware.cpu.nice.percentage:
-      custom.hardware.cpu.steal.percentage:
-      custom.hardware.cpu.wait.percentage:
-      custom.hardware.cpu.interrupt.percentage:
-      custom.hardware.cpu.softinterrupt.percentage:
-      custom.hardware.disk.utilization:
-      custom.hardware.memory.utilization:
-      custom.hardware.swap.utilization:
-      custom.hardware.network.interface.status:
-      hardware.disk.size.total:
-      hardware.disk.size.used:
-      hardware.memory.total:
-      hardware.memory.used:
-      hardware.memory.utilization:
-      hardware.memory.swap.total:
-      hardware.memory.swap.avail:
-      hardware.memory.buffer:
-      hardware.memory.cached:
-      hardware.network.ip.outgoing.datagrams:
-      hardware.network.ip.incoming.datagrams:
-      hardware.system_stats.cpu.idle:
-      hardware.system_stats.io.outgoing.blocks:
-      hardware.system_stats.io.incoming.blocks:
-    attributes:
-      host_name: resource_metadata.resource_url
-
+  # remove resource_type   compute_host   
   - resource_type: host_disk
     metrics:
-      hardware.cpu.load.1min:
-      hardware.cpu.load.5min:
-      hardware.cpu.load.15min:
-      hardware.cpu.util:
-      hardware.cpu.user:
-      hardware.cpu.nice:
-      hardware.cpu.system:
-      hardware.cpu.idle:
-      hardware.cpu.wait:
-      hardware.cpu.kernel:
-      hardware.cpu.interrupt:
-      hardware.disk.size.total:
-      hardware.disk.size.used:
-      hardware.disk.read.bytes:
-      hardware.disk.write.bytes:
-      hardware.disk.read.requests:
-      hardware.disk.write.requests:
       custom.hardware.disk.read.bytes.average:
       custom.hardware.disk.write.bytes.average:
       custom.hardware.disk.read.requests.average:
@@ -878,8 +810,6 @@ resources:
 
   - resource_type: host_network_interface
     metrics:
-      hardware.network.ip.incoming.datagrams:
-      hardware.network.ip.outgoing.datagrams:
       hardware.network.incoming.bytes:
       hardware.network.incoming.drop:
       hardware.network.incoming.errors:
@@ -894,29 +824,6 @@ resources:
 
   - resource_type: host
     metrics:
-      hardware.disk.read.bytes:
-      hardware.disk.write.bytes:
-      hardware.disk.read.requests:
-      hardware.disk.write.requests:
-      custom.hardware.disk.read.bytes.average:
-      custom.hardware.disk.write.bytes.average:
-      custom.hardware.disk.read.requests.average:
-      custom.hardware.disk.write.requests.average:
-      custom.hardware.disk.read.bytes:
-      custom.hardware.disk.write.bytes:
-      custom.hardware.disk.read.requests:
-      custom.hardware.disk.write.requests:
-      hardware.memory.total:
-      hardware.memory.used:
-      hardware.memory.swap.total:
-      hardware.memory.swap.avail:
-      hardware.memory.buffer:
-      hardware.memory.cached:
-      hardware.network.ip.outgoing.datagrams:
-      hardware.network.ip.incoming.datagrams:
-      hardware.system_stats.cpu.idle:
-      hardware.system_stats.io.outgoing.blocks:
-      hardware.system_stats.io.incoming.blocks:
       custom.hardware.cpu.user.percentage:
       custom.hardware.cpu.system.percentage:
       custom.hardware.cpu.idle.percentage:
@@ -929,17 +836,17 @@ resources:
       custom.hardware.cpu.kernel.percentage:
       custom.hardware.cpu.guest.percentage:
       custom.hardware.cpu.guestnice.percentage:
-      custom.hardware.disk.utilization:
-      custom.hardware.disk.size.total:
-      custom.hardware.disk.size.used:
+ 
       custom.hardware.memory.total:
       custom.hardware.memory.used:
       custom.hardware.memory.cached:
       custom.hardware.memory.buffer:
       custom.hardware.memory.utilization:
+
       custom.hardware.swap.avail:
       custom.hardware.swap.total:
       custom.hardware.swap.utilization:
+
       custom.hardware.network.interface.status:
     attributes:
       host_name: resource_metadata.resource_url
@@ -961,11 +868,7 @@ sources:
         - vcpus
         - memory
         - memory.usage
-        - memory.resident
-        - memory.swap.in
-        - memory.swap.out
-      #  - memory.bandwidth.total
-      #  - memory.bandwidth.local
+        - memory.util
         - network.incoming.bytes
         - network.incoming.packets
         - network.outgoing.bytes
@@ -978,40 +881,14 @@ sources:
         - disk.device.read.requests
         - disk.device.write.bytes
         - disk.device.write.requests
-        - disk.device.read.bytes.rate
-        - disk.device.read.requests.rate
-        - disk.device.write.bytes.rate
-        - disk.device.write.requests.rate
         - disk.device.capacity
         - disk.device.allocation
         - disk.device.usage
-        - disk.root.size
-        - disk.usage
     - name: hardware_snmp
       interval: 60
       resources:
           - snmp://30.90.2.18
       meters:
-        - hardware.cpu.util
-        - hardware.cpu.user
-        - hardware.cpu.nice
-        - hardware.cpu.system
-        - hardware.cpu.idle
-        - hardware.cpu.wait
-        - hardware.cpu.kernel
-        - hardware.cpu.interrupt
-        - hardware.disk.size.total
-        - hardware.disk.size.used
-        - hardware.disk.read.bytes
-        - hardware.disk.write.bytes
-        - hardware.disk.read.requests
-        - hardware.disk.write.requests
-        - hardware.memory.used
-        - hardware.memory.total
-        - hardware.memory.buffer
-        - hardware.memory.cached
-        - hardware.memory.swap.avail
-        - hardware.memory.swap.total
         - hardware.network.incoming.bytes
         - hardware.network.incoming.errors
         - hardware.network.incoming.drop
@@ -1020,8 +897,6 @@ sources:
         - hardware.network.outgoing.errors
         - hardware.network.outgoing.drop
         - hardware.network.outgoing.packets
-        - hardware.network.ip.incoming.datagrams
-        - hardware.network.ip.outgoing.datagrams
     - name: user_defined # 配置节点对应ip
       meters:
         - custom.hardware.cpu.user.percentage
@@ -1032,14 +907,33 @@ sources:
         - custom.hardware.cpu.steal.percentage
         - custom.hardware.cpu.softinterrupt.percentage
         - custom.hardware.cpu.interrupt.percentage
-        - custom.hardware.disk.utilization
-        - custom.hardware.memory.utilization
-        - custom.hardware.swap.utilization
+        - custom.hardware.cpu.kernel.percentage
+        - custom.hardware.cpu.guest.percentage
+        - custom.hardware.cpu.guestnice.percentage
+        - custom.hardware.cpu.util.percentage
+        
+        - custom.hardware.memory.total:
+        - custom.hardware.memory.used:
+        - custom.hardware.memory.cached:
+        - custom.hardware.memory.buffer:
+        - custom.hardware.memory.utilization:
+        
+        - custom.hardware.swap.avail:
+        - custom.hardware.swap.total:
+        - custom.hardware.swap.utilization:
+        
         - custom.hardware.network.interface.status
+        - custom.hardware.disk.read.bytes.average:
+        - custom.hardware.disk.write.bytes.average:
+        - custom.hardware.disk.read.requests.average:
+        - custom.hardware.disk.write.requests.average:   
+        - custom.hardware.disk.size.total:
+        - custom.hardware.disk.size.used:
         - custom.hardware.disk.read.bytes
         - custom.hardware.disk.write.bytes
         - custom.hardware.disk.read.requests
         - custom.hardware.disk.write.requests
+        - custom.hardware.disk.utilization
       resources:
         - snmp://30.90.2.18
       interval: 60
@@ -1122,6 +1016,7 @@ sources:
 ##### 6.5. 更改ceilometer执行权限（每个安装ceilometer的节点都需要配置）
 vim /etc/sudoers
 增加一行：
+
 ```
 ceilometer ALL = (root) NOPASSWD: ALL
 ```
@@ -1501,7 +1396,6 @@ sources:
       meters:
         - cpu
         - vcpus
-      #  - cpu_util
         - memory
         - memory.util
         - memory.usage
@@ -1654,7 +1548,6 @@ sources:
       meters:
         - cpu
         - vcpus
-        - cpu_util
         - memory
         - memory.util
         - memory.usage
@@ -1834,7 +1727,6 @@ resources:
       network.outgoing.packets.drop:
       network.outgoing.packets.error:
       vcpus:
-      cpu_util:
       cpu:
       cpu_l3_cache:
       disk.root.size:
@@ -2386,16 +2278,19 @@ ln -s /usr/bin/supermin5 /usr/bin/supermin
 
 
 
-**aarch64**  （安装有问题，待确认）
+**aarch64**  （长期评价测试）
 
 ```
-apt install -y gperf flex bison libncurses5-dev libpcre3-dev  pkg-config python3-augeas  libaugeas-dev libmagic-dev libjansson-dev libhivex-dev supermin ocaml libwin-hivex-perl libhivex-ocaml libhivex-ocaml-dev libguestfs-ocaml
-./configure
-make
+下载源码包libguestfs-1.40.2.tar.gz
+解压后进入目录
+ 
+apt install -y gperf flex bison ncurses-dev pkg-config augeas-tools augeas-doc python-augeas
+ libaugeas-dev libmagic-dev libjansson-dev libhivex-dev libhivex-ocaml libhivex-ocaml-dev supermin gdisk
 
-如果编译错误
- apt install -y erlang-guestfs, gir1.2-guestfs-1.0, golang-guestfs-dev, guestfsd, libguestfs-dev, libguestfs-gfs2, libguestfs-gobject-1.0-0, libguestfs-gobject-dev, libguestfs-hfsplus, libguestfs-java, libguestfs-jfs, libguestfs-nilfs, libguestfs-ocaml, libguestfs-ocaml-dev, libguestfs-perl, libguestfs-reiserfs, libguestfs-rescue, libguestfs-rsync, libguestfs-tools, libguestfs-xfs, libguestfs-zfs, libguestfs0, lua-guestfs, php-guestfs, python-guestfs, python3-guestfs, ruby-guestfs
-
+./configure --with-default-backend="libvirt"
+ make
+ # export LIBGUESTFS_BACKEND=direct
+ # export LIBGUESTFS_BACKEND=libvirt
 ```
 
 
@@ -2440,67 +2335,6 @@ gnocchi_resource.yaml   聚合监控数据并保存到gnocchi
 
 compute 节点
 polling.yaml--指定实例要获取的metric项，与gnocchi_resource对应metric项一致
-
-
-
-#### 3.2. 关于获取cpu_util
-
-由于stein版本ceilometer取消了获取cpu_util项
-
-需要创建有rate:mean聚合方法的策略
-
-```
-1.创建 rate:mean的策略的聚合方法
-2.修改pipeline中vcpus  cpus策略
-3.修改gnocchi_resources.yaml文件中策略和对应cpu  vcpus策略
-4.修改archive-policy-rule中的策略与正则匹配cpu
-4.重启服务(systemctl restart openstack-cei*       systemctl restart gno*     systemctl restart openstack-nova*)
-5.创建新的实例
-6.查询创建
-gnocchi measures show --resource-id 847ab913-b149-4daa-b263-3d7d228a3bcf --aggregation rate:mean cpu --granularity 60
-7. 得到的value是cpu时间，需要转换，参考链接
-```
-
-参考链接：https://berndbausch.medium.com/how-i-learned-to-stop-worrying-and-love-gnocchi-aggregation-c98dfa2e20fe
-
-
-
-#### 3.3 创建策略相关
-
-创建规则
-
-```gnocchi archive-policy-rule create -a low -m "*" default
-gnocchi archive-policy-rule create -a low -m "*" default
-```
-
-
-为gnocchi创建聚合策略
-
-```
-openstack metric archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m  -m mean -m max -m min -m count -m sum -m std horizon-mimic
-```
-
-
-创建规则，如果已存在，先创建新规则，删除旧规则，更新新规则
-
-```gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
-gnocchi archive-policy-rule update default -n default-origin
-gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
-gnocchi archive-policy-rule delete default-origin
-```
-
-策略规则与策略需要配合使用，策略配置好后，需要查看策略规则是否过滤掉需要收集的metric项
-
-
-
-
-
-#### 3.4. 收集不到云主机信息
-看nova配置是否修改
-看计算节点polling.yaml是否有收集项
-看控制节点gnocchi_resources.yaml中是对应instance, instance_disk, instance_network_interface中对应metric是否正确
-看实例是在计算节点还是控制节点，最好都在计算节点部署
-修改完对应配置后，重启相关服务，重建虚拟机进行验证
 
 
 
