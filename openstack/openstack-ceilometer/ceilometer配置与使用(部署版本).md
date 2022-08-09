@@ -160,6 +160,8 @@ redis服务不会开机自启动，可以将上述命令放入开机启动项里
 
    ```
 yum -y install openstack-gnocchi-api openstack-gnocchi-metricd python-gnocchiclient
+   
+版本：4.3.2
    ```
 
 ### 2.2 创建数据库
@@ -288,7 +290,7 @@ service_token_roles_required = true
 verbose = true
 log_dir = /var/log/gnocchi
 parallel_operations = 200
-coordination_url = redis://controller:6379?db=5
+coordination_url = redis://:comleader@controller:6379?db=5
 [api]
 auth_mode = keystone
 host = controller
@@ -399,45 +401,9 @@ WantedBy=multi-user.target
 systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  
 systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
 ```
-### 2.6 聚合策略创建
-
-为gnocchi创建聚合策略
-
-   ```
-   gnocchi archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m mean -m max -m min -m count -m sum -m std -m rate:mean horizon-mimic
-   ```
-### 2.7 修改聚合策3略规则
-
-创建规则，如果已存在，先更新规则， 创建新规则，删除旧规则
-
-   ```gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
-   gnocchi archive-policy-rule update default -n default-origin
-   gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
-   gnocchi archive-policy-rule delete default-origin
-   ```
-
-   策略规则与策略需要配合使用，
-
-### 2.8 替换源码，重启服务
 
 
-
-```
-systemctl status openstack-gnocchi-api.service openstack-gnocchi-metricd.service
-```
-#### 2.8.1 替换gnocchi源码
-
-**修改源码，或者强制安装最新的修复该版本的源码，然后重新启动。**
-
-（有时间可以找 ，源码spec文件，修改后直接打成源码格式，就不用二次安装了）
-
-```
-rpm -ivh dm-gnocchi.rpm --force
-
-systemctl restart openstack-gnocchi-api.service openstack-gnocchi-metricd.service
-```
-
-#### 2.8.2 替换gnocchiclient源码
+### 2.6 替换gnocchiclient源码
 
 `vim /usr/lib/python2.7/site-packages/gnocchiclient/shell.py`
 
@@ -455,7 +421,46 @@ os.environ["OS_AUTH_TYPE"] = "password"
 
 
 
-### 2.9 常用命令
+
+
+
+
+### 2.7 聚合策略创建
+
+为gnocchi创建聚合策略
+
+   ```
+gnocchi archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m mean -m max -m min -m count -m sum -m std -m rate:mean horizon-mimic
+   ```
+### 2.8 修改聚合策略规则
+
+创建规则，如果已存在，先更新规则， 创建新规则，删除旧规则
+
+   ```
+gnocchi archive-policy-rule update default -n default-origin
+gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
+gnocchi archive-policy-rule delete default-origin
+   ```
+
+   策略规则与策略需要配合使用，
+
+### 2.9 替换gnocchi源码，重启服务
+
+安装包参考后面**6打包**章节,，安装后，会替换代码以及切割文件配置
+
+**安装最新的修复该版本的源码，然后重新启动。**
+
+（有时间可以找 ，源码spec文件，修改后直接打成源码格式，就不用二次安装了）
+
+```
+rpm -ivh dm-mcs-dashboard-gnocchi-1.0.5-1.noarch.rpm --force
+
+systemctl restart openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+```
+
+
+
+### 2.10 常用命令
 
 ```
 # 首先要登陆
@@ -473,8 +478,6 @@ gnocchi measures show metric_id --aggregation rate:mean --granularity 60 #  对�
 
 
 ## 3 安装snmp
-
-
 
 ### 3.1 安装
 
@@ -552,11 +555,21 @@ dontLogTCPWrappersConnects yes
 yum -y install openstack-ceilometer-notification openstack-ceilometer-central openstack-ceilometer-compute
 ```
 
-### 4.2 配置文件修改
 
 
+### 4.2 <font color=red>替换代码☆☆☆</font>
 
-#### 4.2.1 polling文件修改
+```
+rpm -ivh ceilometer-12.1.0-1.noarch.rpm --force
+```
+
+安装包参考后面**6打包**章节,，安装后，会替换代码以及配置文件
+
+替换代码（此处替换前后，不应该更改默认app名称，否则无法初始化数据库，打包时跟源码包名称，版本号一致，待测试）
+
+### 4.3 配置文件修改
+
+#### 4.3.1 polling文件修改
 
 控制节点和计算节点，ip值不同，metric相同
 
@@ -631,10 +644,10 @@ sources:
         - custom.hardware.disk.write.bytes
         - custom.hardware.disk.read.requests
         - custom.hardware.disk.write.requests
-        - custom.hardware.disk.read.bytes.average:
-        - custom.hardware.disk.write.bytes.average:
-        - custom.hardware.disk.read.requests.average:
-        - custom.hardware.disk.write.requests.average:
+        - custom.hardware.disk.read.bytes.average
+        - custom.hardware.disk.write.bytes.average
+        - custom.hardware.disk.read.requests.average
+        - custom.hardware.disk.write.requests.average
       resources:
         - snmp://30.90.2.27    # ip address of this node
       interval: 60
@@ -644,7 +657,7 @@ sources:
 
 
 
-#### 4.2.2 pipeline文件修改
+#### 4.3.2 pipeline文件修改
 
 只在有openstack-ceilometer-notification服务的节点修改
 
@@ -771,7 +784,7 @@ sinks:
 
 
 
-#### 4.2.3 gnocchi_resources文件修改
+#### 4.3.3 gnocchi_resources文件修改
 
 只在有openstack-ceilometer-notification服务的节点修改
 
@@ -934,11 +947,11 @@ resources:
       host_name: resource_metadata.resource_url
 ```
 
-#### 4.2.4 ceilometer.conf文件修改
+#### 4.3.4 ceilometer.conf文件修改
 
     sed -i.default -e '/^#/d' -e '/^$/d'  /etc/ceilometer/ceilometer.conf
 
-##### 4.2.4.1 配置部分解释
+##### 4.3.4.1 配置部分解释
 
    1. 配置身份认证方式以及消息列队访问。
 
@@ -993,7 +1006,7 @@ resources:
       ```
 
 
-##### 4.2.4.2 完整配置
+##### 4.3.4.2 完整配置
 
 ```
 [DEFAULT]
@@ -1042,7 +1055,7 @@ region_name = RegionOne
 
 
 
-#### 4.2.5 nova配置
+#### 4.3.5 nova配置
 
 在计算节点执行以下操作。
 
@@ -1064,7 +1077,7 @@ region_name = RegionOne
 
 
 
-#### 4.2.6 权限配置
+#### 4.3.6 权限配置
 
 由于增加了命令行，所以所有节点需要增加权限
 
@@ -1077,11 +1090,221 @@ ceilometer ALL = (root) NOPASSWD: ALL
 
 
 
-### 4.3 替换代码<font color=red>☆☆☆</font>
+#### 4.3.7 entry_points.txt文件修改
 
-替换代码（此处替换前后，不应该更改默认app名称，否则无法初始化数据库，打包时跟源码包名称，版本号一致，待测试）
+```
+[ceilometer.builder.poll.central]
+hardware.snmp = ceilometer.hardware.pollsters.generic:GenericHardwareDeclarativePollster
 
+[ceilometer.compute.virt]
+hyperv = ceilometer.compute.virt.hyperv.inspector:HyperVInspector
+libvirt = ceilometer.compute.virt.libvirt.inspector:LibvirtInspector
+vsphere = ceilometer.compute.virt.vmware.inspector:VsphereInspector
+xenapi = ceilometer.compute.virt.xenapi.inspector:XenapiInspector
 
+[ceilometer.discover.central]
+endpoint = ceilometer.polling.discovery.endpoint:EndpointDiscovery
+fip_services = ceilometer.network.services.discovery:FloatingIPDiscovery
+fw_policy = ceilometer.network.services.discovery:FirewallPolicyDiscovery
+fw_services = ceilometer.network.services.discovery:FirewallDiscovery
+images = ceilometer.image.discovery:ImagesDiscovery
+ipsec_connections = ceilometer.network.services.discovery:IPSecConnectionsDiscovery
+lb_health_probes = ceilometer.network.services.discovery:LBHealthMonitorsDiscovery
+lb_listeners = ceilometer.network.services.discovery:LBListenersDiscovery
+lb_loadbalancers = ceilometer.network.services.discovery:LBLoadBalancersDiscovery
+lb_members = ceilometer.network.services.discovery:LBMembersDiscovery
+lb_pools = ceilometer.network.services.discovery:LBPoolsDiscovery
+lb_vips = ceilometer.network.services.discovery:LBVipsDiscovery
+tenant = ceilometer.polling.discovery.tenant:TenantDiscovery
+tripleo_overcloud_nodes = ceilometer.hardware.discovery:NodesDiscoveryTripleO
+volume_backups = ceilometer.volume.discovery:VolumeBackupsDiscovery
+volume_snapshots = ceilometer.volume.discovery:VolumeSnapshotsDiscovery
+volumes = ceilometer.volume.discovery:VolumeDiscovery
+vpn_services = ceilometer.network.services.discovery:VPNServicesDiscovery
+
+[ceilometer.discover.compute]
+local_instances = ceilometer.compute.discovery:InstanceDiscovery
+
+[ceilometer.discover.ipmi]
+local_node = ceilometer.polling.discovery.localnode:LocalNodeDiscovery
+
+[ceilometer.event.publisher]
+gnocchi = ceilometer.publisher.gnocchi:GnocchiPublisher
+http = ceilometer.publisher.http:HttpPublisher
+https = ceilometer.publisher.http:HttpPublisher
+notifier = ceilometer.publisher.messaging:EventNotifierPublisher
+test = ceilometer.publisher.test:TestPublisher
+zaqar = ceilometer.publisher.zaqar:ZaqarPublisher
+
+[ceilometer.event.trait_plugin]
+bitfield = ceilometer.event.trait_plugins:BitfieldTraitPlugin
+split = ceilometer.event.trait_plugins:SplitterTraitPlugin
+timedelta = ceilometer.event.trait_plugins:TimedeltaPlugin
+
+[ceilometer.hardware.inspectors]
+snmp = ceilometer.hardware.inspector.snmp:SNMPInspector
+
+[ceilometer.notification.pipeline]
+event = ceilometer.pipeline.event:EventPipelineManager
+meter = ceilometer.pipeline.sample:SamplePipelineManager
+
+[ceilometer.poll.central]
+image.size = ceilometer.image.glance:ImageSizePollster
+ip.floating = ceilometer.network.floatingip:FloatingIPPollster
+network.services.firewall = ceilometer.network.services.fwaas:FirewallPollster
+network.services.firewall.policy = ceilometer.network.services.fwaas:FirewallPolicyPollster
+network.services.lb.active.connections = ceilometer.network.services.lbaas:LBActiveConnectionsPollster
+network.services.lb.health_monitor = ceilometer.network.services.lbaas:LBHealthMonitorPollster
+network.services.lb.incoming.bytes = ceilometer.network.services.lbaas:LBBytesInPollster
+network.services.lb.listener = ceilometer.network.services.lbaas:LBListenerPollster
+network.services.lb.loadbalancer = ceilometer.network.services.lbaas:LBLoadBalancerPollster
+network.services.lb.member = ceilometer.network.services.lbaas:LBMemberPollster
+network.services.lb.outgoing.bytes = ceilometer.network.services.lbaas:LBBytesOutPollster
+network.services.lb.pool = ceilometer.network.services.lbaas:LBPoolPollster
+network.services.lb.total.connections = ceilometer.network.services.lbaas:LBTotalConnectionsPollster
+network.services.lb.vip = ceilometer.network.services.lbaas:LBVipPollster
+network.services.vpn = ceilometer.network.services.vpnaas:VPNServicesPollster
+network.services.vpn.connections = ceilometer.network.services.vpnaas:IPSecConnectionsPollster
+port = ceilometer.network.statistics.port_v2:PortPollster
+port.receive.bytes = ceilometer.network.statistics.port_v2:PortPollsterReceiveBytes
+port.receive.drops = ceilometer.network.statistics.port_v2:PortPollsterReceiveDrops
+port.receive.errors = ceilometer.network.statistics.port_v2:PortPollsterReceiveErrors
+port.receive.packets = ceilometer.network.statistics.port_v2:PortPollsterReceivePackets
+port.transmit.bytes = ceilometer.network.statistics.port_v2:PortPollsterTransmitBytes
+port.transmit.packets = ceilometer.network.statistics.port_v2:PortPollsterTransmitPackets
+port.uptime = ceilometer.network.statistics.port_v2:PortPollsterUptime
+radosgw.containers.objects = ceilometer.objectstore.rgw:ContainersObjectsPollster
+radosgw.containers.objects.size = ceilometer.objectstore.rgw:ContainersSizePollster
+radosgw.objects = ceilometer.objectstore.rgw:ObjectsPollster
+radosgw.objects.containers = ceilometer.objectstore.rgw:ObjectsContainersPollster
+radosgw.objects.size = ceilometer.objectstore.rgw:ObjectsSizePollster
+radosgw.usage = ceilometer.objectstore.rgw:UsagePollster
+storage.containers.objects = ceilometer.objectstore.swift:ContainersObjectsPollster
+storage.containers.objects.size = ceilometer.objectstore.swift:ContainersSizePollster
+storage.objects = ceilometer.objectstore.swift:ObjectsPollster
+storage.objects.containers = ceilometer.objectstore.swift:ObjectsContainersPollster
+storage.objects.size = ceilometer.objectstore.swift:ObjectsSizePollster
+switch = ceilometer.network.statistics.switch:SWPollster
+switch.flow = ceilometer.network.statistics.flow:FlowPollster
+switch.flow.bytes = ceilometer.network.statistics.flow:FlowPollsterBytes
+switch.flow.duration.nanoseconds = ceilometer.network.statistics.flow:FlowPollsterDurationNanoseconds
+switch.flow.duration.seconds = ceilometer.network.statistics.flow:FlowPollsterDurationSeconds
+switch.flow.packets = ceilometer.network.statistics.flow:FlowPollsterPackets
+switch.port = ceilometer.network.statistics.port:PortPollster
+switch.port.collision.count = ceilometer.network.statistics.port:PortPollsterCollisionCount
+switch.port.receive.bytes = ceilometer.network.statistics.port:PortPollsterReceiveBytes
+switch.port.receive.crc_error = ceilometer.network.statistics.port:PortPollsterReceiveCRCErrors
+switch.port.receive.drops = ceilometer.network.statistics.port:PortPollsterReceiveDrops
+switch.port.receive.errors = ceilometer.network.statistics.port:PortPollsterReceiveErrors
+switch.port.receive.frame_error = ceilometer.network.statistics.port:PortPollsterReceiveFrameErrors
+switch.port.receive.overrun_error = ceilometer.network.statistics.port:PortPollsterReceiveOverrunErrors
+switch.port.receive.packets = ceilometer.network.statistics.port:PortPollsterReceivePackets
+switch.port.transmit.bytes = ceilometer.network.statistics.port:PortPollsterTransmitBytes
+switch.port.transmit.drops = ceilometer.network.statistics.port:PortPollsterTransmitDrops
+switch.port.transmit.errors = ceilometer.network.statistics.port:PortPollsterTransmitErrors
+switch.port.transmit.packets = ceilometer.network.statistics.port:PortPollsterTransmitPackets
+switch.port.uptime = ceilometer.network.statistics.port:PortPollsterUptime
+switch.ports = ceilometer.network.statistics.switch:SwitchPollsterPorts
+switch.table = ceilometer.network.statistics.table:TablePollster
+switch.table.active.entries = ceilometer.network.statistics.table:TablePollsterActiveEntries
+switch.table.lookup.packets = ceilometer.network.statistics.table:TablePollsterLookupPackets
+switch.table.matched.packets = ceilometer.network.statistics.table:TablePollsterMatchedPackets
+volume.backup.size = ceilometer.volume.cinder:VolumeBackupSize
+volume.size = ceilometer.volume.cinder:VolumeSizePollster
+volume.snapshot.size = ceilometer.volume.cinder:VolumeSnapshotSize
+
+[ceilometer.poll.compute]
+cpu = ceilometer.compute.pollsters.instance_stats:CPUPollster
+cpu_l3_cache = ceilometer.compute.pollsters.instance_stats:CPUL3CachePollster
+cpu_util = ceilometer.compute.pollsters.instance_stats:CPUUtilPollster
+disk.device.allocation = ceilometer.compute.pollsters.disk:PerDeviceAllocationPollster
+disk.device.capacity = ceilometer.compute.pollsters.disk:PerDeviceCapacityPollster
+disk.device.iops = ceilometer.compute.pollsters.disk:PerDeviceDiskIOPSPollster
+disk.device.latency = ceilometer.compute.pollsters.disk:PerDeviceDiskLatencyPollster
+disk.device.read.bytes = ceilometer.compute.pollsters.disk:PerDeviceReadBytesPollster
+disk.device.read.latency = ceilometer.compute.pollsters.disk:PerDeviceDiskReadLatencyPollster
+disk.device.read.requests = ceilometer.compute.pollsters.disk:PerDeviceReadRequestsPollster
+disk.device.usage = ceilometer.compute.pollsters.disk:PerDevicePhysicalPollster
+disk.device.write.bytes = ceilometer.compute.pollsters.disk:PerDeviceWriteBytesPollster
+disk.device.write.latency = ceilometer.compute.pollsters.disk:PerDeviceDiskWriteLatencyPollster
+disk.device.write.requests = ceilometer.compute.pollsters.disk:PerDeviceWriteRequestsPollster
+memory.bandwidth.local = ceilometer.compute.pollsters.instance_stats:MemoryBandwidthLocalPollster
+memory.bandwidth.total = ceilometer.compute.pollsters.instance_stats:MemoryBandwidthTotalPollster
+memory.resident = ceilometer.compute.pollsters.instance_stats:MemoryResidentPollster
+memory.swap.in = ceilometer.compute.pollsters.instance_stats:MemorySwapInPollster
+memory.swap.out = ceilometer.compute.pollsters.instance_stats:MemorySwapOutPollster
+memory.usage = ceilometer.compute.pollsters.instance_stats:MemoryUsagePollster
+memory.util = ceilometer.compute.pollsters.instance_stats:MemoryUtilPollster
+memory = ceilometer.compute.pollsters.instance_stats:MemoryPollster
+network.incoming.bytes = ceilometer.compute.pollsters.net:IncomingBytesPollster
+network.incoming.bytes.rate = ceilometer.compute.pollsters.net:IncomingBytesRatePollster
+network.incoming.packets = ceilometer.compute.pollsters.net:IncomingPacketsPollster
+network.incoming.packets.drop = ceilometer.compute.pollsters.net:IncomingDropPollster
+network.incoming.packets.error = ceilometer.compute.pollsters.net:IncomingErrorsPollster
+network.outgoing.bytes = ceilometer.compute.pollsters.net:OutgoingBytesPollster
+network.outgoing.bytes.rate = ceilometer.compute.pollsters.net:OutgoingBytesRatePollster
+network.outgoing.packets = ceilometer.compute.pollsters.net:OutgoingPacketsPollster
+network.outgoing.packets.drop = ceilometer.compute.pollsters.net:OutgoingDropPollster
+network.outgoing.packets.error = ceilometer.compute.pollsters.net:OutgoingErrorsPollster
+perf.cache.misses = ceilometer.compute.pollsters.instance_stats:PerfCacheMissesPollster
+perf.cache.references = ceilometer.compute.pollsters.instance_stats:PerfCacheReferencesPollster
+perf.cpu.cycles = ceilometer.compute.pollsters.instance_stats:PerfCPUCyclesPollster
+perf.instructions = ceilometer.compute.pollsters.instance_stats:PerfInstructionsPollster
+
+[ceilometer.poll.ipmi]
+hardware.ipmi.current = ceilometer.ipmi.pollsters.sensor:CurrentSensorPollster
+hardware.ipmi.fan = ceilometer.ipmi.pollsters.sensor:FanSensorPollster
+hardware.ipmi.node.airflow = ceilometer.ipmi.pollsters.node:AirflowPollster
+hardware.ipmi.node.cpu_util = ceilometer.ipmi.pollsters.node:CPUUtilPollster
+hardware.ipmi.node.cups = ceilometer.ipmi.pollsters.node:CUPSIndexPollster
+hardware.ipmi.node.io_util = ceilometer.ipmi.pollsters.node:IOUtilPollster
+hardware.ipmi.node.mem_util = ceilometer.ipmi.pollsters.node:MemUtilPollster
+hardware.ipmi.node.outlet_temperature = ceilometer.ipmi.pollsters.node:OutletTemperaturePollster
+hardware.ipmi.node.power = ceilometer.ipmi.pollsters.node:PowerPollster
+hardware.ipmi.node.temperature = ceilometer.ipmi.pollsters.node:InletTemperaturePollster
+hardware.ipmi.temperature = ceilometer.ipmi.pollsters.sensor:TemperatureSensorPollster
+hardware.ipmi.voltage = ceilometer.ipmi.pollsters.sensor:VoltageSensorPollster
+
+[ceilometer.sample.endpoint]
+_sample = ceilometer.telemetry.notifications:TelemetryIpc
+hardware.ipmi.current = ceilometer.ipmi.notifications.ironic:CurrentSensorNotification
+hardware.ipmi.fan = ceilometer.ipmi.notifications.ironic:FanSensorNotification
+hardware.ipmi.temperature = ceilometer.ipmi.notifications.ironic:TemperatureSensorNotification
+hardware.ipmi.voltage = ceilometer.ipmi.notifications.ironic:VoltageSensorNotification
+http.request = ceilometer.middleware:HTTPRequest
+http.response = ceilometer.middleware:HTTPResponse
+meter = ceilometer.meter.notifications:ProcessMeterNotifications
+
+[ceilometer.sample.publisher]
+file = ceilometer.publisher.file:FilePublisher
+gnocchi = ceilometer.publisher.gnocchi:GnocchiPublisher
+http = ceilometer.publisher.http:HttpPublisher
+https = ceilometer.publisher.http:HttpPublisher
+notifier = ceilometer.publisher.messaging:SampleNotifierPublisher
+prometheus = ceilometer.publisher.prometheus:PrometheusPublisher
+test = ceilometer.publisher.test:TestPublisher
+udp = ceilometer.publisher.udp:UDPPublisher
+zaqar = ceilometer.publisher.zaqar:ZaqarPublisher
+
+[console_scripts]
+ceilometer-agent-notification = ceilometer.cmd.agent_notification:main
+ceilometer-polling = ceilometer.cmd.polling:main
+ceilometer-rootwrap = oslo_rootwrap.cmd:main
+ceilometer-send-sample = ceilometer.cmd.sample:send_sample
+ceilometer-status = ceilometer.cmd.status:main
+ceilometer-upgrade = ceilometer.cmd.storage:upgrade
+
+[network.statistics.drivers]
+opencontrail = ceilometer.network.statistics.opencontrail.driver:OpencontrailDriver
+opendaylight = ceilometer.network.statistics.opendaylight.driver:OpenDayLightDriver
+
+[oslo.config.opts]
+ceilometer = ceilometer.opts:list_opts
+ceilometer-auth = ceilometer.opts:list_keystoneauth_opts
+
+```
+
+ 
 
 ### 4.4 初始化资源、数据库
 
@@ -1202,50 +1425,98 @@ apt install -y gperf flex bison ncurses-dev pkg-config augeas-tools augeas-doc p
 
 
 
-
-
-
-
 ## 6. 打包
 
-日志切割文件拷贝
+### 6.1 ceilometer打包
 
-entry_points文件修改
+#### 6.1.1 新建目录(如openstack-ceilometer)
 
+#### 6.1.2 拷贝文件
 
+目录中包含，ceilometer/源码，polling.yaml/pipeline.yaml/gnocchi_resources.yaml三个配置文件，以及setup.py文件，yaml文件内容见章节4.3.1--4.3.3
 
-
-
-
-
-##### 3.2.4 修改entry_points.txt添加entry_points，让stevedore能够扫描到新加的pollster
-
-该位置加载代码中新添加的pollster
-
-vim /usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/entry_points.txt 
-
-添加后可以从self.extension中获取
-
-{'obj': <ceilometer.compute.pollsters.instance_stats.MemoryUtilPollster object at 0x7fb231486990>, 'entry_point': EntryPoint.parse('memory.util = ceilometer.compute.pollsters.instance_stats:MemoryUtilPollster'), 'name': 'memory.util', 'plugin': <class 'ceilometer.compute.pollsters.instance_stats.MemoryUtilPollster'>}
-
-##### 3.2.5  修改配置文件
-
-- 同时在polling.yanl （控制节点和计算节点）、pipeline.yaml（控制节点）、gnochi_resource.yaml（控制节点）增加对应metric
-- 重启openstack-ceilometer-compute服务，gnocchi查询对应resource的对应metric，看是否新增，数据是否正常收集
+![img](.\ceilometer打包目录.png)
 
 
 
+setup.py文件内容如下：
+
+```
+# -*- coding: utf-8 -*-
+from setuptools import setup, find_packages
+
+setup(name='ceilometer',
+      version='12.1.0',
+      description='dm-mcs-dashboard-ceilometer v2.0.0',
+      author='xindawangyu',
+      author_email='xindawangyu',
+      url='www.ieucd.com',
+      license='GPL',
+      packages=find_packages(),
+      package_data = {'ceilometer': ['test.log', 'pipeline/data/*.yaml', 'hardware/pollsters/data/*.yaml', 'publisher/data/*.yaml', 'data/meters.d/*.yaml']},
+   #   include_package_data=True,
+   #  # zip_safe=False,
+     # python_requires='>=2.7',
+      data_files=[
+                ('/etc/ceilometer/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/polling.yaml']),
+              #  ('/usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/entry_points.txt']),
+                ('/etc/ceilometer/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/pipeline.yaml']),
+                ('/etc/ceilometer/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/gnocchi_resources.yaml']),
+                 ],
+
+)
+
+```
+
+#### 6.1.3 生成rpm包
+
+```
+python setup.py  bdist_rpm
+```
+
+entry_points文件打包进去有问题，暂时没有放到包里
 
 
 
+### 6.2 gnocchi打包
 
-## 四、日志切割
+#### 6.2.1 新建目录(如openstack-gnocchi/)
+
+#### 6.2.2 拷贝文件
+
+目录中包含，gnochi/源码，gnocchi/uwsgi-gnocchi.ini/openstack-gnocchi-api.service，以及setup.py文件
+
+![img](.\gnocchi打包目录.png)
 
 
 
-更改启动方式后，uwsgi日志需要定期处理
+setup.py文件
 
-修改`/etc/logrotate.d/gnocchi`，
+内容如下：
+
+```
+from setuptools import setup, find_packages
+
+setup(name='dm-mcs-dashboard-gnocchi',
+      version='1.0.5',
+      description='dm-mcs-dashboard-gnocchi-1.0.5',
+      author='xindawangyu',
+      author_email='xindawangyu',
+      url='www.ieucd.com',
+      license='GPL',
+      packages=find_packages(),
+      package_data={'gnocchi':['gnocchi-config-generator.conf', 'indexer/alembic/versions/*.py',
+                     'indexer/alembic/*.*','rest/prometheus/*.*','rest/*.*', 'tests/functional/gabbits/*.yaml',
+                     'tests/functional/gabbits/prometheus_fixtures/*.dump', 'tests/functional_live/gabbits/*.yaml']},
+      data_files=[
+          ('/etc/logrotate.d/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-gnocchi/conf/gnocchi']),
+          ('/etc/gnocchi/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-gnocchi/conf/uwsgi-gnocchi.ini']),
+          ('/usr/lib/systemd/system/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-gnocchi/conf/openstack-gnocchi-api.service']),
+      ],
+      )
+```
+
+gnocchi日志切割文件
 
 ```
 /var/log/gnocchi/*.log {
@@ -1253,14 +1524,60 @@ vim /usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/entry_poin
     size 10M
     missingok
     compress
-    copytruncate  # 切割后新日志正常写入
+    copytruncate  
 }
+```
+
+uwsgi-gnocchi.ini
+
+```
+[uwsgi]
+http-socket = controller:8041
+wsgi-file = /usr/bin/gnocchi-api
+master = true
+die-on-term = true
+threads = 10
+processes = 8
+enabled-threads = true
+thunder-lock = true
+plugins = python
+buffer-size = 65535
+listen = 4096
+logto = /var/log/gnocchi/uwsgi-gnocchi.log
+max-requests = 4000
+socket-timeout = 60
+pidfile = /var/run/gnocchi-uwsgi.pid
+
+```
+
+openstack-gnocchi-api.service
+
+```
+[Unit]
+Description=Gnocchi API service
+After=syslog.target network.target
+
+[Service]
+KillSignal=SIGQUIT
+Type=notify
+User=root
+NotifyAccess=all
+ExecStart=/usr/sbin/uwsgi --ini /etc/gnocchi/uwsgi-gnocchi.ini
+ExecStop=/usr/sbin/uwsgi --stop /var/run/gnocchi-uwsgi.pid
+ExecReload=/usr/sbin/uwsgi --reload /var/run/gnocchi-uwsgi.pid
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
 
 ```
 
 
 
+#### 6.2.3 生成rpm包
 
-
+```
+python setup.py  bdist_rpm
+```
 
 
