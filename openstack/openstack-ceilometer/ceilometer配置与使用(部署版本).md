@@ -1,4 +1,4 @@
-# 一、gnocchi/ceilometer-stein修改版配置与使用(dms-2.0.0)
+# 一、gnocchi/ceilometer-stein修改版配置与使用(2022.8.9版)
 
 
 
@@ -152,7 +152,7 @@ redis服务不会开机自启动，可以将上述命令放入开机启动项里
 
 ## 2. 安装配置Gnocchi
 
-在<font color=red>**控制节点和计算节点**</font>分别安装gnocchi服务，共用数据库及rpc地址。
+在<font color=red>**控制节点和计算节点**</font>分别安装gnocchi服务，共用数据库及rpc地址，**api服务地址是自己的ip地址**。
 
 ### 2.1 安转包
 
@@ -174,9 +174,9 @@ yum -y install openstack-gnocchi-api openstack-gnocchi-metricd python-gnocchicli
 
    ```
    mysql -u root -p
-   CREATE DATABASE gnocchi;
-   GRANT ALL PRIVILEGES ON gnocchi.* TO 'gnocchi'@'localhost' IDENTIFIED BY 'comleader@123';
-   GRANT ALL PRIVILEGES ON gnocchi.* TO 'gnocchi'@'%' IDENTIFIED BY 'comleader@123';
+   CREATE DATABASE gnocchi3;
+   GRANT ALL PRIVILEGES ON gnocchi3.* TO 'gnocchi'@'localhost' IDENTIFIED BY 'comleader@123';
+   GRANT ALL PRIVILEGES ON gnocchi3.* TO 'gnocchi'@'%' IDENTIFIED BY 'comleader@123';
    exit
    ```
 
@@ -339,7 +339,44 @@ service_token_roles_required = true
 
 ```
 
-### 2.4 初始化gnocchi
+
+
+### 2.4 替换gnocchi源码/gnocchiclient源码
+
+#### 2.4.1 替换gnocchi源码
+
+安装包参考后面**6打包**章节,，安装后，会替换代码以及切割文件配置
+
+**安装最新的修复该版本的源码。**
+
+（有时间可以找 ，源码spec文件，修改后直接打成源码格式，就不用二次安装了）
+
+```
+rpm -ivh dm-mcs-dashboard-gnocchi-1.0.5-1.noarch.rpm --force
+
+```
+
+
+
+#### 2.4.2 替换gnocchiclient源码
+
+`vim /usr/lib/python2.7/site-packages/gnocchiclient/shell.py`
+
+将130行内容修改为：
+
+os.environ["OS_AUTH_TYPE"] = "password"
+
+修改前：
+
+![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0214513727.png)
+
+修改后：
+
+![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0214513728.png)
+
+
+
+### 2.5 初始化gnocchi
 
 初始化gnocchi的数据库、文件索引
 
@@ -351,7 +388,9 @@ service_token_roles_required = true
 
 ```chmod -R 777 /var/lib/gnocchi```
 
-### 2.5 启动gnocchi
+
+
+### 2.6 配置/启动gnocchi
 
 配置/etc/gnocchi/uwsgi-gnocchi.ini，注意修改系统的监听数（默认128）,参考修改链接：https://blog.csdn.net/qq_35876972/article/details/105340159
 
@@ -374,7 +413,7 @@ socket-timeout = 60
 pidfile = /var/run/gnocchi-uwsgi.pid
 ```
 
-修改openstack-goncchi-api.service
+修改goncchi-api.service
 
 ```
 [Unit]
@@ -398,41 +437,22 @@ WantedBy=multi-user.target
 
 
 ```
-systemctl enable openstack-gnocchi-api.service openstack-gnocchi-metricd.service  
-systemctl start openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+systemctl daemon-reload
+systemctl enable gnocchi-api.service gnocchi-metricd.service  
+systemctl start gnocchi-api.service gnocchi-metricd.service
 ```
 
 
-### 2.6 替换gnocchiclient源码
+### 2.7 聚合策略/聚合策略规则
 
-`vim /usr/lib/python2.7/site-packages/gnocchiclient/shell.py`
+<font color=blue><b>更新代码后，策略和默认规则已经更改为horizon-mimic，确认数据库更新后下面的命令可以不执行</b></font>
 
-将130行内容修改为：
-
-os.environ["OS_AUTH_TYPE"] = "password"
-
-修改前：
-
-![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0214513727.png)
-
-修改后：
-
-![点击放大](https://support.huaweicloud.com/dpmg-kunpengcpfs/zh-cn_image_0214513728.png)
-
-
-
-
-
-
-
-### 2.7 聚合策略创建
-
-为gnocchi创建聚合策略
+#### 2.7.1 为gnocchi创建聚合策略
 
    ```
 gnocchi archive-policy create -d granularity:1m,points:30 -d granularity:5m,points:288 -d granularity:30m,points:336 -d granularity:2h,points:360 -d granularity:1d,points:365 -m mean -m max -m min -m count -m sum -m std -m rate:mean horizon-mimic
    ```
-### 2.8 修改聚合策略规则
+#### 2.7.2 修改聚合策略规则
 
 创建规则，如果已存在，先更新规则， 创建新规则，删除旧规则
 
@@ -442,25 +462,49 @@ gnocchi archive-policy-rule create -a horizon-mimic -m "*" default
 gnocchi archive-policy-rule delete default-origin
    ```
 
-   策略规则与策略需要配合使用，
 
-### 2.9 替换gnocchi源码，重启服务
 
-安装包参考后面**6打包**章节,，安装后，会替换代码以及切割文件配置
 
-**安装最新的修复该版本的源码，然后重新启动。**
 
-（有时间可以找 ，源码spec文件，修改后直接打成源码格式，就不用二次安装了）
+### 2.8 gnocchi-api负载均衡（写入总部署文档中）
+
+#### 2.8.1 nginx配置
 
 ```
-rpm -ivh dm-mcs-dashboard-gnocchi-1.0.5-1.noarch.rpm --force
+# 配置位置： /etc/nginx/conf.d/gnocchi.conf
 
-systemctl restart openstack-gnocchi-api.service openstack-gnocchi-metricd.service
+upstream gnocchinfo {
+    # ip_hash;
+    server 192.168.230.107:8049;
+    server 192.168.230.106:8041;
+    server 192.168.230.109:8041;
+}
+
+server {
+    listen 8041;
+    client_max_body_size 10240M;
+    client_header_buffer_size 1k;
+    large_client_header_buffers 4 32k;
+ 
+    access_log            /var/log/nginx/gnocchi_wsgi.access.log;
+    error_log             /var/log/nginx/gnocchi_wsgi.error.log;
+    
+   location / {
+       proxy_pass http://gnocchinfo;
+    }
+}
+
 ```
 
 
 
-### 2.10 常用命令
+#### 2.8.2 控制节点gnocchi-api端口更改
+
+由于nginx监听了8041端口，所以和nginx相同节点的gnocchi-api端口要修改，和上面nginx里配置一致
+
+
+
+### 2.9 常用命令
 
 ```
 # 首先要登陆
@@ -553,6 +597,8 @@ dontLogTCPWrappersConnects yes
 在<font color=red>**控制节点和计算节点**</font>执行以下操作。
 ```
 yum -y install openstack-ceilometer-notification openstack-ceilometer-central openstack-ceilometer-compute
+
+版本：12.1.0
 ```
 
 
@@ -571,7 +617,7 @@ rpm -ivh ceilometer-12.1.0-1.noarch.rpm --force
 
 #### 4.3.1 polling文件修改
 
-控制节点和计算节点，ip值不同，metric相同
+<font color=blue><b>控制节点和计算节点，ip值不同，metric相同</b></font>
 
 ```
 ---
@@ -659,7 +705,7 @@ sources:
 
 #### 4.3.2 pipeline文件修改
 
-只在有openstack-ceilometer-notification服务的节点修改
+<font color=blue><b>只在有openstack-ceilometer-notification服务的节点修改</b></font>
 
 ```
 ---
@@ -786,7 +832,7 @@ sinks:
 
 #### 4.3.3 gnocchi_resources文件修改
 
-只在有openstack-ceilometer-notification服务的节点修改
+<font color=blue><b>只在有openstack-ceilometer-notification服务的节点修改</b></font>
 
 ```
 ---
@@ -801,6 +847,27 @@ archive_policies:
     definition:
       - granularity: 5 minutes
         timespan: 30 days
+  - name: horizon-mimic
+    aggregation_methods:
+      - mean
+      - rate:mean
+      - max
+      - min
+      - count
+      - std
+      - sum
+    back_window: 0
+    definition:
+      - granularity: 1 minute
+        timespan: 30 minutes
+      - granularity: 5 minutes
+        timespan: 24 hours     
+      - granularity: 30 minutes
+        timespan: 183 days     
+      - granularity: 2 hours
+        timespan: 365 days
+      - granularity: 1 day
+        timespan: 365 days
   - name: ceilometer-low-rate
     aggregation_methods:
       - mean
@@ -913,6 +980,7 @@ resources:
       hardware.network.outgoing.drop:
       hardware.network.outgoing.errors:
       hardware.network.outgoing.packets:
+      custom.hardware.network.interface.status:
     attributes:
       host_name: resource_metadata.resource_url
       device_name: resource_metadata.name
@@ -941,8 +1009,6 @@ resources:
       custom.hardware.swap.avail:
       custom.hardware.swap.total:
       custom.hardware.swap.utilization:
-
-      custom.hardware.network.interface.status:
     attributes:
       host_name: resource_metadata.resource_url
 ```
@@ -1057,7 +1123,7 @@ region_name = RegionOne
 
 #### 4.3.5 nova配置
 
-在计算节点执行以下操作。
+<font color=blue><b>在计算节点执行以下操作。</b></font>
 
 1. 编辑“/etc/nova/nova.conf”文件并在以下[DEFAULT]部分配置消息通知：
 
@@ -1079,7 +1145,7 @@ region_name = RegionOne
 
 #### 4.3.6 权限配置
 
-由于增加了命令行，所以所有节点需要增加权限
+<font color=blue><b>由于增加了命令行，所以所有节点需要增加权限</b></font>
 
 vim /etc/sudoers
 增加一行：
@@ -1090,7 +1156,9 @@ ceilometer ALL = (root) NOPASSWD: ALL
 
 
 
-#### 4.3.7 entry_points.txt文件修改
+#### 4.3.7 entry_points.txt文件修改(更新rpm包后，不用操作)
+
+`/usr/lib/python2.7/site-packages/ceilometer-12.0.0-py2.7.egg-info`
 
 ```
 [ceilometer.builder.poll.central]
@@ -1318,10 +1386,27 @@ ceilometer-auth = ceilometer.opts:list_keystoneauth_opts
 
 ### 4.5 启动服务
 
+
+
+<font color=blue><b>控制节点</b></font>
+
    ```
 systemctl enable openstack-ceilometer-notification.service  openstack-ceilometer-central.service
 systemctl start openstack-ceilometer-notification.service openstack-ceilometer-central.service
    ```
+
+<font color=blue><b>计算节点</b></font>
+
+```
+systemctl enable openstack-ceilometer-central.service openstack-ceilometer-compute.service
+systemctl start openstack-ceilometer-central.service openstack-ceilometer-compute.service
+```
+
+<font color=blue><b>再次更新配置</b></font>
+
+```
+ceilometer-upgrade
+```
 
 
 
@@ -1447,23 +1532,197 @@ from setuptools import setup, find_packages
 
 setup(name='ceilometer',
       version='12.1.0',
-      description='dm-mcs-dashboard-ceilometer v2.0.0',
+      description='dm-mcs-ceilometer v2.0.0',
       author='xindawangyu',
       author_email='xindawangyu',
       url='www.ieucd.com',
       license='GPL',
       packages=find_packages(),
       package_data = {'ceilometer': ['test.log', 'pipeline/data/*.yaml', 'hardware/pollsters/data/*.yaml', 'publisher/data/*.yaml', 'data/meters.d/*.yaml']},
-   #   include_package_data=True,
-   #  # zip_safe=False,
-     # python_requires='>=2.7',
       data_files=[
-                ('/etc/ceilometer/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/polling.yaml']),
-              #  ('/usr/lib/python2.7/site-packages/ceilometer-12.1.0-py2.7.egg-info/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/entry_points.txt']),
-                ('/etc/ceilometer/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/pipeline.yaml']),
-                ('/etc/ceilometer/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-ceilometer/conf/gnocchi_resources.yaml']),
+                ('/etc/ceilometer/', ['./conf/polling.yaml']),
+                ('/etc/ceilometer/', ['./conf/pipeline.yaml']),
+                ('/etc/ceilometer/', ['./conf/gnocchi_resources.yaml']),
                  ],
-
+      entry_points={
+    'ceilometer.builder.poll.central': [
+    'hardware.snmp = ceilometer.hardware.pollsters.generic:GenericHardwareDeclarativePollster'],
+                'ceilometer.compute.virt': ['hyperv = ceilometer.compute.virt.hyperv.inspector:HyperVInspector',
+                                            'libvirt = ceilometer.compute.virt.libvirt.inspector:LibvirtInspector',
+                                            'vsphere = ceilometer.compute.virt.vmware.inspector:VsphereInspector',
+                                            'xenapi = ceilometer.compute.virt.xenapi.inspector:XenapiInspector'],
+                'ceilometer.discover.central': ['endpoint = ceilometer.polling.discovery.endpoint:EndpointDiscovery',
+                                                'fip_services = ceilometer.network.services.discovery:FloatingIPDiscovery',
+                                                'fw_policy = ceilometer.network.services.discovery:FirewallPolicyDiscovery',
+                                                'fw_services = ceilometer.network.services.discovery:FirewallDiscovery',
+                                                'images = ceilometer.image.discovery:ImagesDiscovery',
+                                                'ipsec_connections = ceilometer.network.services.discovery:IPSecConnectionsDiscovery',
+                                                'lb_health_probes = ceilometer.network.services.discovery:LBHealthMonitorsDiscovery',
+                                                'lb_listeners = ceilometer.network.services.discovery:LBListenersDiscovery',
+                                                'lb_loadbalancers = ceilometer.network.services.discovery:LBLoadBalancersDiscovery',
+                                                'lb_members = ceilometer.network.services.discovery:LBMembersDiscovery',
+                                                'lb_pools = ceilometer.network.services.discovery:LBPoolsDiscovery',
+                                                'lb_vips = ceilometer.network.services.discovery:LBVipsDiscovery',
+                                                'tenant = ceilometer.polling.discovery.tenant:TenantDiscovery',
+                                                'tripleo_overcloud_nodes = ceilometer.hardware.discovery:NodesDiscoveryTripleO',
+                                                'volume_backups = ceilometer.volume.discovery:VolumeBackupsDiscovery',
+                                                'volume_snapshots = ceilometer.volume.discovery:VolumeSnapshotsDiscovery',
+                                                'volumes = ceilometer.volume.discovery:VolumeDiscovery',
+                                                'vpn_services = ceilometer.network.services.discovery:VPNServicesDiscovery'],
+                'ceilometer.discover.compute': ['local_instances = ceilometer.compute.discovery:InstanceDiscovery'],
+                'ceilometer.discover.ipmi': ['local_node = ceilometer.polling.discovery.localnode:LocalNodeDiscovery'],
+                'ceilometer.event.publisher': ['gnocchi = ceilometer.publisher.gnocchi:GnocchiPublisher',
+                                               'http = ceilometer.publisher.http:HttpPublisher',
+                                               'https = ceilometer.publisher.http:HttpPublisher',
+                                               'notifier = ceilometer.publisher.messaging:EventNotifierPublisher',
+                                               'test = ceilometer.publisher.test:TestPublisher',
+                                               'zaqar = ceilometer.publisher.zaqar:ZaqarPublisher'],
+                'ceilometer.event.trait_plugin': ['bitfield = ceilometer.event.trait_plugins:BitfieldTraitPlugin',
+                                                  'split = ceilometer.event.trait_plugins:SplitterTraitPlugin',
+                                                  'timedelta = ceilometer.event.trait_plugins:TimedeltaPlugin'],
+                'ceilometer.hardware.inspectors': ['snmp = ceilometer.hardware.inspector.snmp:SNMPInspector'],
+                'ceilometer.notification.pipeline': ['event = ceilometer.pipeline.event:EventPipelineManager',
+                                                     'meter = ceilometer.pipeline.sample:SamplePipelineManager'],
+                'ceilometer.poll.central': ['image.size = ceilometer.image.glance:ImageSizePollster',
+                                            'ip.floating = ceilometer.network.floatingip:FloatingIPPollster',
+                                            'network.services.firewall = ceilometer.network.services.fwaas:FirewallPollster',
+                                            'network.services.firewall.policy = ceilometer.network.services.fwaas:FirewallPolicyPollster',
+                                            'network.services.lb.active.connections = ceilometer.network.services.lbaas:LBActiveConnectionsPollster',
+                                            'network.services.lb.health_monitor = ceilometer.network.services.lbaas:LBHealthMonitorPollster',
+                                            'network.services.lb.incoming.bytes = ceilometer.network.services.lbaas:LBBytesInPollster',
+                                            'network.services.lb.listener = ceilometer.network.services.lbaas:LBListenerPollster',
+                                            'network.services.lb.loadbalancer = ceilometer.network.services.lbaas:LBLoadBalancerPollster',
+                                            'network.services.lb.member = ceilometer.network.services.lbaas:LBMemberPollster',
+                                            'network.services.lb.outgoing.bytes = ceilometer.network.services.lbaas:LBBytesOutPollster',
+                                            'network.services.lb.pool = ceilometer.network.services.lbaas:LBPoolPollster',
+                                            'network.services.lb.total.connections = ceilometer.network.services.lbaas:LBTotalConnectionsPollster',
+                                            'network.services.lb.vip = ceilometer.network.services.lbaas:LBVipPollster',
+                                            'network.services.vpn = ceilometer.network.services.vpnaas:VPNServicesPollster',
+                                            'network.services.vpn.connections = ceilometer.network.services.vpnaas:IPSecConnectionsPollster',
+                                            'port = ceilometer.network.statistics.port_v2:PortPollster',
+                                            'port.receive.bytes = ceilometer.network.statistics.port_v2:PortPollsterReceiveBytes',
+                                            'port.receive.drops = ceilometer.network.statistics.port_v2:PortPollsterReceiveDrops',
+                                            'port.receive.errors = ceilometer.network.statistics.port_v2:PortPollsterReceiveErrors',
+                                            'port.receive.packets = ceilometer.network.statistics.port_v2:PortPollsterReceivePackets',
+                                            'port.transmit.bytes = ceilometer.network.statistics.port_v2:PortPollsterTransmitBytes',
+                                            'port.transmit.packets = ceilometer.network.statistics.port_v2:PortPollsterTransmitPackets',
+                                            'port.uptime = ceilometer.network.statistics.port_v2:PortPollsterUptime',
+                                            'radosgw.containers.objects = ceilometer.objectstore.rgw:ContainersObjectsPollster',
+                                            'radosgw.containers.objects.size = ceilometer.objectstore.rgw:ContainersSizePollster',
+                                            'radosgw.objects = ceilometer.objectstore.rgw:ObjectsPollster',
+                                            'radosgw.objects.containers = ceilometer.objectstore.rgw:ObjectsContainersPollster',
+                                            'radosgw.objects.size = ceilometer.objectstore.rgw:ObjectsSizePollster',
+                                            'radosgw.usage = ceilometer.objectstore.rgw:UsagePollster',
+                                            'storage.containers.objects = ceilometer.objectstore.swift:ContainersObjectsPollster',
+                                            'storage.containers.objects.size = ceilometer.objectstore.swift:ContainersSizePollster',
+                                            'storage.objects = ceilometer.objectstore.swift:ObjectsPollster',
+                                            'storage.objects.containers = ceilometer.objectstore.swift:ObjectsContainersPollster',
+                                            'storage.objects.size = ceilometer.objectstore.swift:ObjectsSizePollster',
+                                            'switch = ceilometer.network.statistics.switch:SWPollster',
+                                            'switch.flow = ceilometer.network.statistics.flow:FlowPollster',
+                                            'switch.flow.bytes = ceilometer.network.statistics.flow:FlowPollsterBytes',
+                                            'switch.flow.duration.nanoseconds = ceilometer.network.statistics.flow:FlowPollsterDurationNanoseconds',
+                                            'switch.flow.duration.seconds = ceilometer.network.statistics.flow:FlowPollsterDurationSeconds',
+                                            'switch.flow.packets = ceilometer.network.statistics.flow:FlowPollsterPackets',
+                                            'switch.port = ceilometer.network.statistics.port:PortPollster',
+                                            'switch.port.collision.count = ceilometer.network.statistics.port:PortPollsterCollisionCount',
+                                            'switch.port.receive.bytes = ceilometer.network.statistics.port:PortPollsterReceiveBytes',
+                                            'switch.port.receive.crc_error = ceilometer.network.statistics.port:PortPollsterReceiveCRCErrors',
+                                            'switch.port.receive.drops = ceilometer.network.statistics.port:PortPollsterReceiveDrops',
+                                            'switch.port.receive.errors = ceilometer.network.statistics.port:PortPollsterReceiveErrors',
+                                            'switch.port.receive.frame_error = ceilometer.network.statistics.port:PortPollsterReceiveFrameErrors',
+                                            'switch.port.receive.overrun_error = ceilometer.network.statistics.port:PortPollsterReceiveOverrunErrors',
+                                            'switch.port.receive.packets = ceilometer.network.statistics.port:PortPollsterReceivePackets',
+                                            'switch.port.transmit.bytes = ceilometer.network.statistics.port:PortPollsterTransmitBytes',
+                                            'switch.port.transmit.drops = ceilometer.network.statistics.port:PortPollsterTransmitDrops',
+                                            'switch.port.transmit.errors = ceilometer.network.statistics.port:PortPollsterTransmitErrors',
+                                            'switch.port.transmit.packets = ceilometer.network.statistics.port:PortPollsterTransmitPackets',
+                                            'switch.port.uptime = ceilometer.network.statistics.port:PortPollsterUptime',
+                                            'switch.ports = ceilometer.network.statistics.switch:SwitchPollsterPorts',
+                                            'switch.table = ceilometer.network.statistics.table:TablePollster',
+                                            'switch.table.active.entries = ceilometer.network.statistics.table:TablePollsterActiveEntries',
+                                            'switch.table.lookup.packets = ceilometer.network.statistics.table:TablePollsterLookupPackets',
+                                            'switch.table.matched.packets = ceilometer.network.statistics.table:TablePollsterMatchedPackets',
+                                            'volume.backup.size = ceilometer.volume.cinder:VolumeBackupSize',
+                                            'volume.size = ceilometer.volume.cinder:VolumeSizePollster',
+                                            'volume.snapshot.size = ceilometer.volume.cinder:VolumeSnapshotSize'],
+                'ceilometer.poll.compute': ['cpu = ceilometer.compute.pollsters.instance_stats:CPUPollster',
+                                            'cpu_l3_cache = ceilometer.compute.pollsters.instance_stats:CPUL3CachePollster',
+                                            'cpu_util = ceilometer.compute.pollsters.instance_stats:CPUUtilPollster',
+                                            'disk.device.allocation = ceilometer.compute.pollsters.disk:PerDeviceAllocationPollster',
+                                            'disk.device.capacity = ceilometer.compute.pollsters.disk:PerDeviceCapacityPollster',
+                                            'disk.device.iops = ceilometer.compute.pollsters.disk:PerDeviceDiskIOPSPollster',
+                                            'disk.device.latency = ceilometer.compute.pollsters.disk:PerDeviceDiskLatencyPollster',
+                                            'disk.device.read.bytes = ceilometer.compute.pollsters.disk:PerDeviceReadBytesPollster',
+                                            'disk.device.read.latency = ceilometer.compute.pollsters.disk:PerDeviceDiskReadLatencyPollster',
+                                            'disk.device.read.requests = ceilometer.compute.pollsters.disk:PerDeviceReadRequestsPollster',
+                                            'disk.device.usage = ceilometer.compute.pollsters.disk:PerDevicePhysicalPollster',
+                                            'disk.device.write.bytes = ceilometer.compute.pollsters.disk:PerDeviceWriteBytesPollster',
+                                            'disk.device.write.latency = ceilometer.compute.pollsters.disk:PerDeviceDiskWriteLatencyPollster',
+                                            'disk.device.write.requests = ceilometer.compute.pollsters.disk:PerDeviceWriteRequestsPollster',
+                                            'memory.bandwidth.local = ceilometer.compute.pollsters.instance_stats:MemoryBandwidthLocalPollster',
+                                            'memory.bandwidth.total = ceilometer.compute.pollsters.instance_stats:MemoryBandwidthTotalPollster',
+                                            'memory.resident = ceilometer.compute.pollsters.instance_stats:MemoryResidentPollster',
+                                            'memory.swap.in = ceilometer.compute.pollsters.instance_stats:MemorySwapInPollster',
+                                            'memory.swap.out = ceilometer.compute.pollsters.instance_stats:MemorySwapOutPollster',
+                                            'memory.usage = ceilometer.compute.pollsters.instance_stats:MemoryUsagePollster',
+                                            'memory.util = ceilometer.compute.pollsters.instance_stats:MemoryUtilPollster',
+                                            'memory = ceilometer.compute.pollsters.instance_stats:MemoryPollster',
+                                            'network.incoming.bytes = ceilometer.compute.pollsters.net:IncomingBytesPollster',
+                                            'network.incoming.bytes.rate = ceilometer.compute.pollsters.net:IncomingBytesRatePollster',
+                                            'network.incoming.packets = ceilometer.compute.pollsters.net:IncomingPacketsPollster',
+                                            'network.incoming.packets.drop = ceilometer.compute.pollsters.net:IncomingDropPollster',
+                                            'network.incoming.packets.error = ceilometer.compute.pollsters.net:IncomingErrorsPollster',
+                                            'network.outgoing.bytes = ceilometer.compute.pollsters.net:OutgoingBytesPollster',
+                                            'network.outgoing.bytes.rate = ceilometer.compute.pollsters.net:OutgoingBytesRatePollster',
+                                            'network.outgoing.packets = ceilometer.compute.pollsters.net:OutgoingPacketsPollster',
+                                            'network.outgoing.packets.drop = ceilometer.compute.pollsters.net:OutgoingDropPollster',
+                                            'network.outgoing.packets.error = ceilometer.compute.pollsters.net:OutgoingErrorsPollster',
+                                            'perf.cache.misses = ceilometer.compute.pollsters.instance_stats:PerfCacheMissesPollster',
+                                            'perf.cache.references = ceilometer.compute.pollsters.instance_stats:PerfCacheReferencesPollster',
+                                            'perf.cpu.cycles = ceilometer.compute.pollsters.instance_stats:PerfCPUCyclesPollster',
+                                            'perf.instructions = ceilometer.compute.pollsters.instance_stats:PerfInstructionsPollster'],
+                'ceilometer.poll.ipmi': [
+                    'hardware.ipmi.current = ceilometer.ipmi.pollsters.sensor:CurrentSensorPollster',
+                    'hardware.ipmi.fan = ceilometer.ipmi.pollsters.sensor:FanSensorPollster',
+                    'hardware.ipmi.node.airflow = ceilometer.ipmi.pollsters.node:AirflowPollster',
+                    'hardware.ipmi.node.cpu_util = ceilometer.ipmi.pollsters.node:CPUUtilPollster',
+                    'hardware.ipmi.node.cups = ceilometer.ipmi.pollsters.node:CUPSIndexPollster',
+                    'hardware.ipmi.node.io_util = ceilometer.ipmi.pollsters.node:IOUtilPollster',
+                    'hardware.ipmi.node.mem_util = ceilometer.ipmi.pollsters.node:MemUtilPollster',
+                    'hardware.ipmi.node.outlet_temperature = ceilometer.ipmi.pollsters.node:OutletTemperaturePollster',
+                    'hardware.ipmi.node.power = ceilometer.ipmi.pollsters.node:PowerPollster',
+                    'hardware.ipmi.node.temperature = ceilometer.ipmi.pollsters.node:InletTemperaturePollster',
+                    'hardware.ipmi.temperature = ceilometer.ipmi.pollsters.sensor:TemperatureSensorPollster',
+                    'hardware.ipmi.voltage = ceilometer.ipmi.pollsters.sensor:VoltageSensorPollster'],
+                'ceilometer.sample.endpoint': ['_sample = ceilometer.telemetry.notifications:TelemetryIpc',
+                                               'hardware.ipmi.current = ceilometer.ipmi.notifications.ironic:CurrentSensorNotification',
+                                               'hardware.ipmi.fan = ceilometer.ipmi.notifications.ironic:FanSensorNotification',
+                                               'hardware.ipmi.temperature = ceilometer.ipmi.notifications.ironic:TemperatureSensorNotification',
+                                               'hardware.ipmi.voltage = ceilometer.ipmi.notifications.ironic:VoltageSensorNotification',
+                                               'http.request = ceilometer.middleware:HTTPRequest',
+                                               'http.response = ceilometer.middleware:HTTPResponse',
+                                               'meter = ceilometer.meter.notifications:ProcessMeterNotifications'],
+                'ceilometer.sample.publisher': ['file = ceilometer.publisher.file:FilePublisher',
+                                                'gnocchi = ceilometer.publisher.gnocchi:GnocchiPublisher',
+                                                'http = ceilometer.publisher.http:HttpPublisher',
+                                                'https = ceilometer.publisher.http:HttpPublisher',
+                                                'notifier = ceilometer.publisher.messaging:SampleNotifierPublisher',
+                                                'prometheus = ceilometer.publisher.prometheus:PrometheusPublisher',
+                                                'test = ceilometer.publisher.test:TestPublisher',
+                                                'udp = ceilometer.publisher.udp:UDPPublisher',
+                                                'zaqar = ceilometer.publisher.zaqar:ZaqarPublisher'],
+                'console_scripts': ['ceilometer-agent-notification = ceilometer.cmd.agent_notification:main',
+                                    'ceilometer-polling = ceilometer.cmd.polling:main',
+                                    'ceilometer-rootwrap = oslo_rootwrap.cmd:main',
+                                    'ceilometer-send-sample = ceilometer.cmd.sample:send_sample',
+                                    'ceilometer-status = ceilometer.cmd.status:main',
+                                    'ceilometer-upgrade = ceilometer.cmd.storage:upgrade'],
+                'network.statistics.drivers': [
+                    'opencontrail = ceilometer.network.statistics.opencontrail.driver:OpencontrailDriver',
+                    'opendaylight = ceilometer.network.statistics.opendaylight.driver:OpenDayLightDriver'],
+                'oslo.config.opts': ['ceilometer = ceilometer.opts:list_opts',
+                                     'ceilometer-auth = ceilometer.opts:list_keystoneauth_opts']},
 )
 
 ```
@@ -1471,7 +1730,7 @@ setup(name='ceilometer',
 #### 6.1.3 生成rpm包
 
 ```
-python setup.py  bdist_rpm
+python setup.py bdist_rpm
 ```
 
 entry_points文件打包进去有问题，暂时没有放到包里
@@ -1497,9 +1756,9 @@ setup.py文件
 ```
 from setuptools import setup, find_packages
 
-setup(name='dm-mcs-dashboard-gnocchi',
-      version='1.0.5',
-      description='dm-mcs-dashboard-gnocchi-1.0.5',
+setup(name='gnocchi',
+      version='4.3.2',
+      description='dm-mcs-gnocchi-1.0.5',
       author='xindawangyu',
       author_email='xindawangyu',
       url='www.ieucd.com',
@@ -1509,9 +1768,9 @@ setup(name='dm-mcs-dashboard-gnocchi',
                      'indexer/alembic/*.*','rest/prometheus/*.*','rest/*.*', 'tests/functional/gabbits/*.yaml',
                      'tests/functional/gabbits/prometheus_fixtures/*.dump', 'tests/functional_live/gabbits/*.yaml']},
       data_files=[
-          ('/etc/logrotate.d/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-gnocchi/conf/gnocchi']),
-          ('/etc/gnocchi/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-gnocchi/conf/uwsgi-gnocchi.ini']),
-          ('/usr/lib/systemd/system/', ['/home/yungjinzhou/Desktop/test_rpm/openstack-gnocchi/conf/openstack-gnocchi-api.service']),
+          ('/etc/logrotate.d/', ['./conf/gnocchi']),
+          ('/etc/gnocchi/', ['./conf/uwsgi-gnocchi.ini']),
+          ('/usr/lib/systemd/system/', ['./conf/gnocchi-api.service']),
       ],
       )
 ```
@@ -1550,7 +1809,7 @@ pidfile = /var/run/gnocchi-uwsgi.pid
 
 ```
 
-openstack-gnocchi-api.service
+gnocchi-api.service
 
 ```
 [Unit]
