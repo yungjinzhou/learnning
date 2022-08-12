@@ -382,6 +382,8 @@ os.environ["OS_AUTH_TYPE"] = "password"
 
 在控制节点执行以下操作。
 
+<font color=red><b>需要配置好后才能执行</b></font>
+
 ```gnocchi-upgrade```
 
 赋予“/var/lib/gnocchi”文件可读写权限。
