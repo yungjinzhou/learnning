@@ -37,6 +37,24 @@ ln -s /usr/bin/supermin5 /usr/bin/supermin
 
 ```
 
+#### arm64（kp机器）
+
+```
+下载源码包libguestfs-1.40.2.tar.gz
+解压后进入目录
+ 
+apt install -y gperf flex bison ncurses-dev pkg-config augeas-tools augeas-doc python-augeas
+ libaugeas-dev libmagic-dev libjansson-dev libhivex-dev libhivex-ocaml libhivex-ocaml-dev supermin gdisk
+
+./configure --with-default-backend="libvirt"
+ make
+ # export LIBGUESTFS_BACKEND=direct
+ # export LIBGUESTFS_BACKEND=libvirt
+ 
+ 
+
+```
+
 
 
 #### arm64(uos系统)

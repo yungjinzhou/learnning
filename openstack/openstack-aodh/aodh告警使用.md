@@ -63,6 +63,8 @@ mysql> GRANT ALL PRIVILEGES ON aodh.* TO 'aodh'@'%' \
 
 ```
 yum install openstack-aodh-api openstack-aodh-evaluator openstack-aodh-notifier openstack-aodh-listener openstack-aodh-expirer python-aodhclient
+
+版本：8.0.0
 ```
 
 #### 1.2.4 编辑配置
