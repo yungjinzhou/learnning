@@ -2,7 +2,9 @@
 
 
 
-api/home_page/usage_rank?type=host接口异常
+api/home_page/usage_rank?type=host接口异常(数据不准确)
+
+如果不用模块，请求api，返回空（比如ironic）
 
 节点网络数据，首页
 
@@ -24,11 +26,31 @@ node_info(网卡列表)优化
 
 
 
+##### ☆☆☆☆鹤壁
+
+Octavia/ironic-------api（done）
+
+21/22-------node-info-----disk-num/disk_name(done)
+
+26--node-info---------cpu_num-----------未能区分(done)
+
+26---ceilometer-----network detail-----ceilometrer没有metric(增加了bond)
+
+21-----ceilometer-----ascii error (done)
+
+236.22   ceilometer    fdisk(done)
+
+确认各个节点时间是否一致
 
 
-license导入后，提示无效，重新导入，然后回报成功，应该是归一 的问题
 
 
+
+ openstack server create hebi-ft-execotor- \
+   --image 480d2922-b13f-4daf-a55b-670f77c579e4  \
+   --flavor c453122c-df9e-459b-a4ec-b5e90d51132b \
+   --availability-zone ft-nova:ft-compute-1\
+   --nic net-id=98faabb3-571f-44f4-8e6d-8ccd64676de7,v4-fixed-ip=192.168.231.55 --wait
 
 
 
@@ -91,7 +113,7 @@ node_info用于测试及定位的脚本
 
 
 
-##### 新环境下部署 horizon
+##### [新环境下部署]() horizon
 
 mysqlclient 需要先安装yum install python3-devel
 
@@ -309,6 +331,8 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
+
+
 前端需要改的
 
 ```
@@ -316,6 +340,16 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 2、部门详情页面、项目详情页面
 3、云主机、容器、云硬盘状态，限制条件、云物理机在某种状态下可进行操作的逻辑修改（看他们方案是否已经出来）
 4、容器、镜像仓库页面（贺印啥时候可以处理，）
+5. 缓存问题，比如修改编辑安全组，更换另一个实例，还是会出现问题
+6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换
+
 ```
 
+
+
+
+
+优化
+
+所有
 
