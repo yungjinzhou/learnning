@@ -1705,19 +1705,155 @@ epoll_list = epoll.epoll()
 
 
 
-
-
 ## 五、kombu使用
-
-
 
 ### 5.1 producer
 
-代码示例：
+#### 5.1.1 代码示例
+
+##### 直接发送
+
+```
+import json
+
+from kombu import Exchange, Queue, Connection
+from kombu.pools import producers, connections
+
+
+def _transport_func(queue, data):
+    import json
+    from kombu import Connection, Exchange, Producer, Queue
+    hostname = f"amqp://openstack:comleader@123@192.168.230.107:5672//"
+    conn = Connection(hostname)
+    channel = conn.channel()
+    # exchange = Exchange("snapshot", type="direct", durable=False)
+    exchange = Exchange("test-12", durable=False)
+    producer = Producer(exchange=exchange, channel=channel, routing_key=queue)
+    queue_conn = Queue(name=queue, exchange=exchange, routing_key=queue)
+    queue_conn.maybe_bind(conn)
+    queue_conn.declare()
+    producer.publish(json.dumps(data))
+    conn.release()
+
+```
 
 
 
+##### 使用pools
 
+```
+import json
+
+from kombu import Exchange, Queue, Connection
+from kombu.pools import producers, connections
+
+
+def _transport_func_use_pool(queue, data):
+    # hostname = f"amqp{transport_url.split('rabbit')[-1]}:5672//"
+    hostname = f"amqp://openstack:comleader@123@192.168.230.107:5672//"
+    connection = Connection(hostname=hostname)
+    exchange = Exchange('test-11', durable=False)
+    send_queue_conn = Queue(queue, exchange=exchange, routing_key=queue)
+    with connections[connection].acquire(block=True) as conn:
+        with producers[conn].acquire(block=True) as producer:
+            producer.publish(
+                serializer='json',
+                body=data,
+                exchange=exchange,
+                declare=[send_queue_conn],
+                routing_key=queue
+            )
+    connection.release()
+
+```
+
+
+
+#### 5.1.2 参数解释
+
+##### Producer参数
+
+Producer 消息生产者.
+
+```
+class kombu.Producer(channel, exchange=None, routing_key=None, serializer=None, auto_declare=None, compression=None, on_return=None)
+```
+
+参数:	
+
+```
+channel – Connection 或者channel.
+exchange – 可选参数，使用的exchange.
+routing_key – 可选参数，消息的路由键.
+serializer – 使用的序列化机制,默认使用“json”.
+compression – 使用的压缩方法. 默认不压缩.
+auto_declare – 在安装时自动声明使用的exchange. 默认值是True.
+on_return – 消息不能递交时使用的callback,需要在publish()方法中使用mandatory或immediate参数. 这个callback的签名是: (exception, exchange, routing_key, message). 需要注意的是使用这个特性时,producer需要自己处理events.
+
+
+
+默认值含义：
+auto_declare  = True
+默认情况下会在构造对象时自动声明exchange. 如果你想手动声明,需要设置此值为False.
+
+compression  = None
+采用的压缩方法,默认不压缩.
+
+declare ( )
+声明exchange.，声明后才会真正创建，exchange会自动声明,如果开启了auto_declare.
+
+exchange  = None
+默认的exchange.
+
+maybe_declare ( entity,  retry=False,  **retry_policy )[source]
+如果在会话里还没有声明exchange则声明.
+
+on_return  = None
+使用的callback,见参数描述.
+
+```
+
+
+
+##### publish()参数
+
+向指定的exchange发布消息.
+
+```
+publish(body, routing_key=None, delivery_mode=None, mandatory=False,  immediate=False, priority=0, content_type=None, content_encoding=None,  serializer=None, headers=None, compression=None, exchange=None, retry=False, retry_policy=None, declare=[], expiration=None, **properties)
+```
+
+
+
+参数:	
+
+```
+body – 消息体.
+routing_key – 消息的路由键.
+delivery_mode – 了解delivery_mode.
+mandatory – 目前还不支持.
+immediate – 目前还不支持.
+priority – 消息的优先级. 0到9.
+content_type – 消息内容的类型,默认auto-detect.
+content_encoding – 消息内容的编码,默认auto-detect.
+serializer – 使用的序列化手段,默认auto-detect.
+compression – 使用的压缩方法,默认是none.
+headers – 附加到消息体的头.
+exchange – 发布消息的exchange. 注意exchange必须被声明.
+declare – 需要的实体对象列表,在发布消息之前必须声明.实体对象用maybe_declare()方法来声明.
+retry – 尝试重新发布消息, 或者在连接丢失时声明实体对象.
+retry_policy – 重新尝试的策略, 这是ensure()方法支持的一个关键字参数.
+expiration – 每个消息的TTL,以秒为单位. 默认是没有.
+**properties – 额外的消息属性,参考AMQP说明.
+revive ( channel )[source]
+连接断开后重新复活producer.
+
+routing_key  = ''
+默认的路由键.
+
+serializer  = None
+使用的序列化机制. 默认使用JSON.
+```
 
 
 
@@ -1729,7 +1865,153 @@ epoll_list = epoll.epoll()
 
 ### 5.2 consumer
 
-代码示例
+
+
+#### 5.2.1 代码示例
+
+```
+from kombu import Connection, Exchange, Queue, Consumer
+
+hostname = f"amqp://openstack:comleader@123@192.168.230.107:5672//"
+connection = Connection(hostname=hostname)
+exchange = Exchange('test-12', durable=False)
+queue_name = "test-12"
+queue = Queue(queue_name, exchange=exchange, routing_key=queue_name)
+
+
+def process_message(body, message):
+    print("The body is {}".format(body))
+    message.ack()
+
+
+with Consumer(connection, queues=queue, callbacks=[process_message], accept=["text/plain", "application/json"]):
+    connection.drain_events(timeout=2)
+
+```
+
+
+
+#### 5.2.2 参数解释
+
+##### Consumer参数
+
+消息消费者.
+
+```
+class kombu.Consumer(channel, queues=None, no_ack=None, auto_declare=None, callbacks=None, on_decode_error=None, on_message=None, accept=None, tag_prefix=None)
+```
+
+参数:	
+
+```
+channel – 这个消费者使用的connection/channel.
+queues – 用于消费的单个或者一个队列列表.
+
+auto_declare – 默认情况下,所有的实体对象会在安装时声明, 如果你想手动控制对象的声明设置此值为 False.
+
+no_ack –是否自动对消息进行确认的标志. 如果开启,broker会自动确认消息. 这可以提高性能,但同时意味着消息被删除时你无法进行控制.默认关闭.
+
+callbacks - 当消息到达时,按顺序调用的callbacks列表.
+
+accept - 可以接收的消息类型列表.如果消费者接收到了不信任的消费类型会抛出异常. 默认情况下允许所有的消息类型,但是如果调用了kombu.disable_untrusted_serializers()将只允许接受json格式的消息.
+
+declare - 声明队列,交换器和绑定.
+
+on_decode_error - 消息不能解码时的callback.
+```
+
+
+
+##### Consumer函数说明
+
+```
+Consumer.add_queue(queue)
+增加一个要消费的队列.调用这个函数不会开始从队列中消费消息, 你需要在之后调用consume().
+
+Consumer.auto_declare = True
+默认情况下,所有的实体对象会在安装时声明, 如果你想手动控制对象的声明设置此值为 False.
+
+Consumer.callbacks = None
+当消息到达时,按顺序调用的callbacks列表.
+
+
+Consumer.cancel( )   结束所有活动的队列消费.
+不会对已经递交的消息起作用, 这意味着服务器不会再向这个消费者发送任何消息.
+
+Consumer.cancel_by_queue(queue)
+从指定的队列取消消费消息.
+
+Consumer.close( )
+结束所有活动的队列消费.不会对已经递交的消息起作用, 这意味着服务器不会再向这个消费者发送任何消息.
+
+
+Consumer.consume(no_ack=None) 开始消费消息.
+可以被调用多次, 会从上次调用之后新加入的队列中消费消息, 它不会取消从删除的队列中消费消息 ( 使用cancel_by_queue()).
+
+Consumer.consuming_from(queue) 返回True,如果消费者当前正在从队列中消费消息.
+
+
+Consumer.declare( )声明队列,交换器和绑定. 这些会自动声明,如果设置了auto_declare.
+
+
+Consumer.flow(active)
+Enable/disable对端的流.
+这是一种简单的流控机制,一端可以防止自己的队列溢出或者发现自己接收到了它所能够处理的最大消息数.接收到停止请求的一端会在发送完当前内容后停止发送走到另一端取消了流控.
+
+
+Consumer.no_ack = None
+是否自动对消息进行确认的标志. 如果开启,broker会自动确认消息. 这可以提高性能,但同时意味着消息被删除时你无法进行控制.默认关闭.
+
+
+Consumer.on_decode_error = None
+消息不能解码时的callback.
+这个函数的签名有2个参数: (message, exc), 一个是解码失败的消息,另外一个是解码失败时抛出的异常.
+
+
+Consumer.on_message =None
+当消息接收时调用的可选函数
+这个函数会代替 receive()方法, 同时 callbacks 也会被禁用.
+所以当你不想消息被自动解码时可以用它来代替callbacks when you don’t want the body to be automatically decoded. 注意消息如果是压缩的仍然会被解压.
+这个函数的签名要求一个参数, 是原始的消息对象 (Message的一个子类).
+需要注意message.body属性, 代表了消息的原始内容, 在一些情况下是只读的buffer 对象.
+
+
+Consumer.purge( ) 从所有队列中清除消息.
+Warning 这会删除所有准备好的消息,没有undo操作.
+
+
+Consumer.qos(prefetch_size=0, prefetch_count=0, apply_global=False)
+指定qos.
+客户端可以要求消息被提前发送在处理另外一个消息时,这样接下来的消息已经达到了本地而不需要再等待从channel中发送过来,这样的预发送机制可以提高性能.
+如果设置了no_ack参数,则预发送窗口被忽略.
+参数 :	
+prefetch_size – 8进制的预发送窗口大小. 服务端将会提前发送消息如果这个值小于等于可以预发送的大小 (还有一些其它限制). 设置为0意味着没有限制, 其它的限制仍会起作用.
+prefetch_count – 指定所有消息总共的预发送窗口.
+apply_global – 在所有通道上应用新的全局配置.
+Consumer. queues  = None
+用于消费的单个或者一个队列列表.
+
+
+Consumer.receive(body, message) 消息达到时调用方法.
+分发到注册的callbacks.
+参数:	
+body – 解码后的消息体.
+message – 消息实例.
+抛出:	NotImplementedError – 如果没有注册callbacks.
+
+
+Consumer.recover(requeue=False)重新递交没有确认的消息.
+在指定的channel上要求broker重新递交所有未确认的消息.
+参数:	requeue – 默认情况下消息会被重新递交给原来的接收者.如果设置require为True,服务器将会尝试对消息进行重新排队,可能将它递交给另外一个候选消费者.
+
+
+Consumer.register_callback(callback)  注册一个新的callback用于接收到消息时调用.
+callback的签名需要接收2个参数:(body, message), 解码后的消息体和消息实例 (Message的一个子类).
+
+
+Consumer.revive(channel)
+连接丢失时唤醒消费者.
+```
 
 
 
