@@ -91,11 +91,11 @@ RabbitMQ和virtual host的关系也差不多，可以让多个业务线同时使
 
 AMQP 连接通常是长连接。AMQP是一个使用TCP提供可靠投递的应用层协议。AMQP使用认证机制并且提供TLS（SSL）保护。
 
-当一个应用不再需要连接到AMQP代理的时候，需要优雅的释放掉AMQP连接，而不是直接将TCP连接关闭。
+当一个应用不再需要连接到AMQP代理的时候，<font color=blue><b>需要优雅的释放掉AMQP连接</b></font>，而不是直接将TCP连接关闭。
 
 ### 1.7 通道 （channels）
 
-AMQP 提供了**通道**（channels）来处理多连接，可以把通道理解成**共享一个TCP连接的多个轻量化连接**。
+AMQP 提供了**通道**（channels）来处理多连接，可以把通道理解成<font color=blue><b>共享一个TCP连接的多个轻量化连接</b></font>。
 
 信道是 “真实的” TCP连接内的虚拟连接，AMQP的命令都是通过通道发送的。在一条TCP连接上可以创建多条信道。
 
@@ -165,8 +165,8 @@ Advanced Message Queuing Protocol)是一种基于队列的可靠消息服务协�
 
 ### 1.11 binding-key 和routing-key区别
 
-binding-key应用于队列，是将哪些队列绑定到该交换机(exchange)上，或者说注册到该交换机上的队列
-routing-key应用于消息，是到交换机上的消息 通过定义的routing-key(路由规则)发送到匹配的队列
+<font color=blue><b>binding-key应用于队列</b></font>，是将哪些队列绑定到该交换机(exchange)上，或者说注册到该交换机上的队列
+<font color=blue><b>routing-key应用于消息</b></font>，是到交换机上的消息 通过定义的routing-key(路由规则)发送到匹配的队列
 Default Exchange，即交换机的direct模式，是将binding-key和routing-key设置成了和队列名称相同的字段
 
 
@@ -1707,9 +1707,33 @@ epoll_list = epoll.epoll()
 
 
 
+## 五、kombu使用
 
 
 
+### 5.1 producer
+
+代码示例：
+
+
+
+
+
+
+
+参数解释参考链接：https://blog.csdn.net/happyAnger6/article/details/54696457
+
+
+
+
+
+### 5.2 consumer
+
+代码示例
+
+
+
+参数解释参考链接：https://blog.csdn.net/happyAnger6/article/details/54696457
 
 
 
