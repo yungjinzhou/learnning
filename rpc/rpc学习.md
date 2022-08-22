@@ -2023,7 +2023,7 @@ Consumer.revive(channel)
 
 
 
-
+代码使用参考链接https://pengpengxp.github.io/archive/before-2018-11-10/2017-06-28-%E4%BD%BF%E7%94%A8kombu%E6%93%8D%E4%BD%9Crabiitmq.html
 
 
 
