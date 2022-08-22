@@ -1,66 +1,8 @@
-### todo
+## todo
 
 
 
-api/home_page/usage_rank?type=host接口异常(数据不准确)
-
-如果不用模块，请求api，返回空（比如ironic）
-
-节点网络数据，首页
-
-告警数据不一致
-
-云管配置文件cpu/disk/memory超分，接口方式获取， placement
-
-云管归一逻辑，统一增加sid逻辑
-
-
-
-
-
-
-
-node_info(网卡列表)优化
-
-1号工程部署调试
-
-
-
-##### ☆☆☆☆鹤壁
-
-Octavia/ironic-------api（done）
-
-21/22-------node-info-----disk-num/disk_name(done)
-
-26--node-info---------cpu_num-----------未能区分(done)
-
-26---ceilometer-----network detail-----ceilometrer没有metric(增加了bond)
-
-21-----ceilometer-----ascii error (done)
-
-236.22   ceilometer    fdisk(done)
-
-确认各个节点时间是否一致
-
-
-
-
-
- openstack server create hebi-ft-execotor- \
-   --image 480d2922-b13f-4daf-a55b-670f77c579e4  \
-   --flavor c453122c-df9e-459b-a4ec-b5e90d51132b \
-   --availability-zone ft-nova:ft-compute-1\
-   --nic net-id=98faabb3-571f-44f4-8e6d-8ccd64676de7,v4-fixed-ip=192.168.231.55 --wait
-
-
-
-
-
-
-
-
-
-##### 定位网络问题的命令
+### 定位网络问题的命令
 
 ```javascript
 tracert ip
@@ -80,7 +22,7 @@ virsh dumpxml domain-id
 
 
 
-##### 本周任务
+### 本周任务
 
 1. 
 2. 
@@ -90,21 +32,7 @@ virsh dumpxml domain-id
 
 
 
-##### 待处理
-
-horizon拟态部署问题，检测运行情况，优化部署环节，测试方法
-
-容器网络，两个子网报错问题（调研）
-
-云主机、云硬盘（底层支持并发）
-
-
-
-
-
-
-
-##### [新环境下部署]() horizon
+### [新环境下部署]() horizon
 
 mysqlclient 需要先安装yum install python3-devel
 
@@ -116,9 +44,9 @@ cryptography==3.4.7需要先升级pip3到21版本以上
 
 
 
+### 脚本处理僵尸云主机、云硬盘
 
-
-##### 云主机 实例删除，日志报错，找不到实例id 
+#### 云主机 实例删除，日志报错，找不到实例id 
 
 ```
  File "/usr/lib/python2.7/site-packages/nova/db/sqlalchemy/api.py", line 1904, in _instance_get_by_uuid
@@ -211,9 +139,7 @@ execute_sql(f'delete from instance_system_metadate where instance_uuid="{target_
 
 
 
-
-
-##### 删除僵尸卷
+#### 删除僵尸卷
 
 ```
 
@@ -252,7 +178,7 @@ time="2022-04-28T02:03:24Z" level=fatal msg="Error determining manifest MIME typ
 
 
 
-##### tolearn
+### tolearn
 
 aiohttp/asyncio/webserver
 rpc服务构建/aysncio/aiohttp
@@ -264,8 +190,9 @@ vue/html/css
 
 
 
+### 修改
 
-##### 部署修改部分
+#### 部署修改部分
 
 gnocchi-api、gnocchi-metricd、控制节点、计算节点都需要安装
 gnocchi.conf配置文件更新
@@ -287,7 +214,7 @@ kp节点 sysstat安装
 
 
 
-##### 监控拟态分离设计与优化
+#### 监控拟态分离设计与优化
 
 ```python
 /api/monitor要迁移接口
@@ -300,9 +227,7 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
-
-
-前端需要改的
+#### 前端需要改的
 
 ```
 1、插件式前端页面部署
@@ -318,13 +243,7 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
-
-
-bug记录处理
-
-
-
-
+#### bug记录处理
 
 1. 
 
@@ -334,7 +253,7 @@ bug记录处理
 
 2. 修改项目配额，云硬盘容量不生效，安全组规则不生效
 
-
+3. ceilometer过滤网卡，增加bond网卡
 
 
 
