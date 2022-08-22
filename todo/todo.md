@@ -63,6 +63,7 @@ Octavia/ironic-------api（done）
 ##### 定位网络问题的命令
 
 ```javascript
+tracert ip
 route -n
 ip netns 
 ip route
@@ -97,16 +98,6 @@ horizon拟态部署问题，检测运行情况，优化部署环节，测试方�
 
 云主机、云硬盘（底层支持并发）
 
-node_info用于测试及定位的脚本
-
-
-
-24. 
-
-
-
-
-
 
 
 
@@ -120,30 +111,6 @@ mysqlclient 需要先安装yum install python3-devel
 cryptography==3.4.7需要先升级pip3到21版本以上
 
 环境需要安装crontabs (yum install crontabs -y)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##### 更新horizon  
-
-
-
-```
-/root/cmd/update-mimic.sh
-192.168.230.101
-
-```
 
 
 
@@ -318,6 +285,8 @@ kp节点 sysstat安装
 
 
 
+
+
 ##### 监控拟态分离设计与优化
 
 ```python
@@ -342,6 +311,7 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 4、容器、镜像仓库页面（贺印啥时候可以处理，）
 5. 缓存问题，比如修改编辑安全组，更换另一个实例，还是会出现问题
 6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换
+7. 监控拟态分离，接口变更
 
 ```
 
