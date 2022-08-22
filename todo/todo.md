@@ -312,6 +312,7 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 5. 缓存问题，比如修改编辑安全组，更换另一个实例，还是会出现问题
 6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换
 7. 监控拟态分离，接口变更
+8. admin项目下，某些资源项不允许创建（云主机/容器/网络/负载均衡器/路由器/安全组/）
 
 ```
 
@@ -319,7 +320,21 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
-优化
+bug记录处理
 
-所有
+
+
+
+
+1. 
+
+![企业微信截图_6f346cb5-b61e-42d4-8824-ce8f269c5df0](./路由器页面删除错误.png)
+
+
+
+2. 修改项目配额，云硬盘容量不生效，安全组规则不生效
+
+
+
+
 
