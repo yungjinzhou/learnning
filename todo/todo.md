@@ -32,18 +32,6 @@ virsh dumpxml domain-id
 
 
 
-### [新环境下部署]() horizon
-
-mysqlclient 需要先安装yum install python3-devel
-
-cryptography==3.4.7需要先升级pip3到21版本以上
-
-环境需要安装crontabs (yum install crontabs -y)
-
-
-
-
-
 ### 脚本处理僵尸云主机、云硬盘
 
 #### 云主机 实例删除，日志报错，找不到实例id 
@@ -230,14 +218,18 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 #### 前端需要改的
 
 ```
-1、插件式前端页面部署
+1、插件式前端页面部署（包括创建、编辑项目时候界面的参数）
 2、部门详情页面、项目详情页面
 3、云主机、容器、云硬盘状态，限制条件、云物理机在某种状态下可进行操作的逻辑修改（看他们方案是否已经出来）
 4、容器、镜像仓库页面（贺印啥时候可以处理，）
 5. 缓存问题，比如修改编辑安全组，更换另一个实例，还是会出现问题
 6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换
-7. 监控拟态分离，接口变更
+7. 监控拟态分离，接口变更（）
 8. admin项目下，某些资源项不允许创建（云主机/容器/网络/负载均衡器/路由器/安全组/）
+9. 增强型快照接口
+10. 云主机规格、部门、项目页面，内存、硬盘有G、T选项
+11. 架构配置写成接口的形式
+12. 第一个bug确认，是否发送请求
 
 ```
 
@@ -251,9 +243,56 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
-2. 修改项目配额，云硬盘容量不生效，安全组规则不生效
+2. 修改项目配额，云硬盘容量不生效，安全组规则不生效,，云硬盘备份
 
-3. ceilometer过滤网卡，增加bond网卡
+3. sid非拟态处理
+
+4. 删除部门project not found调用位置的接口
+
+```
+resource/core.py---line:857
+resource/core.py---line:799
+resource/core.py---line:785
+resource/core.py---line:782
+resource/core.py---line:716
+resource/backends/sql.py----line:111
+resource/backends/sql.py----line:66
+resource/backends/sql.py----line:63
+resource/backends/sql.py----line:44
+models/token_model.py----line:468
+limit/core.py---line:72
+identity/core.py----line:924
+auth/plugins/mapped.py-----line:154
+auth/core.py----line:212
+auth/core.py-----line:207
+api/projects.py---line:181
+api/os_inherit.py----line:96
+api/_shared/authentication.py----line:92
+
+
+
+
+
+
+
+
+
+```
+
+删除部门暂时不清楚用法的代码位置
+
+```
+common/rebc_enforcer/enforcer.py---------314
+
+
+
+```
+
+
+
+
+
+
 
 
 
