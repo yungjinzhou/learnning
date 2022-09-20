@@ -184,13 +184,10 @@ vue/html/css
 
 gnocchi-api、gnocchi-metricd、控制节点、计算节点都需要安装
 gnocchi.conf配置文件更新
-gnocchi-api/..monitor-cache/alarm.....uwsgi启动的，增加gevent模块
-openstack-node-info，部署(nova免密登录、python3）
-gnocchi/ceilometer/包更新
 
 日志切割处理
 
-/etc/logrotate.d/gnocchi；/etc/logrotate.d/ceilometer；/etc/logrotate.d/gnocchi；/etc/logrotate.d/monitor-cache ;/etc/logrotate.d/alarm (部分可以打到rpm包里执行)
+/etc/logrotate.d/gnocchi；/etc/logrotate.d/ceilometer； (部分可以打到rpm包里执行)
 
 ngiix配置，/api/aodh/,/api/ceilometer/,等配置
 
@@ -211,6 +208,19 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
+# 接口缓存优化  
+api/home_page/source_num
+api/home_page/usage_rank?type=host
+api/home_page/base_info
+
+
+# monitor_cache新处理接口
+home_page/views.py
+settings.py
+stackapi/cinderapi.py
+placementapi.py
+utils/stack_requeset.py
+
 ```
 
 
@@ -230,6 +240,19 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 13. 监控设置，修改后，弹出数值为变动的弹窗---已处理
 14. 大屏展示，告警top统计，告警状态改成 告警---已处理
 15. 云主机列表，chagne_project，返回值没有显示---不显示，已处理
+16. 项目详情，组件化部署时，负载均衡已经禁止，但是详情里有
+17. 分配浮动ip后，绑定浮动ip接口，传参数，可用域，现在只有nova（ports_list）?unusedxxxxxx
+18. 登录自动退出后，再次登录，有问题
+19. 登录后不操作退出的时机，前端是如何控制的（后端接口，get   api/auth/logout，会返回一个时间，不手动操作后，一定时间强制退出
+
+a. 调整云主机规格---过滤优化
+b. iso镜像创建实例时，禁止创建云硬盘，
+c. 可用状态云硬盘，增加创建镜像的接口（增加一个接口，页面参考创建镜像的页面，没有  架构，最小内存，操作系统，）
+d. 禅道上分配的前端相关问题
+e. 浮动ip绑定、解绑后，页面刷新缓慢，要等一会儿才能看到（后端网络处理完成需要的时间）
+f. 云硬盘备份--隐藏，组件接口标识 cinder-backup
+g. 大屏展示，不受限制，可以一直展示
+
 
 
 未处理：
@@ -237,19 +260,10 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 4、容器、镜像仓库页面（）
 5. 缓存问题或后端未归一（志宣定位nova归一问题），修改编辑安全组，
 9. 增强型快照接口
-16. 项目详情，组件化部署时，负载均衡已经禁止，但是详情里有
-17. 分配浮动ip后，绑定浮动ip接口，传参数，可用域，现在只有nova（ports_list）?unusedxxxxxx
-18. 登录自动退出后，再次登录，有问题
-19. 登录后不操作退出的时机，前端是如何控制的（后端接口，get   api/auth/logout，会返回一个时间）
 
-新出现：
-a. 云主机规格，禅道
-b. iso镜像创建实例时，禁止创建云硬盘，
-c. 可用状态云硬盘，增加创建镜像的接口（增加一个接口，页面参考创建镜像的页面，没有  架构，最小内存，操作系统，）
-d. 禅道上分配的前端相关问题
-e. 浮动ip绑定、解绑后，页面刷新缓慢，要等一会儿才能看到
-f. 云硬盘备份--隐藏，组件接口标识 cinder-backup
-g. 镜像上传，最小内存
+
+
+
 ```
 
 
