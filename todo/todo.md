@@ -193,6 +193,10 @@ ngiix配置，/api/aodh/,/api/ceilometer/,等配置
 
 kp节点 sysstat安装
 
+Node_info服务  ，日志切割，日志位置更换 /var/log/host_info/host_info.log  
+
+
+
 
 
 
@@ -261,16 +265,29 @@ g. 大屏展示，不受限制，可以一直展示
 5. 缓存问题或后端未归一（志宣定位nova归一问题），修改编辑安全组，
 9. 增强型快照接口
 
-
+新发现：
+h. 裸金属组件不显示，但是云物理机还显示；
+i. default部门，禁止编辑
+j. 项目详情，显示项目id
+k. 项目状态：启动/禁用
+l. 
 
 
 ```
 
 
 
-#### bug记录处理
+#### bug
 
-2. 修改项目配额，云硬盘容量不生效，云硬盘备份
+- 部署问题优化 
+  - 有时候执行体启动不了，是created的状态
+  - 
+- 2新bug
+  - 处理删除项目后，云主机等冗余资源
+  - Node_info更换日志，日志切割处理
+  - 首页偶尔获取空数据的问题（memcache数据丢失https://blog.csdn.net/rongdmmap/article/details/84159182）
+  - default部门下增加用户，报错
+  - 
 
 
 
@@ -278,11 +295,35 @@ g. 大屏展示，不受限制，可以一直展示
 
 
 
-1. 本地rpc文件查看
-2. Django session数据库清理
-3. 容器中crontab不起作用---已解决
-4. 串口设备从容器出去
-5. 
+memcache发现有数据丢失的情况，导致首页短时间空白显示，更改为redis存储并测试
+
+大屏展示：
+
+```
+/api/home_page/usage_rank?type=host✅
+/api/home_page/source_num
+alarms
+/api/home_page/net_io✅
+
+```
+
+首页
+
+```
+/api/home_page/usage_rank?type=vm&metric=cpu✅
+/api/home_page/usage_rank?type=vm&metric=memory✅
+/api/home_page/usage_rank?type=vm&metric=storage✅
+/api/home_page/base_info----------
+/api/home_page/usage_info✅
+/api/home_page/usage_rank?type=host
+
+```
+
+
+
+
+
+
 
 
 
