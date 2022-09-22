@@ -101,3 +101,6 @@ docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
 
 
 
+
+
+参考链接：https://yeasy.gitbook.io/docker_practice/compose/commands
