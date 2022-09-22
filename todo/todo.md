@@ -184,17 +184,18 @@ vue/html/css
 
 gnocchi-api、gnocchi-metricd、控制节点、计算节点都需要安装
 gnocchi.conf配置文件更新
-gnocchi-api/..monitor-cache/alarm.....uwsgi启动的，增加gevent模块
-openstack-node-info，部署(nova免密登录、python3）
-gnocchi/ceilometer/包更新
 
 日志切割处理
 
-/etc/logrotate.d/gnocchi；/etc/logrotate.d/ceilometer；/etc/logrotate.d/gnocchi；/etc/logrotate.d/monitor-cache ;/etc/logrotate.d/alarm (部分可以打到rpm包里执行)
+/etc/logrotate.d/gnocchi；/etc/logrotate.d/ceilometer； (部分可以打到rpm包里执行)
 
 ngiix配置，/api/aodh/,/api/ceilometer/,等配置
 
 kp节点 sysstat安装
+
+Node_info服务  ，日志切割，日志位置更换 /var/log/host_info/host_info.log  
+
+
 
 
 
@@ -211,6 +212,19 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 
 
 
+# 接口缓存优化  
+api/home_page/source_num
+api/home_page/usage_rank?type=host
+api/home_page/base_info
+
+
+# monitor_cache新处理接口
+home_page/views.py
+settings.py
+stackapi/cinderapi.py
+placementapi.py
+utils/stack_requeset.py
+
 ```
 
 
@@ -218,75 +232,94 @@ url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceVie
 #### 前端需要改的
 
 ```
-1、插件式前端页面部署（包括创建、编辑项目时候界面的参数）
-2、部门详情页面、项目详情页面
-3、云主机、容器、云硬盘状态，限制条件、云物理机在某种状态下可进行操作的逻辑修改（看他们方案是否已经出来）
-4、容器、镜像仓库页面（贺印啥时候可以处理，）
-5. 缓存问题，比如修改编辑安全组，更换另一个实例，还是会出现问题
-6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换
-7. 监控拟态分离，接口变更（）
-8. admin项目下，某些资源项不允许创建（云主机/容器/网络/负载均衡器/路由器/安全组/）
+已处理：
+1、插件式前端页面部署（包括创建、编辑项目时候界面的参数）---已处理
+2、部门详情页面、项目详情页面---已处理
+6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换---已处理
+7. 监控拟态分离，接口变更（）---已处理
+8. admin项目下，某些资源项不允许创建（云主机/容器/网络/负载均衡器/路由器/安全组/）---已处理
+10. 云主机规格、部门、项目页面，内存、硬盘有G、T选项---已处理
+11. 架构配置写成接口的形式---已处理
+12. 网络路由器设置删除接口，是否发送请求---已处理
+13. 监控设置，修改后，弹出数值为变动的弹窗---已处理
+14. 大屏展示，告警top统计，告警状态改成 告警---已处理
+15. 云主机列表，chagne_project，返回值没有显示---不显示，已处理
+16. 项目详情，组件化部署时，负载均衡已经禁止，但是详情里有
+17. 分配浮动ip后，绑定浮动ip接口，传参数，可用域，现在只有nova（ports_list）?unusedxxxxxx
+18. 登录自动退出后，再次登录，有问题
+19. 登录后不操作退出的时机，前端是如何控制的（后端接口，get   api/auth/logout，会返回一个时间，不手动操作后，一定时间强制退出
+
+a. 调整云主机规格---过滤优化
+b. iso镜像创建实例时，禁止创建云硬盘，
+c. 可用状态云硬盘，增加创建镜像的接口（增加一个接口，页面参考创建镜像的页面，没有  架构，最小内存，操作系统，）
+d. 禅道上分配的前端相关问题
+e. 浮动ip绑定、解绑后，页面刷新缓慢，要等一会儿才能看到（后端网络处理完成需要的时间）
+f. 云硬盘备份--隐藏，组件接口标识 cinder-backup
+g. 大屏展示，不受限制，可以一直展示
+
+
+
+未处理：
+3、云主机、容器、云硬盘状态，限制条件、云物理机在某种状态下可进行操作的逻辑修改（）
+4、容器、镜像仓库页面（）
+5. 缓存问题或后端未归一（志宣定位nova归一问题），修改编辑安全组，
 9. 增强型快照接口
-10. 云主机规格、部门、项目页面，内存、硬盘有G、T选项
-11. 架构配置写成接口的形式
-12. 第一个bug确认，是否发送请求
 
-```
-
-
-
-#### bug记录处理
-
-1. 
-
-![企业微信截图_6f346cb5-b61e-42d4-8824-ce8f269c5df0](./路由器页面删除错误.png)
-
-
-
-2. 修改项目配额，云硬盘容量不生效，安全组规则不生效,，云硬盘备份
-
-3. sid非拟态处理
-
-4. 删除部门project not found调用位置的接口
-
-```
-resource/core.py---line:857
-resource/core.py---line:799
-resource/core.py---line:785
-resource/core.py---line:782
-resource/core.py---line:716
-resource/backends/sql.py----line:111
-resource/backends/sql.py----line:66
-resource/backends/sql.py----line:63
-resource/backends/sql.py----line:44
-models/token_model.py----line:468
-limit/core.py---line:72
-identity/core.py----line:924
-auth/plugins/mapped.py-----line:154
-auth/core.py----line:212
-auth/core.py-----line:207
-api/projects.py---line:181
-api/os_inherit.py----line:96
-api/_shared/authentication.py----line:92
-
-
-
-
-
-
-
+新发现：
+h. 裸金属组件不显示，但是云物理机还显示；
+i. default部门，禁止编辑
+j. 项目详情，显示项目id
+k. 项目状态：启动/禁用
+l. 
 
 
 ```
 
-删除部门暂时不清楚用法的代码位置
+
+
+#### bug
+
+- 部署问题优化 
+  - 有时候执行体启动不了，是created的状态
+  - 
+- 2新bug
+  - 处理删除项目后，云主机等冗余资源
+  - Node_info更换日志，日志切割处理
+  - 首页偶尔获取空数据的问题（memcache数据丢失https://blog.csdn.net/rongdmmap/article/details/84159182）
+  - default部门下增加用户，报错
+  - 
+
+
+
+
+
+
+
+memcache发现有数据丢失的情况，导致首页短时间空白显示，更改为redis存储并测试
+
+大屏展示：
 
 ```
-common/rebc_enforcer/enforcer.py---------314
-
-
+/api/home_page/usage_rank?type=host✅
+/api/home_page/source_num
+alarms
+/api/home_page/net_io✅
 
 ```
+
+首页
+
+```
+/api/home_page/usage_rank?type=vm&metric=cpu✅
+/api/home_page/usage_rank?type=vm&metric=memory✅
+/api/home_page/usage_rank?type=vm&metric=storage✅
+/api/home_page/base_info----------
+/api/home_page/usage_info✅
+/api/home_page/usage_rank?type=host
+
+```
+
+
 
 
 
