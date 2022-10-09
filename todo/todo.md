@@ -224,7 +224,7 @@ settings.py
 stackapi/cinderapi.py
 placementapi.py
 utils/stack_requeset.py
-
+ 
 ```
 
 
@@ -235,6 +235,7 @@ utils/stack_requeset.py
 已处理：
 1、插件式前端页面部署（包括创建、编辑项目时候界面的参数）---已处理
 2、部门详情页面、项目详情页面---已处理
+5. 缓存问题或后端未归一（志宣定位nova归一问题），修改编辑安全组，---已处理
 6. 页面项目切换，显示项目切换成功，但是实际内容比如实例列表还是没有切换---已处理
 7. 监控拟态分离，接口变更（）---已处理
 8. admin项目下，某些资源项不允许创建（云主机/容器/网络/负载均衡器/路由器/安全组/）---已处理
@@ -262,7 +263,6 @@ g. 大屏展示，不受限制，可以一直展示
 未处理：
 3、云主机、容器、云硬盘状态，限制条件、云物理机在某种状态下可进行操作的逻辑修改（）
 4、容器、镜像仓库页面（）
-5. 缓存问题或后端未归一（志宣定位nova归一问题），修改编辑安全组，
 9. 增强型快照接口
 
 新发现：
@@ -270,9 +270,15 @@ h. 裸金属组件不显示，但是云物理机还显示；
 i. default部门，禁止编辑
 j. 项目详情，显示项目id
 k. 项目状态：启动/禁用
-l. 
-
-
+l. 部门详情里，负载均衡还有显示，没显示部门id
+m. 点击编辑项目，显示创建项目
+n. docker镜像，架构必选，上传镜像格式指定
+o.  heat编排，云管理员可以看到编排模块
+p. 自定义模板-内部网络，根据网络名称过滤子网的信息，以及cidr识别
+q.  docker磁盘大小显示，0改成不限制
+r. 路由器，创建时，网络非必选，可以不传或者外部网络，不传网络时，snat也不需要设置
+s. 编辑镜像，可见性，第一次登录，点击编辑镜像，可见性那里没有返回的默认显示
+t. 
 ```
 
 
@@ -281,13 +287,26 @@ l.
 
 - 部署问题优化 
   - 有时候执行体启动不了，是created的状态
+  - 执行体离线原因，清洗后也启动不了的原因(跟鹏辉定位，网络没有删除成功，导致容器启动失败，鹏辉那儿清洗脚本优化了，后续继续观察)
+  - Monitor_cache，请求处理成并发（同步gnocchi-api最大请求调整）
+  - 裁决日志，大数不一致，处理方法![image-20220930173515816](./大数裁决问题.png)
+  - 主机监控，详情，首次点进去，网络监控数据获取为空，多切换几次网卡后，有数据返回
   - 
+  
+  
+  
 - 2新bug
+  
   - 处理删除项目后，云主机等冗余资源
-  - Node_info更换日志，日志切割处理
-  - 首页偶尔获取空数据的问题（memcache数据丢失https://blog.csdn.net/rongdmmap/article/details/84159182）
-  - default部门下增加用户，报错
+  - Node_info更换日志，日志切割处理（已和陈凯沟通）
+  - 首页偶尔获取空数据的问题（memcache数据丢失https://blog.csdn.net/rongdmmap/article/details/84159182）（已处理为redis存储）
+  - 运行一段时间后，云管连接不上mysql提示（定位是msyql问题）
+  - heat  云管理员，其他部门、项目下，可以正常返回cloud_admin，
+  - heat在其他项目下创建的资源，属于其他项目（不用修改）
+  - heat自动创建的项目，删除不掉的原因（现在重命名了项目，云管做了处理，可以删除了）--已解决
   - 
+  
+  
 
 
 
@@ -300,21 +319,21 @@ memcache发现有数据丢失的情况，导致首页短时间空白显示，更
 大屏展示：
 
 ```
-/api/home_page/usage_rank?type=host✅
+/api/home_page/usage_rank?type=host
 /api/home_page/source_num
 alarms
-/api/home_page/net_io✅
+/api/home_page/net_io
 
 ```
 
 首页
 
 ```
-/api/home_page/usage_rank?type=vm&metric=cpu✅
-/api/home_page/usage_rank?type=vm&metric=memory✅
-/api/home_page/usage_rank?type=vm&metric=storage✅
+/api/home_page/usage_rank?type=vm&metric=cpu
+/api/home_page/usage_rank?type=vm&metric=memory
+/api/home_page/usage_rank?type=vm&metric=storage
 /api/home_page/base_info----------
-/api/home_page/usage_info✅
+/api/home_page/usage_info
 /api/home_page/usage_rank?type=host
 
 ```
