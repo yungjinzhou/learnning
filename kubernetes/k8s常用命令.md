@@ -57,6 +57,10 @@ kubectl rollout undo deployment/nginx-deployment   #回滚上一个版本
 
 
 
+kubectl scale deployment nginx-deployment --replicas 5　　#对应用的副本数进行扩容，直接指定副本数为5
 
+
+
+如果要删除这些资源，执行 kubectl delete deployment nginx-deployment 或者 kubectl delete -f nginx-deployment.yaml
 ```
 
