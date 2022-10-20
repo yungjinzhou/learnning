@@ -309,47 +309,12 @@ t.
 - 2新bug
   
   - 处理删除项目后，云主机等冗余资源
-  - Node_info更换日志，日志切割处理（已和陈凯沟通）
-  - 首页偶尔获取空数据的问题（memcache数据丢失https://blog.csdn.net/rongdmmap/article/details/84159182）（已处理为redis存储）
-  - 运行一段时间后，云管连接不上mysql提示（定位是msyql问题）
-  - heat  云管理员，其他部门、项目下，可以正常返回cloud_admin，
-  - heat在其他项目下创建的资源，属于其他项目（不用修改）
-  - heat自动创建的项目，删除不掉的原因（现在重命名了项目，云管做了处理，可以删除了）--已解决
   - 云主机列表、路由列表（已处理）、项目列表、操作日志、接口  时间超过1s
   - 镜像列表，接口，需要优化
+  - 云主机，软删除，恢复，软删除，恢复，然后对该云主机创建原生快照，提示状态为soft_delete，无发创建
   - 
   
   
-
-
-
-
-
-
-
-memcache发现有数据丢失的情况，导致首页短时间空白显示，更改为redis存储并测试
-
-大屏展示：
-
-```
-/api/home_page/usage_rank?type=host
-/api/home_page/source_num
-alarms
-/api/home_page/net_io
-
-```
-
-首页
-
-```
-/api/home_page/usage_rank?type=vm&metric=cpu
-/api/home_page/usage_rank?type=vm&metric=memory
-/api/home_page/usage_rank?type=vm&metric=storage
-/api/home_page/base_info----------
-/api/home_page/usage_info
-/api/home_page/usage_rank?type=host
-
-```
 
 
 

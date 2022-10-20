@@ -111,5 +111,11 @@ kubectl create clusterrolebinding magedu-read-all-pods --clusterrole=cluster-rea
 
 
 
+
+
+# 进入容器
+kubectl exec -n ingress-nginx -it nginx-ingress-controller-6bd7c597cb-6pchv -- /bin/bash
+
+
 ```
 
