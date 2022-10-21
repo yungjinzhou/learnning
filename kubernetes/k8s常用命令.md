@@ -68,47 +68,42 @@ kubectl describe pod net-test-5767cb94df-djt98 #查看pod的详细信息
 
 
 # 不执行查看定义方式，--dry-run
-
+# serviceaccount使用
 kubectl explain sa   使用kebectl explain对资源进行解释，详细信息，有哪些参数等信息
 kubectl create serviceaccount mysa -o yaml --dry-run #不执行查看定义方式
 kubectl create serviceaccount mysa -o yaml --dry-run > serviceaccount.yaml  #直接导出为yaml定义文件，可以节省敲键盘的时间
 
 
+
+# 账户操作
 kubectl create serviceaccount admin
 kubectl describe sa/admin
 
 
+# 配置操作
 kubectl config view
-
 kubectl config use-context magedu@kubernetes
 
 
-kubectl create role -h   
 
+
+# 角色操作
+kubectl create role -h   
 kubectl create role pods-reader --verb=get,list,watch --resource=pods --dry-run -o yaml #干跑模式查看role的定义
 
-
+# 角色帮定操作
 kubectl create rolebinding -h 
-
-
 kubectl describe rolebinding magedu-read-pods #查看角色绑定的信息，这里可以看到user：magedu绑定到了pods-reader这个角色上
-
 
 kubectl config use-context magedu@kubernetes #切换magedu这个用户，并使用get获取pods资源信息
 Switched to context "magedu@kubernetes".
-
 
 kubectl config use-context kubernetes-admin@kubernetes  #切换会kubernetes-admin用户
 Switched to context "kubernetes-admin@kubernetes".
 
 kubectl get rolebinding  #获取角色绑定信息
-
-
 kubectl delete rolebinding magedu-read-pods #删除前面的绑定
-
-
 kubectl create clusterrolebinding magedu-read-all-pods --clusterrole=cluster-read --user=magedu --dry-run -o yaml > clusterrolebinding-demo.yaml  #创建角色绑定，将magedu绑定到clusterrole：magedu-read-all-pods上
-
 
 
 
@@ -117,5 +112,8 @@ kubectl create clusterrolebinding magedu-read-all-pods --clusterrole=cluster-rea
 kubectl exec -n ingress-nginx -it nginx-ingress-controller-6bd7c597cb-6pchv -- /bin/bash
 
 
+
+#查看k8s支持的存储类型
+kubectl explain pod.spec.volumes 
 ```
 
