@@ -206,6 +206,9 @@ kp节点 sysstat安装
 
 Node_info服务  ，日志切割，日志位置更换 /var/log/host_info/host_info.log  
 
+gnocchi负载均衡，gnocchi-api启动，用gnocchi用户
+
+gnocchi负载均衡，nginx监听8047 ，其他所有节点走8041看是否有问题
 
 
 
@@ -214,29 +217,8 @@ Node_info服务  ，日志切割，日志位置更换 /var/log/host_info/host_in
 
 
 
-#### 监控拟态分离设计与优化
-
-```python
-/api/monitor要迁移接口
-url(r'^instances/system_resources$', csrf_exempt(views.InstanceSystemResourceView.as_view()), name='获取vm实例'),(已用缓存处理，暂时不用修改)
-    url(r'^instances/system_resources/vm_hardware_name$', csrf_exempt(views.VmHardwareNameApi.as_view()), name='获取云主机网卡/硬盘名称'),
 
 
-
-# 接口缓存优化  
-api/home_page/source_num
-api/home_page/usage_rank?type=host
-api/home_page/base_info
-
-
-# monitor_cache新处理接口
-home_page/views.py
-settings.py
-stackapi/cinderapi.py
-placementapi.py
-utils/stack_requeset.py
- 
-```
 
 
 
@@ -312,9 +294,63 @@ t.
   - 云主机列表、路由列表（已处理）、项目列表、操作日志、接口  时间超过1s
   - 镜像列表，接口，需要优化
   - 云主机，软删除，恢复，软删除，恢复，然后对该云主机创建原生快照，提示状态为soft_delete，无发创建
-  - 
+  - 首次登录，发现页面上有屏蔽的组件还是显示
+  - node_info做成rpm包
+  - ceilometer打包 entry_points.txt打进去，用官方的spec试试
   
   
+
+
+
+
+
+镜像处理
+
+容器镜像列表--------镜像仓库列表
+
+容器镜像上传(上传到镜像仓库)----在容器-更多操作-
+
+容器镜像下载(pull)  ，创建容器时，使用的镜像
+
+容器镜像修改---通过habor
+
+容器镜像 tag修改--通过harbor
+
+容器镜像删除--通过harbor
+
+创建容器，增加已有卷，挂载
+
+
+
+
+
+优化权限问题，尽量取消sudoers那里的配置
+
+2022-10-27 10:08:15.123 16314 ERROR ceilometer.hardware.inspector.snmp [-] converter is int or float and value is empty str (EndOfMibView()), handle this value to zero, please check the reason: Exception: exec command failed. ret_code: 1, command: sudo fdisk -l | grep Disk|grep /dev/sd, stdout: , stderr: 
+
+
+
+
+
+vim  /etc/sudoers
+
+```
+ceilometer ALL= (root) NOPASSWD:ALL
+
+```
+
+
+
+容器镜像仓库设计讨论、zun镜像接口格式制定、nova免密讨论
+珠海云云管执行体调试，页面调试，证书制作与导入
+珠海云vpn配置调试、虚拟环境配置、软件配置
+珠海云kp节点适配gnocchi组件；gnocchi组件在ubuntu18.04.5 LTS ,aarch64, kp-compute 4.15.0-112-generic部署的文档 
+gnocchi负载均衡调试、snmp服务调试
+gnocchi、ceilometer数据收集问题调试
+libguestfs在kp节点的适配安装
+日志切割配置；同步部署文档中
+
+
 
 
 
