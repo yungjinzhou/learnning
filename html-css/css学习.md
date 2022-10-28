@@ -2,7 +2,7 @@
 
 
 
-### 书写方式
+### 载入方式
 
 #### 行内式
 
@@ -153,7 +153,7 @@ div{
 </html>
 ```
 
-宽高和边框属性
+#### 宽高和边框属性
 
 ```html
 <!DOCTYPE html>
@@ -198,7 +198,7 @@ div{
 </html>
 ```
 
-外边距
+#### 外边距
 
 ```html
 <!DOCTYPE html>
@@ -249,7 +249,7 @@ div{
 </html>
 ```
 
-padding(内边距)属性
+#### padding(内边距)属性
 
 ```html
 <!DOCTYPE html>
@@ -287,7 +287,36 @@ padding(内边距)属性
 
 
 
-选择器
+### 选择器
+
+#### 标签选择器
+
+```
+div{color:red} 
+......
+<div>这是第一个div</div>   <!-- 对应以上样式 -->
+<div>这是第二个div</div>   <!-- 对应以上样式 -->
+```
+
+
+
+类选择器
+
+```
+.blue{color:blue}
+.big{font-size:20px}
+.box{width:100px;height:100px;background:gold} 
+......
+<div class="blue">....</div>
+<h3 class="blue big box">....</h3>
+<p class="blue box">....</p>
+```
+
+
+
+
+
+
 
 ```html
 <!DOCTYPE html>
