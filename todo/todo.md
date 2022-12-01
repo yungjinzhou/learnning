@@ -2,39 +2,187 @@
 
 
 
-### 定位网络问题的命令
-
-```javascript
-tracert ip
-route -n
-ip netns 
-ip route
-ip  a
-brctl show
-ovs-vsctl
-bridge fdb # bridge fdb展示的是隧道信息
-bridge fdb shwo dev vxlan-3
-tcpdump -i eth0 -nnvvv
-tcpdump -i dev icmp -nnvvv
-vrish edit domain-id  # 查看虚拟机xml信息，有网卡信息
-virsh dumpxml domain-id
-```
 
 
+### 本季度任务
 
-### 本周任务
-
-
-
+- 告警接口测试
+- 云管相关接口总耗时情况，及处理速度优化
+  - 项目列表、操作日志、接口  时间超过1s（已处理）
+  - 镜像列表（已处理）
+  - 项目操作、项目用户操作相关接口优化（已处理）
+- 
+- 网卡状态监控设计，前后端对接
+- goncchi接口测试，pool is closed如何复现问题
+- 计算节点适配（gnocchi/snmp/ceilometer/redis）
+- 计算节点，gnocchi/ceilometer打包（rpm包）
+- 平台适配（ubuntu执行体节点适配）
+- 原生快照、增强型快照设计、开发、优化
+- 网络拓扑图配合前端开发与测试
+- 接口中文化
+- Node_info做成rpm包
 - 
 
 
 
+#### 原生快照接口
+
+1. 原生接口快照改动设计；
+    1.1 原来云主机页面的创建快照更换后端接口为增强型快照的接口；
+    1.2 原来云主机页面更多里增加 创建备份，后端接口是原生快照的接口生接口；
+    1.3 原来云主机快照模块，等底层nova开发完成后，作为实际的云主机快照页面；
+    1.4 在计算模块，增加云主机备份，后端对接的是原生快照接口；
+2. 增强型快照接口页面与云管设计开发（由于底层nova未开发完成，等底层完成后开发）；
 
 
 
 
 
+#### 网卡状态监控
+
+1.网卡状态设计初步方案;
+  1.1 前端显示：在主机监控主机详情中，增加网卡状态信息的显示
+  1.2 前端显示：可以过滤，默认只显示在线状态的网卡（过滤规则：全部物理网卡、在线物理网卡）
+  1.3 后端处理：node_info收集所有物理网卡信息(已处理)（node_info中，放开限制，获取所有物理机上的网卡，同时过滤掉虚拟机的；）
+  1.4 底层处理：ceilometer处理所有物理网卡信息，收集和获取网卡状态（已处理）（  ceilometer源码中修改判断网卡状态逻辑，之前通过改动metric，及snmp.yaml里的oid来区分，data_process代码里过滤了物理网卡，现在放开限制，但是过滤掉虚拟机的nic进行测试；）
+  1.5 后端处理：提供前端显示逻辑所需要的接口及数据（已完成）
+  1.6 后端处理：修改原来接口
+
+
+
+
+
+
+
+
+
+### 新增任务
+
+- 处理删除项目/部门后，云主机等冗余资源
+
+  - 删除前判断是否还有其他资源（已处理）
+
+- 大镜像上传问题处理 
+
+- 新调度策略下，license/celery运行情况（新处理登录时要同步一次，只靠beat有时间间隔）
+
+- 新调度策略下，云管执行体展示、拟态处理修改（已处理）
+
+- 云主机，软删除，恢复，软删除，恢复，然后对该云主机创建原生快照，提示状态为soft_delete，无发创建
+
+- 常用接口压测
+
+- sw适配：主机监控、云主机监控、ceilometer/gnocchi/snmp组件、nova/cinder/neutron组件
+
+- 调研
+
+  - consule监控使用
+
+  - 大镜像上传问题
+
+- 珠海云
+  - 修改项目的代码需要更新，否则报错（2022/11/23发现的问题）已经修改并挂在到珠海云代码中
+  - 
+- 日志info总是两条
+- node_info改造
+- 负载均衡配额（所有配额使用的地方都要修改），返回数据没有已使用，修改源码或云管代码增加已使用
+- 普通用户没有申请云硬盘的操作或者删除的操作，没有删除自己创建容器的按钮，云主机只有软删除，考虑加上云主机回收站
+- 日志详情
+  - 页面需要修改的地方：
+    执行体日志:
+    1，执行体动作列，需从translate接口获取，根据当前列字段和接口字段进行替换，可为多个，逗号分隔；
+    2，新增日志详情列，用于查看日志详情，每个条目有查看按钮；
+    3，详情弹出一个模式框，内容为json，框体设定一定大小，可上下滑动。
+    裁决日志：
+    1，裁决策略列，需从translate接口获取，根据当前列字段和接口字段进行替换；
+    2，异常原因列，需从translate接口获取，根据当前列字段和接口字段进行替换，可为多个，逗号分隔
+    3，详情弹出一个模式框，内容为json，框体设定一定大小，可上下滑动。
+  
+  - 云管需要修改：
+    新增一个mimic_log_translate表，新增一个translate接口，返回mimic_log_translate表英文中文对照表
+  
+  - 
+  
+  
+    ![企业微信截图_16697066785228](./企业微信截图_16697066785228.png)
+  
+  
+
+
+
+#### 大镜像上传问题
+
+
+
+分片上传
+
+断点续传
+
+大镜像上传
+
+1.容器创建接口修改，增加创建容器时挂载已有硬盘的情况；
+2.大镜像上传问题调研，目前根据搜集的资料有三种方案（可行性需要调研与测试）；
+ 2.1 nginx接收切片，利用nginx的handler处理或合并请求，然后上传后调用glanceapi上传（可能需要开发nginx模块或者适配，调研中）；
+ 2.2 改造glance接口，前端处理切片，glance接收后合并，然后调用glanceapi上传（改动代码量大，另外glanceapi改造后需要测试是否影响其他功能）；
+ 2.3 前端分片上传，在控制节点写一个服务，接收分片，重组后，调用glanceapi上传镜像（增加了服务组件）；
+ 2.4 基于ftp服务，上传到ftp等服务器，然后控制节点拉取镜像然后上传(需要控制节点写服务)。
+
+
+
+
+
+1. nginx负责切片功能，保证上传成功，上传后调用glanceapi上传；
+2. 改造glance，前端切片，glance接收，然后合并后调用glanceapi上传；
+3. 前端分片上传，在控制节点写一个服务，接收分片，重组后，调用glanceapi上传镜像；
+4. 
+
+
+
+
+
+#### 总耗时长的请求日志
+
+
+
+```
+# 接口增删改查都要确认下
+[2022-11-25 09:43:52,004] - [task_id:api] - [base.py:222] - [INFO][request: /api/auth/change_project -method: POST -total time consuming: 4] (只有登录接口请求)
+
+[2022-11-25 09:44:30,776] - [task_id:api] - [base.py:222] - [INFO][request: /api/project_manager/domain_users -method: PUT -total time consuming: 3] (串联请求改成并发)
+
+
+
+[2022-11-25 09:56:03,298] - [task_id:api] - [base.py:222] - [INFO][request: /api/auth/change_domain -method: GET -total time consuming: 2] （有删除后重试查询的逻辑，）
+
+
+
+[2022-11-25 10:37:45,232] - [task_id:api] - [base.py:222] - [INFO][request: /api/operate/order_async -method: POST -total time consuming: 3]  (创建资源)
+
+[2022-11-25 10:54:17,579] - [task_id:api] - [base.py:222] - [INFO][request: /api/compute/servers -method: GET -total time consuming: 2]
+
+
+[2022-11-25 13:46:41,119] - [task_id:api] - [base.py:222] - [INFO][request: /api/project_manager/projects -method: PUT -total time consuming: 3]
+
+```
+
+
+
+
+
+
+
+
+
+
+
+### 今日任务
+
+- windows拉代码权限问题
+- 处理node info，处理ssh key
+- 处理配置文件，horizon服务
+- 处理celery服务，配置
+- 处理monitor-cache服务及配置
+- 
 
 
 
@@ -174,6 +322,30 @@ time="2022-04-28T02:03:24Z" level=fatal msg="Error determining manifest MIME typ
 
 
 
+
+
+#### Node info 服务，nova配置免密
+
+```
+ su nova -s /bin/bash -c "ssh-keygen -m PEM -t rsa -b 2048 -N '' -q -f /var/lib/nova/.ssh/id_rsa"
+    log_info "Put nova's public key to controller and compute node"
+    for node in `cat /etc/hosts | grep -E "controller|compute" | awk '{print $1}'`
+    do
+        su nova -s /usr/bin/expect -c "spawn ssh-copy-id root@$node
+            expect {
+                \"*yes/no\" { send \"yes\r\"; exp_continue }
+                \"*password:\" { send \"comleader@123\r\" }
+            }
+            expect eof"
+    done
+```
+
+
+
+
+
+
+
 ### tolearn
 
 aiohttp/asyncio/webserver
@@ -188,9 +360,16 @@ vue/html/css
 
 ### 修改
 
-#### 部署修改部分
+#### 监控部署修改部分
 
-gnocchi-api、gnocchi-metricd、控制节点、计算节点都需要安装
+控制节点
+
+gnocchi-api、gnocchi-metricd（gnocchi服务在控制节点可以不启动，只做负载均衡）；ceilometer-notification、ceilometer-central，snmp
+
+计算节点
+
+gnocchi-api、gnocchi-metricd、ceilometer-notification、ceilometer-central、ceilometer-compute/snmp，libguestfs
+
 gnocchi.conf配置文件更新
 
 日志切割处理
@@ -203,9 +382,7 @@ kp节点 sysstat安装
 
 Node_info服务  ，日志切割，日志位置更换 /var/log/host_info/host_info.log  
 
-gnocchi负载均衡，gnocchi-api启动，用gnocchi用户
-
-gnocchi负载均衡，nginx监听8047 ，其他所有节点走8041看是否有问题
+gnocchi负载均衡，
 
 
 
@@ -222,6 +399,35 @@ gnocchi负载均衡，nginx监听8047 ，其他所有节点走8041看是否有�
 #### 前端需要改的
 
 ```
+未处理：
+3、云主机，限制条件、云物理机在某种状态下可进行操作的逻辑修改（）
+7. 网络拓扑图
+9. 增强型快照接口
+10. 原生快照接口修改
+11. 网卡状态显示问题
+12. 普通用户创建容器，当没有部门流程或项目流程时，申请提示操作成功，实际接口返回400报错，（msg
+: "对应部门和项目的审批流程未创建或未启用"）
+13. 放开普通用户容器删除接口，容器强制删除接口，
+14. 放开普通用户删除卷接口
+15. 放开普通用户云主机回收站页面，用户可以恢复或者删除
+16. 云主机详情，切换时间维度，传输参数不对（半小时-1m,24小时-5m, 一周-30m，一个月-2h）
+17. 容器挂载卷，只有已有云硬盘，
+18. 删除容器，没有选择删除卷的选项，不删除
+
+新发现：
+
+1. 在新部门下的，新项目，修改时，默认值是1(需要确认修改)， 提示云因盘大小不能小于1，切换成TB，也是错误
+2. 修改其他部门下的admin项目，里面有container_number和containers两个字段，（后端以containers数据为准，赋值给了container_number）
+3. 删除部门、删除项目，不更改字段，传参限制1个，就是不批量删除了，界面限制用户选多个，向后端传参列表中一个就行
+4. 创建项目，直接点确定，容器没有默认的个数导致报错
+5. 另外有个页面功能需要优化一下，创建主机时，选择安全组现在只能单选，建议改成可多选的形式。
+
+
+
+
+
+
+
 已处理：
 1、插件式前端页面部署（包括创建、编辑项目时候界面的参数）---已处理
 2、部门详情页面、项目详情页面---已处理
@@ -258,88 +464,39 @@ o. heat编排，云管理员可以看到编排模块（登录对应用户可看�
 q.  docker磁盘大小显示，0改成不限制
 r. 路由器，创建时，网络非必选，可以不传或者外部网络，不传网络时，snat也不需要设置
 s. 编辑镜像，可见性，第一次登录，点击编辑镜像，可见性那里没有返回的默认显示
-
-
-
-
-未处理：
-3、云主机、容器、云硬盘状态，限制条件、云物理机在某种状态下可进行操作的逻辑修改（）
-4、容器、镜像仓库页面（）
-9. 增强型快照接口
-
-新发现：
-p. 插件式部署，创建项目、编辑项目、创建部门、编辑部门里组件参数没有同步显示或隐藏
-t. admin项目详情，-1改成不限制
-1. 云硬盘-更多操作，点击更改状态，显示in-use
-2. 容器镜像，增加接口
-3. 容器镜像创建、编辑、增加tag标签
-4. 创建容器，增加挂载已有云硬盘
-5. 项目详情，没有已用信息
-
+p. 插件式部署，创建项目、编辑项目、创建部门、编辑部门里组件参数没有同步显示或隐藏（已修改）
+t. admin项目详情，-1改成不限制（已修改）
+1. 云硬盘-更多操作，点击更改状态，显示in-use（暂未复现）
+2. 容器镜像，增加接口（已修改）
+3. 容器镜像创建、编辑、增加tag标签（已修改）
+4. 创建容器，增加挂载已有云硬盘（已修改）
+5. 项目详情，没有已用信息（已修改）
+6. 首页执行体，增加策略，执行体修改（已修改）
+7. 网络拓扑图
+8. 拟态态势，列表获取策略信息（已修改）
+9. admin修改权限（已修改）
+10. 云硬盘快照-编辑的限制（已修改）
+11. 容器的状态字段（已修改）
 ```
 
 
 
-#### bug
+### 定位网络问题的命令
 
-- 部署问题优化 
-  - 有时候执行体启动不了，是created的状态
-  - 执行体离线原因，清洗后也启动不了的原因(跟鹏辉定位，网络没有删除成功，导致容器启动失败，鹏辉那儿清洗脚本优化了，后续继续观察)
-  - 裁决日志，大数不一致，处理方法![image-20220930173515816](./大数裁决问题.png)
-  - 主机监控，详情，首次点进去，网络监控数据获取为空，多切换几次网卡后，有数据返回
-  - 
-  
-  
-  
-- 2新bug
-  
-  - 处理删除项目后，云主机等冗余资源
-  - 云主机列表、路由列表（已处理）、项目列表、操作日志、接口  时间超过1s
-  - 镜像列表，接口，需要优化
-  - 云主机，软删除，恢复，软删除，恢复，然后对该云主机创建原生快照，提示状态为soft_delete，无发创建
-  - 首次登录，发现页面上有屏蔽的组件还是显示
-  - node_info做成rpm包
-  - ceilometer打包 entry_points.txt打进去，用官方的spec试试
-  
-  
-
-
-
-
-
-镜像处理
-
-容器镜像列表--------镜像仓库列表
-
-容器镜像上传(上传到镜像仓库)----在容器-更多操作-
-
-容器镜像下载(pull)  ，创建容器时，使用的镜像
-
-容器镜像修改---通过habor
-
-容器镜像 tag修改--通过harbor
-
-容器镜像删除--通过harbor
-
-创建容器，增加已有卷，挂载
-
-
-
-
-
-优化权限问题，尽量取消sudoers那里的配置
-
-2022-10-27 10:08:15.123 16314 ERROR ceilometer.hardware.inspector.snmp [-] converter is int or float and value is empty str (EndOfMibView()), handle this value to zero, please check the reason: Exception: exec command failed. ret_code: 1, command: sudo fdisk -l | grep Disk|grep /dev/sd, stdout: , stderr: 
-
-
-
-
-
-vim  /etc/sudoers
-
-```
-ceilometer ALL= (root) NOPASSWD:ALL
-
+```javascript
+tracert ip
+route -n
+ip netns 
+ip route
+ip  a
+brctl show
+ovs-vsctl
+bridge fdb # bridge fdb展示的是隧道信息
+bridge fdb shwo dev vxlan-3
+tcpdump -i eth0 -nnvvv
+tcpdump -i dev icmp -nnvvv
+vrish edit domain-id  # 查看虚拟机xml信息，有网卡信息
+virsh dumpxml domain-id
 ```
 
 
@@ -350,57 +507,14 @@ ceilometer ALL= (root) NOPASSWD:ALL
 
 
 
-
-
-
-
-
-
-分片上传
-
-断点续传
-
-大镜像上传
-
-1.容器创建接口修改，增加创建容器时挂载已有硬盘的情况；
-2.大镜像上传问题调研，目前根据搜集的资料有三种方案（可行性需要调研与测试）；
- 2.1 nginx接收切片，利用nginx的handler处理或合并请求，然后上传后调用glanceapi上传（可能需要开发nginx模块或者适配，调研中）；
- 2.2 改造glance接口，前端处理切片，glance接收后合并，然后调用glanceapi上传（改动代码量大，另外glanceapi改造后需要测试是否影响其他功能）；
- 2.3 前端分片上传，在控制节点写一个服务，接收分片，重组后，调用glanceapi上传镜像（增加了服务组件）；
- 2.4 基于ftp服务，上传到ftp等服务器，然后控制节点拉取镜像然后上传(需要控制节点写服务)。
-
-
-
-
-
-1. nginx负责切片功能，保证上传成功，上传后调用glanceapi上传；
-2. 改造glance，前端切片，glance接收，然后合并后调用glanceapi上传；
-3. 前端分片上传，在控制节点写一个服务，接收分片，重组后，调用glanceapi上传镜像；
-4. 
-
-监控  console使用
-
-
-
-
-
-
-
-
-
-
-
-232环境，云主机列表刷新报错问题定位，项目管理列表报错定位
-
-编排创建实例报错问题定位
-
-珠海云 列表刷新错误问题定位，增加日志查问题
-
-232环境网关超时
-
-云硬盘列表，空的时候报错
-
-修改项目配额，云硬盘大小不能小于1（前端转换后未反应过来）
+```
+openstack endpoint create --region RegionOne share public http://192.168.232.107:8786/v1/%\(tenant_id\)s
+openstack endpoint create --region RegionOne   share internal http://192.168.232.107:8786/v1/%\(tenant_id\)s
+openstack endpoint create --region RegionOne   share admin http://192.168.232.107:8786/v1/%\(tenant_id\)s
+openstack endpoint create --region RegionOne   sharev2 public http://192.168.232.107:8786/v2/%\(tenant_id\)s
+openstack endpoint create --region RegionOne   sharev2 internal http://192.168.232.107:8786/v2/%\(tenant_id\)s
+openstack endpoint create --region RegionOne   sharev2 admin http://192.168.232.107:8786/v2/%\(tenant_id\
+```
 
 
 
