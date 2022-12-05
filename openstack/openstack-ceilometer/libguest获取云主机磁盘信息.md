@@ -90,3 +90,11 @@ make
 
 
 
+
+
+
+
+2022-11-14 11:08:07,501] - [task_id:log] - [views_servers.py:287] - [INFO][请求实例列表总耗时：228s, record sid: 1668395070572777072-horizon]
+[2022-11-14 11:08:07,506] - [task_id:log] - [views_servers.py:287] - [INFO][请求实例列表总耗时：126s, record sid: 16683951725910653239-horizon]
+[2022-11-14 11:08:07,505] - [task_id:log] - [views_servers.py:287] - [INFO][请求实例列表总耗时：176s, record sid: 16683951227178720987-horizon]
+[2022-11-14 11:08:07,509] -

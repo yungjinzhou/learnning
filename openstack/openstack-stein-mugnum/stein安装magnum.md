@@ -53,9 +53,9 @@ openstack service create --name magnum --description "OpenStack Container Infras
 controller替换为控制节点的ip地址
 
 ```
-openstack endpoint create --region RegionOne container-infra public http://192.168.230.107:9511/v1
-openstack endpoint create --region RegionOne container-infra internal http://192.168.230.107:9511/v1
-openstack endpoint create --region RegionOne container-infra admin http://192.168.230.107:9511/v1
+openstack endpoint create --region RegionOne container-infra public http://192.168.230.104:9511/v1
+openstack endpoint create --region RegionOne container-infra internal http://192.168.230.104:9511/v1
+openstack endpoint create --region RegionOne container-infra admin http://192.168.230.104:9511/v1
 ```
 
 
@@ -185,9 +185,9 @@ controller替换为ip地址
 ```
 openstack service create --name barbican --description "Key Manager" key-manager
 
-openstack endpoint create --region RegionOne key-manager public http://192.168.204.173:9311
-openstack endpoint create --region RegionOne key-manager internal http://192.168.204.173:9311
-openstack endpoint create --region RegionOne key-manager admin http://192.168.204.173:9311
+openstack endpoint create --region RegionOne key-manager public http://192.168.230.104:9311
+openstack endpoint create --region RegionOne key-manager internal http://192.168.230.104:9311
+openstack endpoint create --region RegionOne key-manager admin http://192.168.230.104:9311
 ```
 
 ###### 安装
@@ -211,9 +211,9 @@ transport_url = rabbit://openstack:openstack@controller
 db_auto_create = false
 
 [keystone_authtoken]
-www_authenticate_uri = http://192.168.204.173:5000
-auth_url = http://192.168.204.173:5000
-memcached_servers = 192.168.204.173:11211
+www_authenticate_uri = http://192.168.230.104:5000
+auth_url = http://192.168.230.104:5000
+memcached_servers = 192.168.230.104:11211
 auth_type = password
 project_domain_name = default
 user_domain_name = default
