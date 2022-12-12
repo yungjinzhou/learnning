@@ -53,9 +53,9 @@ openstack service create --name magnum --description "OpenStack Container Infras
 controller替换为控制节点的ip地址
 
 ```
-openstack endpoint create --region RegionOne container-infra public http://192.168.230.104:9511/v1
-openstack endpoint create --region RegionOne container-infra internal http://192.168.230.104:9511/v1
-openstack endpoint create --region RegionOne container-infra admin http://192.168.230.104:9511/v1
+openstack endpoint create --region RegionOne container-infra public http://192.168.232.107:9511/v1
+openstack endpoint create --region RegionOne container-infra internal http://192.168.232.107:9511/v1
+openstack endpoint create --region RegionOne container-infra admin http://192.168.232.107:9511/v1
 ```
 
 
@@ -522,9 +522,9 @@ yum install -y openstack-magnum-ui
 到openstack-dashboard下
 
 ```
-cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1370_project_container_infra_panel_group.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
-cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1371_project_container_infra_clusters_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
-cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1372_project_container_infra_cluster_templates_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1370_project_container_infra_panel_group.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled/
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1371_project_container_infra_clusters_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled/
+cp /usr/lib/python2.7/site-packages/magnum_ui/enabled/_1372_project_container_infra_cluster_templates_panel.py /usr/share/openstack-dashboard/openstack_dashboard/local/enabled/
 
 ```
 
@@ -567,7 +567,7 @@ magnum-ui安装参考链接：https://github.com/openstack/magnum-ui
 
 参考链接： http://zengxiaoran.com/2020/12/04/etcd_cluster_discovery/
 
-### 1先搭建etcd集群
+### 1先搭建etcd集群（构建discory url的话，直接参考2，不用搭建宿主机集群）
 
 #### 1.1安装etcd
 
@@ -741,7 +741,7 @@ c373b2eb6d13eb35: name=etcd02 peerURLs=http://192.168.0.6:2380 clientURLs=http:/
 
 
 
-### 2. 启动服务
+#### 1.3 启动服务
 
 ```
 [root@etcd3 /]# systemctl start etcd
@@ -749,13 +749,15 @@ c373b2eb6d13eb35: name=etcd02 peerURLs=http://192.168.0.6:2380 clientURLs=http:/
 
 
 
-### 3.构建discovery
+### 2.构建discovery
+
+(不需要2构建集群，只需要在某个物理节点搭建etcd服务)
 
 由于每次构建k8s集群需要不一样的token来区分，临时在代码中生成token（测试时使用etcd）
 
 生成token的集群，等搭建完成时需要优化为自动生成token，此处手动生成
 
-#### 3.1基本集群
+#### 2.1基本集群
 
 ```
 docker run -d -p 2479:2379 \
@@ -763,7 +765,7 @@ docker run -d -p 2479:2379 \
               -p 4401:4001 \
               -p 7401:7001 \
               --name etcd-discovery \
-              192.168.66.29:80/openstack_magnum/elcolio/etcd
+192.168.66.29:80/openstack_magnum/elcolio/etcd
 ```
 
 
@@ -772,33 +774,69 @@ discovery
 
 ```
 docker run -d -p 7890:8087 \
-           -e DISC_ETCD=http://192.168.230.106:2379 \
-           -e DISC_HOST=http://192.168.230.106:7890 \
+           -e DISC_ETCD=http://192.168.230.104:2379 \
+           -e DISC_HOST=http://192.168.230.104:7890 \
            --name discovery 192.168.66.29:80/openstack_magnum/quay.io/coreos/discovery.etcd.io:latest
 ```
 
-#### 3.2生成token
+#### 2.2生成token
 
 curl http://127.0.0.1:7890/new?size=1
 
-http://192.168.230.106:2379/932d0a1ab8e2f1404fb836427e8099f2
+http://192.168.232.107:7890/56adb00635311f5a48e8b198a2d6bc2a
 
 
 
-#### 3.3修改value size
+#### 2.3修改value size
 
-[root@etcd3 /]# curl -X PUT http://192.168.230.106:2379/v2/keys/discovery/0bbbf4feeddfa35d57f1d9a16c947155/_config/size -d value=1
-{“action”:”set”,”node”:{“key”:”/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size”,”value”:”3”,”modifiedIndex”:4,”createdIndex”:4}}
+[root@etcd3 /]# curl -X PUT http://192.168.232.107:2379/v2/keys/discovery/56adb00635311f5a48e8b198a2d6bc2a/_config/size -d value=1
+
+```
+返回值
+{"action":"set","node":{"key":"/discovery/56adb00635311f5a48e8b198a2d6bc2a/_config/size","value":"1","modifiedIndex":2704,"createdIndex":2704}}
+```
 
 
 
-创建magnum  template时写入discovery_url: http://192.168.230.106:2379/v2/keys/discovery/bc7e989f-079d-4412-8643-acd46a6f5743/_config/size
+
+
+
+
+创建magnum  template时写入discovery_url: http://192.168.232.107:2379/v2/keys/discovery/56adb00635311f5a48e8b198a2d6bc2a/
 
 
 
 
 
 ## 四、搭建harbor内网仓库
+
+
+
+
+
+如果拉harbor镜像，提示https报错，
+
+```
+报错信息
+Unable to find image '192.168.66.29:80/openstack_magnum/elcolio/etcd:latest' locally
+Trying to pull repository 192.168.66.29:80/openstack_magnum/elcolio/etcd ...
+/usr/bin/docker-current: Get https://192.168.66.29:80/v1/_ping: http: server gave HTTP response to HTTPS client.
+```
+
+
+
+需要在/etc/docker/daemon.json修改
+
+```
+{
+"registry-mirrors": ["http://hub-mirror.c.163.com", "https://registry.docker-cn.com"],
+"insecure-registries":["192.168.66.29:80"]
+}
+```
+
+
+
+
 
 
 

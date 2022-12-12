@@ -274,16 +274,66 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 
 
-### 今日任务
+### 本周任务
 
-- 容器删除接口后端处理并更新到232环境
-- cinder创建接口完善错误信息
-- Node_info打包
+- 232环境下测试magnum创建k8s集群，解决拉取镜像问题
+- 网络拓扑增加外部网络信息
+- 前端对接
 - 
 - 
 - 
 - 
 - 
+- 
+- 
+
+
+
+鹤壁项目远程运维时间表，一人三天，轮值班到鹤壁招到专业运维人员。如果值班时间不方便，自行和同事进行协调。
+时间表如下：
+1. 杨金周 12.15-12.17  
+2. 周晓伟 12.18-12.20 
+3. 赵志宣 12.21-12.23 
+4. 金鹏    12.24-12.26  
+5. 陈凯    12.27-12.29 
+6. 赵惟勇 12.30-1.1 
+7. 刘淋淋 1.2-1.4 
+8. 丁鹏辉 1.5-1.7  
+9. 黄叶建    1.8-1.10 
+10. 邱军婷    1.11-1.13
+11. 贺印    12.12-12.14
+vpn账号密码  wangyu/comleader@123
+向日葵账号密码  969264032    f310q7
+
+
+
+
+
+
+
+
+
+
+
+
+
+### docker配置代理
+
+```
+docker服务配代理的方法，配上代理后就可以下载dockerhub镜像：
+mkdir -p /etc/systemd/system/docker.service.d
+cat >   /etc/systemd/system/docker.service.d/http-proxy.conf << eof
+[Service]
+Environment="HTTP_PROXY=192.168.66.77:3128"
+Environment="HTTPS_PROXY=192.168.66.77:3128"
+Environment="NO_PROXY=192.168.*.*,*.local,localhost,127.0.0.1"
+eof
+
+systemctl daemon-reload
+systemctl restart docker
+```
+
+
 
 
 
