@@ -26,7 +26,9 @@ https://cbs.centos.org/kojifiles/packages/openstack-macros/2019.1.1/0.el7/src/op
 
 
 
+https://mirror.chpc.utah.edu/pub/centos/7/cloud/x86_64/openstack-queens/Packages/q/qpid-proton-c-0.22.0-1.el7.x86_64.rpm
 
+https://mirror.chpc.utah.edu/pub/centos/7/cloud/x86_64/openstack-queens/Packages/q/
 
 
 
