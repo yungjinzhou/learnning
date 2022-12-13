@@ -282,9 +282,9 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 - Magnum 解决controller不识别，网络不通的问题
 - gnocchi/ceilometer/gnodeinfo自动化脚本构建
 - gnocchi/ceilometer/nodeinfo  ci构建测试
-- 104环境，登录提示授权时效问题（todo）
-- 
-- 
+- 104环境，登录提示授权时效问题处理
+- 信安云管环境调试（非拟态云管、nodeinfo服务、monitor-cache服务、license处理，celeer服务处理）
+- keystone拟态需求改造接口统计
 - 
 - 
 - 
