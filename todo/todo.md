@@ -357,7 +357,7 @@ InstanceNotFound: Instance 654720ca-3b17-41a2-9abf-d6fd4d9ccee3 could not be fou
 import pymysql
 
 
-HOST = '192.168.230.107'
+HOST = '192.168.232.107'
 PORT = 3306
 USER = "root"
 PASSWORD = "comleader@123"
@@ -408,7 +408,8 @@ def clean_nova_instance_from_db(target_uuid):
         execute_sql(sql)
 
 
-target_uuid = "9c3b7959-0154-4ab7-a86b-8623e2a15b75"
+target_uuid = "955a2154-75b6-4910-ac49-5b14d02c2a10
+"
 clean_nova_instance_from_db(target_uuid)
 
 
@@ -426,7 +427,7 @@ execute_sql(f'delete from instances where uuid="{target_uuid}";')
 execute_sql(f'delete from block_device_mapping where instance_uuid="{target_uuid}";')
 execute_sql(f'delete from instance_actions where instance_uuid="{target_uuid}";')
 execute_sql(f'delete from instance_id_mappings where uuid="{target_uuid}";')
-execute_sql(f'delete from instance_system_metadate where instance_uuid="{target_uuid}";')
+execute_sql(f'delete from instance_system_metadata where instance_uuid="{target_uuid}";')
 
 
 
