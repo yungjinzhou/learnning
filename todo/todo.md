@@ -279,8 +279,10 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 - 232环境下测试magnum创建k8s集群，解决拉取镜像问题
 - 网络拓扑增加外部网络信息
 - 前端对接
+- Magnum 解决controller不识别，网络不通的问题
+- gnocchi/ceilometer/gnodeinfo自动化脚本构建
+- gnocchi/ceilometer/nodeinfo  ci构建测试
 - 104环境，登录提示授权时效问题（todo）
-- 
 - 
 - 
 - 
