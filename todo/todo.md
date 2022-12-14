@@ -339,6 +339,22 @@ systemctl restart docker
 
 
 
+centos配置代理
+
+
+
+```
+export proxy="http://192.168.66.77:3128"
+export http_proxy=$proxy
+export https_proxy=$proxy
+export ftp_proxy=$proxy
+export no_proxy="localhost, 127.0.0.1, ::1"
+```
+
+
+
+
+
 
 
 ### 脚本处理僵尸云主机、云硬盘
@@ -680,6 +696,26 @@ openstack endpoint create --region RegionOne   sharev2 admin http://192.168.232.
 
 
 
+
+
+
+### manum相关问题
+
+
+
+
+
+```
+$ atomic --debug pull --storage ostree http:internal-url/namespace/image:tag
+```
+
+
+
+atomic install --system-package no --system --storage docker--name=etcd 192.168.66.29:80/openstack_magnum/etcd:v3.2.7
+
+
+
+atomic --debug install --system-package no --system --storage docker  --name=etcd 192.168.66.29:80/openstack_magnum/etcd:v3.2.7
 
 
 
