@@ -587,7 +587,10 @@ gnocchi负载均衡，
 20. 裁决日志详情、执行体详情处理
 21. 云硬盘类型，改成插件式的
 22. 容器错误状态，修改，需要贺印提供新的状态信息
-
+23. 跟之前的一样，有这个参数的话，
+1.拟态态势不显示，
+2.首页不显示右上角（云管、云控、鉴权中心这些）
+3. 首页不请求manual接口
 
 
 
@@ -719,3 +722,14 @@ atomic --debug install --system-package no --system --storage docker  --name=etc
 
 
 
+docker run -id  --name=etcd 192.168.66.29:80/openstack_magnum/etcd:v3.2.7
+
+
+
+http://192.168.66.33/guoqiuxia/MCS-horizon/-/archive/master/MCS-horizon-master.tar.gz
+
+
+
+
+
+生产云上有这两个虚拟机，之前用来制作执行体镜像的，gitlab-runner调试好了，可以迁上去，x86:192.168.67.45  arm：192.168.67.146
