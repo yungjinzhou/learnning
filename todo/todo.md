@@ -758,3 +758,29 @@ http://192.168.66.33/guoqiuxia/MCS-horizon/-/archive/master/MCS-horizon-master.t
 
 
 
+环境230.104上测试
+
+使用模板
+
+centos7k8stemplate01
+
+创建cluster名称
+
+clustertest01
+
+失败：报错信息
+
+```
+(pymysql.err.OperationalError) (1213, u'Deadlock: wsrep aborted transaction') (Background on this error at: http://sqlalche.me/e/e3q8)
+```
+
+设置mysql最大连接数151到1024重新测试
+
+
+
+
+
+
+
+
+
