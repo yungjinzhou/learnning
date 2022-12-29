@@ -154,7 +154,7 @@ lock_path = /var/lib/magnum/tmp
 
 
 
-##### 安装barbican(optional)
+##### 安装barbican(optional，可以不安装)
 
 ###### 创建数据库
 
