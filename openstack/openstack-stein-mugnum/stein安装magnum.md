@@ -567,7 +567,9 @@ magnum-ui安装参考链接：https://github.com/openstack/magnum-ui
 
 参考链接： http://zengxiaoran.com/2020/12/04/etcd_cluster_discovery/
 
-### 1先搭建etcd集群（构建discory url的话，直接参考2，不用搭建宿主机集群）
+### 1搭建etcd集群（物理主机节点）
+
+（构建discory url的话，可以直接参考2，不用搭建宿主机集群）
 
 #### 1.1安装etcd
 
@@ -749,15 +751,9 @@ c373b2eb6d13eb35: name=etcd02 peerURLs=http://192.168.0.6:2380 clientURLs=http:/
 
 
 
-### 2.构建discovery
+### 2. 搭建etcd集群（容器方式）
 
-(不需要2构建集群，只需要在某个物理节点搭建etcd服务)
-
-由于每次构建k8s集群需要不一样的token来区分，临时在代码中生成token（测试时使用etcd）
-
-生成token的集群，等搭建完成时需要优化为自动生成token，此处手动生成
-
-#### 2.1基本集群
+基本集群搭建
 
 ```
 docker run -d -p 2479:2379 \
@@ -770,7 +766,15 @@ docker run -d -p 2479:2379 \
 
 
 
-discovery
+### 3. 构建discovery
+
+由于每次构建k8s集群需要不一样的token来区分，临时在代码中生成token（测试时使用etcd）
+
+生成token的集群，等搭建完成时需要优化为自动生成token，此处手动生成
+
+
+
+#### 3.1 搭建discovery服务
 
 ```
 docker run -d -p 7890:8087 \
@@ -779,7 +783,7 @@ docker run -d -p 7890:8087 \
            --name discovery 192.168.66.29:80/openstack_magnum/quay.io/coreos/discovery.etcd.io:latest
 ```
 
-#### 2.2生成token
+#### 3.2生成token
 
 curl http://127.0.0.1:7890/new?size=1
 
@@ -787,7 +791,7 @@ http://192.168.232.107:7890/56adb00635311f5a48e8b198a2d6bc2a
 
 
 
-#### 2.3修改value size
+#### 3.3修改value size
 
 [root@etcd3 /]# curl -X PUT http://192.168.232.107:2379/v2/keys/discovery/56adb00635311f5a48e8b198a2d6bc2a/_config/size -d value=1
 
@@ -798,19 +802,15 @@ http://192.168.232.107:7890/56adb00635311f5a48e8b198a2d6bc2a
 
 
 
-
-
-
+#### 3.4 使用discovery
 
 创建magnum  template时写入discovery_url: http://192.168.232.107:2379/v2/keys/discovery/56adb00635311f5a48e8b198a2d6bc2a/
 
-
+（/_config/size，在magnum代码里有处理，所以在配置界面，不用加后缀）
 
 
 
 ## 四、搭建harbor内网仓库
-
-
 
 
 
