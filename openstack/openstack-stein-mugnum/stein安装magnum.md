@@ -814,6 +814,16 @@ http://192.168.232.107:7890/56adb00635311f5a48e8b198a2d6bc2a
 
 
 
+登录harbor命令
+
+```
+docker login 192.168.66.29 -u admin -p comleader@123
+```
+
+
+
+
+
 如果拉harbor镜像，提示https报错，
 
 ```

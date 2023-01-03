@@ -693,6 +693,16 @@ openstack endpoint create --region RegionOne   sharev2 admin http://192.168.232.
 
 
 
+harbor登录
+
+```
+docker login 192.168.66.29 -u admin -p comleader@123
+```
+
+
+
+
+
 
 
 ```
