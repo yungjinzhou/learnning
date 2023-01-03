@@ -298,6 +298,10 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 
 
+
+
+新需求
+
 ```
 1. mangum k8s部署调研中，
 	1.1 制作centos7镜像；
@@ -324,6 +328,27 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 5. 非拟态云管验证，前端改造中，下周能完成
 
 ```
+
+
+
+
+
+4季度完成情况统计
+
+```
+组件中文化：进行中
+监控测试、负载均衡：完成
+原生快照优化：未完成，等待增强型快照底层开发完成后，一起修改
+接口请求时间：完成（记录耗时、修改优化相关接口）
+zun镜像、仓库设计、云管适配：完成
+网卡状态监控设计与实现：完成
+平台ci适配：完成
+朱海云部署：完成
+1号工程：未完成，项目计划问题未开始
+
+```
+
+
 
 
 
@@ -725,10 +750,10 @@ openstack endpoint create --region RegionOne   sharev2 admin http://192.168.232.
 harbor登录
 
 ```
-docker login 192.168.66.29 -u admin -p comleader@123
+docker login 192.168.66.29:80 -u admin -p comleader@123
 ```
 
-
+配置daemon.json里的地址，应该与登录的地址一致，包括端口
 
 
 
@@ -789,6 +814,26 @@ clustertest01
 
 
 
+
+### tmp
+
+```
+hostnamectl set-hostname k8s-master 
+
+
+
+kubeadm init --apiserver-advertise-address=192.168.22.239 --image-repository 192.168.66.29:80/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+kubeadm init --apiserver-advertise-address=192.168.22.239 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+
+cat >> /etc/hosts << EOF 
+192.168.22.239 k8s-master 
+192.168.22.144 k8s-minion
+EOF
+```
 
 
 
