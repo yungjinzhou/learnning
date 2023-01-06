@@ -362,6 +362,18 @@ openstack coe cluster template create kubernetes-cluster-template --image fedora
  
 openstack coe cluster template create atomic-ussuritest --image e0b3a591-e3fa-4240-8339-5dd93c3ed7e0  --external-network for_magnum --dns-nameserver 8.8.8.8 --master-flavor m1.small --docker-volume-size 10 --flavor m1.small --labels docker_volume_type=lvm --coe kubernetes
  
+ 
+
+openstack coe cluster template create centos_test --image f144e6fa-f3cc-4f88-8106-b67187039043  --external-network manager --fixed-network f7abdcc6-07e7-4714-bbad-14b282eebab0  --fixed-subnet 55bd9834-4315-46b5-adab-5dfa409e60cd --volume-driver --flavor --docker-storage-driver --public --tls-disabled --registry-enabled --server-type --insecure-registry --floating-ip-enabled --keypair --dns-nameserver 8.8.8.8 --master-flavor k8s-test --docker-volume-size 10 --flavor k8s-test --labels docker_volume_type=rbd --coe kubernetes
+ 
+ openstack coe cluster template create centos_test --image f144e6fa-f3cc-4f88-8106-b67187039043  --external-network manager --fixed-network f7abdcc6-07e7-4714-bbad-14b282eebab0  --fixed-subnet 55bd9834-4315-46b5-adab-5dfa409e60cd --docker-storage-driver devicemapper --public --tls-disabled --registry-enabled --server-type vm --volume-driver cinder --floating-ip-enabled --keypair k8s-test --dns-nameserver 8.8.8.8 --master-flavor k8s-test --docker-volume-size 20 --flavor k8s-test --labels docker_volume_type=rbd --coe kubernetes
+ 
+ 
+openstack coe cluster template create centos7templatev3 --image de404375-1877-4042-af43-7a81c22178eb --external-network manager --fixed-network f7abdcc6-07e7-4714-bbad-14b282eebab0  --fixed-subnet 55bd9834-4315-46b5-adab-5dfa409e60cd --docker-storage-driver devicemapper --public --tls-disabled --registry-enabled --server-type vm --volume-driver cinder --floating-ip-enabled --keypair k8s-test --dns-nameserver 8.8.8.8 --master-flavor k8s-test --docker-volume-size 20 --flavor k8s-test --labels docker_volume_type=rbd --coe kubernetes
+
+
+openstack coe cluster template create centos7templatev4 --image 3055c523-6e45-4dcf-b4bb-4695d878127c --external-network manager --fixed-network f7abdcc6-07e7-4714-bbad-14b282eebab0  --fixed-subnet 55bd9834-4315-46b5-adab-5dfa409e60cd --docker-storage-driver devicemapper --public --tls-disabled --registry-enabled --server-type vm --volume-driver cinder --floating-ip-enabled --keypair k8s-test --dns-nameserver 8.8.8.8 --master-flavor k8s-test --docker-volume-size 20 --flavor k8s-test --labels docker_volume_type=rbd --coe kubernetes
+
 ```
 
 
