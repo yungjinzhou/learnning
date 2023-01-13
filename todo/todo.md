@@ -284,16 +284,23 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 ### 本周任务
 
-- 前端对接
-- 制作centos7镜像，提前拉取需要的image
-- 修改magnum代码，添加centos类型分支
-- 修改对应分支脚本，把不符合centos操作的命令替换掉
-- 测试用centos创建模板
-- 测试用centos模板创建cluster，前期替换的yaml文件有问题，替换后可以继续向后运行
-- 优化脚本，有没有安装的命令等，同步到镜像里，重新打包测试
+- 多云管理材料撰写
+- 需求讨论、整理
+- 编排写模板，创建k8s，发现想要的数据没有写入，定位+分析heat创建流程
+- 改用heat，直接写模板，尝试创建k8s，遇到sql连接太多问题，失败，继续测试
+- 执行k8s命令报错(ci-info: no authorized ssh keys fingerprints found for user centos.)
+- 用新的模板，调用heat接口，成功部署k8s底层服务
+- 调研通过yaml部署k8s-dashboard(手动部署dashboard成功)
+- 调研k8s-dashboard用户名密码的方式登录、token方式登录
+- 
+- 执行体日志不切割导致磁盘占满，云管日志跟踪定位
+- 
 - 
 - 优化
-  - 网卡状态（kp-compute在线没有网卡）
+  - 云主机，增加ip查询的方式
+  - 网络列表分页处理，网络列表（名称、ip查询）暂不处理
+- 网卡状态（kp-compute在线没有网卡）
+- 
 - 
 
 

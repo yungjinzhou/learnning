@@ -182,6 +182,22 @@ docker pull quay.io/coreos/flannel:v0.14.0
 kubectl apply -f kube-flannel.yml
 ```
 
+**注意**
+
+查看flannel 的pod，如果启动失败，后面 nodes的状态是NotReady
+
+需要看
+
+
+
+
+
+
+
+
+
+
+
 部署成功
 
 ```apache
@@ -269,11 +285,11 @@ Dashboard 的 GitHub 地址：https://github.com/kubernetes/dashboard
 
 ### 2.4 下载安装
 
-执行安装:
+执行安装:（网上下载方式）
 
 ```
 $ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
-$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
+
 
 namespace/kubernetes-dashboard created
 serviceaccount/kubernetes-dashboard created
@@ -290,6 +306,16 @@ deployment.apps/kubernetes-dashboard created
 service/dashboard-metrics-scraper created
 deployment.apps/dashboard-metrics-scraper created
 ```
+
+
+
+执行安装:（下载yaml文件后编辑后执行）
+
+此种方式可以直接通过修改recommended.yaml配置NodePort，端口，用户密码登录等
+
+
+
+
 
 可以看到新版本 Dashboard 集成了一个` metrics-scraper` 的组件，可以通过 Kubernetes 的 Metrics API 收集一些基础资源的监控信息，并在 web 页面上展示，所以要想在页面上展示监控信息就需要提供 Metrics API，前提需要安装 Metrics Server。
 
@@ -442,6 +468,86 @@ ca.crt:     1025 bytes
 
 
 
+### 2.10 配置用户名密码
+
+A。备份kube-apiserver.yaml（重要）
+
+```
+cp /etc/kubernetes/manifests/kube-apiserver.yaml  /etc/kubernetes/manifests/kube-apiserver.yaml-bak
+```
+
+
+
+B。新增密码
+
+账户admin密码admin，唯一id是1
+
+```
+echo "admin,admin,1" > /etc/kubernetes/pki/basic_auth_file
+
+echo "feng.yuqing,fyq@123,2" >> /etc/kubernetes/pki/basic_auth_file
+```
+
+每行写一个账号，id不能重复 
+
+
+
+修改apiserver.yaml
+
+
+
+```
+vim /etc/kubernetes/manifests/kube-apiserver.yaml``#加入这一行``- --token-auth-file=/etc/kubernetes/pki/basic_auth_file``#保存退出
+
+
+
+具体位置：
+
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=192.168.230.41
+    - -- .......
+    省略......
+    - --tls-cert-file=/etc/kubernetes/pki/apiserver.key
+    - --token-auth-file=/etc/kubernetes/basic_auth_file
+    image: k8s.gcr.io/kube-apiserver:v1.22.4
+    ......
+```
+
+
+
+D。查看状态
+
+apiserver.yaml被修改后会自动重启（十秒左右），查看状态有报错
+
+ 
+
+E。为admin/fengyuqing用户绑定权限
+
+# admin绑定权限
+
+kubectl create clusterrolebinding login-on-dashboard-with-cluster-admin --clusterrole=cluster-admin --user=admin
+
+# 查看绑定结果
+
+kubectl get clusterrolebinding login-on-dashboard-with-cluster-admin
+
+F。修改recommended.yaml
+
+recommended.yaml 是dashboard相关部署文件。
+
+
+
+
+
+
+
+
+
+
+
 ## 注意事项
 
 
@@ -470,7 +576,9 @@ kubectl describe node 查看信息
 
 
 
+还有可能是flannel没有配置好，
 
+提示
 
 
 
