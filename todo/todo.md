@@ -291,6 +291,7 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 - 测试用centos创建模板
 - 测试用centos模板创建cluster，前期替换的yaml文件有问题，替换后可以继续向后运行
 - 优化脚本，有没有安装的命令等，同步到镜像里，重新打包测试
+- 
 - 优化
   - 网卡状态（kp-compute在线没有网卡）
 - 
@@ -812,27 +813,36 @@ clustertest01
 
 
 
+压缩镜像
+
+
+
+```
+
+然后执行dd if=/dev/zero of=/home/junk_files， 把剩余空间全部占满之后执行rm -f /home/junk_files
+
+
+最后再关机压缩一下镜像
+
+qemu-img convert -c -O qcow2 vm-db.qcow2 vm-db-new.qcow2
+```
+
+
+
+
+
 
 
 ### tmp
 
 ```
-hostnamectl set-hostname k8s-master 
-
-
-
-kubeadm init --apiserver-advertise-address=192.168.22.239 --image-repository 192.168.66.29:80/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
-
-
-kubeadm init --apiserver-advertise-address=192.168.22.239 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
-
-
-
-cat >> /etc/hosts << EOF 
-192.168.22.239 k8s-master 
-192.168.22.144 k8s-minion
-EOF
+k8s_POD_kube-proxy-6jmxm_kube-system_648b957c-f8c8-4712-a146-fa5ea813b241_1
 ```
 
 
+
+````
+kubeadm init --apiserver-advertise-address=192.168.230.36 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+````
 
