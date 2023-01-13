@@ -8,19 +8,13 @@
 
 - 告警接口测试
 - 云管相关接口总耗时情况，及处理速度优化
-  - 项目列表、操作日志、接口  时间超过1s（已处理）
-  - 镜像列表（已处理）
-  - 项目操作、项目用户操作相关接口优化（已处理）
-- 
-- 网卡状态监控设计，前后端对接
+  - 
 - goncchi接口测试，pool is closed如何复现问题
 - 计算节点适配（gnocchi/snmp/ceilometer/redis）
 - 计算节点，gnocchi/ceilometer打包（rpm包）
 - 平台适配（ubuntu执行体节点适配）
 - 原生快照、增强型快照设计、开发、优化
-- 网络拓扑图配合前端开发与测试
 - 接口中文化
-- Node_info做成rpm包
 - 
 
 
@@ -38,35 +32,11 @@
 
 
 
-#### 网卡状态监控
-
-1.网卡状态设计初步方案;
-  1.1 前端显示：在主机监控主机详情中，增加网卡状态信息的显示
-  1.2 前端显示：可以过滤，默认只显示在线状态的网卡（过滤规则：全部物理网卡、在线物理网卡）
-  1.3 后端处理：node_info收集所有物理网卡信息(已处理)（node_info中，放开限制，获取所有物理机上的网卡，同时过滤掉虚拟机的；）
-  1.4 底层处理：ceilometer处理所有物理网卡信息，收集和获取网卡状态（已处理）（  ceilometer源码中修改判断网卡状态逻辑，之前通过改动metric，及snmp.yaml里的oid来区分，data_process代码里过滤了物理网卡，现在放开限制，但是过滤掉虚拟机的nic进行测试；）
-  1.5 后端处理：提供前端显示逻辑所需要的接口及数据（已完成）
-  1.6 后端处理：修改原来接口
-
-
-
-
-
-
-
-
-
 ### 新增任务
-
-- 处理删除项目/部门后，云主机等冗余资源
-
-  - 删除前判断是否还有其他资源（已处理）
 
 - 大镜像上传问题处理 
 
 - 新调度策略下，license/celery运行情况（新处理登录时要同步一次，只靠beat有时间间隔）
-
-- 新调度策略下，云管执行体展示、拟态处理修改（已处理）
 
 - 云主机，软删除，恢复，软删除，恢复，然后对该云主机创建原生快照，提示状态为soft_delete，无发创建
 
@@ -78,19 +48,14 @@
 
   - consule监控使用
 
-  - 大镜像上传问题
 
-- 珠海云
-  - 修改项目的代码需要更新，否则报错（2022/11/23发现的问题）已经修改并挂在到珠海云代码中
   - 
-  
+
 - 日志info总是两条
 
 - node_info改造
 
 - 负载均衡配额（所有配额使用的地方都要修改），返回数据没有已使用，修改源码或云管代码增加已使用
-
-- 普通用户没有申请云硬盘的操作或者删除的操作，没有删除自己创建容器的按钮，云主机只有软删除，考虑加上云主机回收站
 
 - 新需求评估（新云平台）
 
@@ -122,8 +87,6 @@
 - nova主机管理，底层不支持向上分页
   
 - nova云主机，查询参数ip，设置
-  
-- redis改造，成集群模式（云管、拟态组件、rpc、gnocchi）
   
 - 
   
@@ -284,8 +247,7 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 ### 本周任务
 
-- 多云管理材料撰写
-- 需求讨论、整理
+- 
 - 编排写模板，创建k8s，发现想要的数据没有写入，定位+分析heat创建流程
 - 改用heat，直接写模板，尝试创建k8s，遇到sql连接太多问题，失败，继续测试
 - 执行k8s命令报错(ci-info: no authorized ssh keys fingerprints found for user centos.)
@@ -398,6 +360,28 @@ export https_proxy=$proxy
 export ftp_proxy=$proxy
 export no_proxy="localhost, 127.0.0.1, ::1"
 ```
+
+
+
+
+
+### 镜像制作，处理
+
+
+
+```
+
+执行dd if=/dev/zero of=/home/junk_files， 把剩余空间全部占满之后
+执行rm -f /home/junk_files
+
+关机
+
+# 压缩镜像
+qemu-img convert -c -O qcow2 CentOS-7-x86_64-GenericCloud.qcow2 CentOS7v6.qcow2
+
+```
+
+
 
 
 
@@ -852,4 +836,8 @@ k8s_POD_kube-proxy-6jmxm_kube-system_648b957c-f8c8-4712-a146-fa5ea813b241_1
 kubeadm init --apiserver-advertise-address=192.168.230.36 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 
 ````
+
+
+
+
 
