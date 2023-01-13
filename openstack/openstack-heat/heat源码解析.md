@@ -2,7 +2,7 @@
 
 
 
-### 资源类型
+## 资源类型
 
 **对基础架构的编排**
 
@@ -98,7 +98,7 @@ OS::Heat::SoftwareConfig和OS::Heat::SoftwareDeployment协同工作，需要一�
 
 
 
-### heat源码解析
+## heat源码解析
 
 在magnum中调用heatclient ，向heatapi发送请求，请求连接：http://controller:8004/v1/b5a1eb4ee8374fa1aa88cd4b59afda98/stacks，下面对heat代码进行解析
 
@@ -448,9 +448,75 @@ convergence   openstack N版本后，默认convergence=Ture
 
 
 
+## magnum创建cluster到请求heat的代码分析
 
 
 
+
+
+
+
+
+
+```
+
+2023-01-06 17:12:18.257 155917 INFO heat.engine.service [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] Creating stack on-delte-v2-lm47gfxm2pr4
+
+
+2023-01-06 17:12:18.296 155921 INFO heat.engine.resource [req-55545d88-319a-4f51-b661-32eb6757c2ba - admin - default default] deleting NoneResource "etcd_volume_attach" [81c77cc8-d88a-4cd0-b778-90cd41b7cb71] Stack "on-delte-v1-o7gxrubzbkhl-kube_masters-bhntcum7mzrs-0-5wccfz57k6y3" [a3ee5aa0-5a87-4f09-ba73-622bad7d9a9f]
+
+
+2023-01-06 17:12:19.075 155917 INFO heat.engine.environment [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] on-delte-v2-lm47gfxm2pr4 Registered: [Template](User:True) Magnum::ApiGatewaySwitcher -> file:///usr/lib/python2.7/site-packages/magnum/drivers/common/templates/fragments/api_gateway_switcher_master.yaml
+
+
+
+2023-01-06 17:12:19.076 155917 INFO heat.engine.environment [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] on-delte-v2-lm47gfxm2pr4 Registered: [Template](User:True) file:///usr/lib/python2.7/site-packages/magnum/drivers/k8s_centos_v1/templates/kubeminion.yaml -> file:///usr/lib/python2.7/site-packages/magnum/drivers/k8s_centos_v1/templates/kubeminion.yaml
+
+
+2023-01-06 17:12:19.076 155917 INFO heat.engine.environment [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] on-delte-v2-lm47gfxm2pr4 Registered: [Template](User:True) file:///usr/lib/python2.7/site-packages/magnum/drivers/k8s_centos_v1/templates/kubemaster.yaml -> file:///usr/lib/python2.7/site-packages/magnum/drivers/k8s_centos_v1/templates/kubemaster.yaml
+
+
+
+2023-01-06 17:12:20.022 155917 INFO heat.engine.service [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] --------convergence---True---
+2023-01-06 17:12:20.022 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] ---template---<heat.engine.hot.template.HOTemplate20141016 object at 0x7fcbd02bdb50>----
+
+
+
+
+2023-01-06 17:12:20.022 155917 INFO heat.engine.service [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] --------convergence---True---
+2023-01-06 17:12:20.022 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] ---template---<heat.engine.hot.template.HOTemplate20141016 object at 0x7fcbd02bdb50>----
+2023-01-06 17:12:20.026 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] ---defn---<heat.engine.stk_defn.StackDefinition object at 0x7fcbcfdabd90>----
+
+
+
+
+2023-01-06 17:12:20.520 155908 INFO heat.engine.stack [req-ddff843c-7886-42a8-a610-b36d2b6ae7cf - - - - -] --------------self.thread_group_mgr: <heat.engine.service.ThreadGroupManager object at 0x7fcbd07dc450>----
+2023-01-06 17:12:20.648 155908 INFO heat.engine.stack [req-ddff843c-7886-42a8-a610-b36d2b6ae7cf - - - - -] Triggering resource 3701 for update
+2023-01-06 17:12:20.686 155921 INFO heat.engine.resource [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] creating NoneResource "extrouter" Stack "on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d" [d80f9a2d-65e2-4219-a485-9296e8d17cc1]
+2023-01-06 17:12:21.369 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] Triggering resource 3695 for update
+2023-01-06 17:12:21.417 155917 INFO heat.engine.resource [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] creating ServerGroup "master_nodes_server_group" Stack "on-delte-v2-lm47gfxm2pr4" [19dbd9b5-a2ba-42c3-8eb4-ce18f9ee8eaf]
+2023-01-06 17:12:21.651 155908 INFO heat.engine.stack [req-ddff843c-7886-42a8-a610-b36d2b6ae7cf - - - - -] Triggering resource 3705 for update
+2023-01-06 17:12:21.678 155908 INFO heat.engine.resource [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] creating NoneResource "private_network" Stack "on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d" [d80f9a2d-65e2-4219-a485-9296e8d17cc1]
+2023-01-06 17:12:21.781 155911 INFO heat.engine.resource [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] creating NoneResource "private_subnet" Stack "on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d" [d80f9a2d-65e2-4219-a485-9296e8d17cc1]
+2023-01-06 17:12:21.870 155921 INFO heat.engine.resource [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] creating NoneResource "extrouter_inside" Stack "on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d" [d80f9a2d-65e2-4219-a485-9296e8d17cc1]
+2023-01-06 17:12:21.880 155917 INFO heat.engine.resource [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] creating TemplateResource "network_switch" Stack "on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d" [d80f9a2d-65e2-4219-a485-9296e8d17cc1]
+2023-01-06 17:12:21.909 155917 INFO heat.engine.service [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] Creating stack on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d-network_switch-bgq5nou6ytcn
+
+
+
+
+
+2023-01-06 17:12:21.909 155917 INFO heat.engine.service [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] Creating stack on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d-network_switch-bgq5nou6ytcn
+2023-01-06 17:12:21.930 155917 INFO heat.engine.service [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] --------convergence---True---
+2023-01-06 17:12:21.931 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] ---template---<heat.engine.hot.template.HOTemplate20141016 object at 0x7fcbcfd36a50>----
+2023-01-06 17:12:21.932 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] ---defn---<heat.engine.stk_defn.StackDefinition object at 0x7fcbcfc85710>----
+2023-01-06 17:12:21.949 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] --------------self.id: ee5f35ae-8346-4947-9007-fa423ce7fa86----
+2023-01-06 17:12:21.949 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] --------------self.thread_group_mgr: <heat.engine.service.ThreadGroupManager object at 0x7fcbd07dc450>----
+2023-01-06 17:12:21.976 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] [on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d-network_switch-bgq5nou6ytcn(ee5f35ae-8346-4947-9007-fa423ce7fa86)] update traversal 40857fa2-d889-45f1-ac08-b41476603367 complete
+2023-01-06 17:12:21.977 155917 INFO heat.engine.stack [req-7788c1d7-e4c0-4e72-8ffb-088f94ead510 - admin - default default] Stack CREATE COMPLETE (on-delte-v2-lm47gfxm2pr4-network-gfk4bf3dl62d-network_switch-bgq5nou6ytcn): Stack CREATE completed successfully
+
+
+```
 
 
 
