@@ -710,6 +710,32 @@ To see the stack trace of this error execute with --v=5 or higher
 
 
 
+kubectl get nodes
+
+node not  ready
+
+```
+NetworkPluginNotReady message:docker: network plugin is not ready: cni config uninitialized
+
+
+
+kubectl describe node
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 用到的docker 镜像
 
 
