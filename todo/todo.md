@@ -6,14 +6,10 @@
 
 ### 本季度任务
 
-- 告警接口测试
+
+
 - 云管相关接口总耗时情况，及处理速度优化
-  - 
-- goncchi接口测试，pool is closed如何复现问题
-- 计算节点适配（gnocchi/snmp/ceilometer/redis）
-- 计算节点，gnocchi/ceilometer打包（rpm包）
-- 平台适配（ubuntu执行体节点适配）
-- 原生快照、增强型快照设计、开发、优化
+- 原生快照、增强型快照设计、开发、优化（第二季度）
 - 接口中文化
 - 
 
