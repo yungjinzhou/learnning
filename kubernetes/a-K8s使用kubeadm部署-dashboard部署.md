@@ -30,6 +30,23 @@ $ cat /etc/hosts
 10.0.0.8 node01
 ```
 
+配置nds
+
+/etc/resolve.conf
+
+```
+cat > /etc/resolve.conf << EOF
+nameserver 8.8.8.8
+nameserver 114.114.114.114
+EOF
+```
+
+
+
+
+
+
+
 禁用防火墙：
 
 ```shell
@@ -70,9 +87,98 @@ net.ipv4.ip_forward = 1
 执行如下命令使修改生效：
 
 ```shell
-$ modprobe br_netfilter
-$ sysctl -p /etc/sysctl.d/k8s.conf
+modprobe br_netfilter
+sysctl -p /etc/sysctl.d/k8s.conf
 ```
+
+
+
+配置yum源
+
+```
+cp /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.bak
+vim  /etc/yum.repos.d/CentOS-Base.repo
+```
+
+配置成aliyun的源
+
+```
+# CentOS-Base.repo
+#
+# The mirror system uses the connecting IP address of the client and the
+# update status of each mirror to pick mirrors that are updated to and
+# geographically close to the client.  You should use this for CentOS updates
+# unless you are manually picking other mirrors.
+#
+# If the mirrorlist= does not work for you, as a fall back you can try the 
+# remarked out baseurl= line instead.
+#
+#
+ 
+[base]
+name=CentOS-$releasever - Base - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/os/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/os/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/os/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#released updates 
+[updates]
+name=CentOS-$releasever - Updates - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/updates/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/updates/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/updates/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#additional packages that may be useful
+[extras]
+name=CentOS-$releasever - Extras - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/extras/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/extras/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/extras/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#additional packages that extend functionality of existing packages
+[centosplus]
+name=CentOS-$releasever - Plus - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/centosplus/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/centosplus/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/centosplus/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#contrib - packages by Centos Users
+[contrib]
+name=CentOS-$releasever - Contrib - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/contrib/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/contrib/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/contrib/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 时间同步
 
@@ -113,7 +219,7 @@ cat > /etc/docker/daemon.json << EOF
 EOF
 ```
 
-添加 yum 源
+添加 kubernetes.repo 源
 
 ```awk
 cat > /etc/yum.repos.d/kubernetes.repo << EOF 
@@ -612,8 +718,1073 @@ kubectl get clusterrolebinding login-on-dashboard-with-cluster-admin
 更新
 
 ```
-kubectl apply -f kubernetes-dashboard.yaml
+kubectl apply -f recommended.yaml
 ```
+
+
+
+
+
+## 三、dashboard-amd:v1.10.0中文部署步骤
+
+>搭建kubeadm1.13版本的k8s和 dashboard-amd64:v1.10.0（中文页面测试）
+
+### 3.1 基本环境
+
+我们这里准备两台`Centos7`的主机用于安装，后续节点可以根究需要添加即可：
+
+```shell
+$ cat /etc/hosts
+10.0.0.7 master
+10.0.0.8 node01
+```
+
+配置nds
+
+/etc/resolve.conf
+
+```
+cat > /etc/resolve.conf << EOF
+nameserver 8.8.8.8
+nameserver 114.114.114.114
+EOF
+```
+
+
+
+禁用防火墙：
+
+```shell
+systemctl stop firewalld
+systemctl disable firewalld
+```
+
+禁用SELINUX：
+
+```shell
+# 永久
+sed -i 's/enforcing/disabled/' /etc/selinux/config 
+
+# 临时
+setenforce 0
+```
+
+关闭swap
+
+```
+# 临时
+swapoff -a  
+
+# 永久
+sed -ri 's/.*swap.*/#&/' /etc/fstab
+```
+
+
+
+创建`/etc/sysctl.d/k8s.conf`文件，添加如下内容：
+
+```shell
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+```
+
+执行如下命令使修改生效：
+
+```shell
+modprobe br_netfilter
+sysctl -p /etc/sysctl.d/k8s.conf
+```
+
+
+
+配置yum源
+
+```
+cp /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.bak
+vim  /etc/yum.repos.d/CentOS-Base.repo
+```
+
+配置成aliyun的源
+
+```
+# CentOS-Base.repo
+#
+# The mirror system uses the connecting IP address of the client and the
+# update status of each mirror to pick mirrors that are updated to and
+# geographically close to the client.  You should use this for CentOS updates
+# unless you are manually picking other mirrors.
+#
+# If the mirrorlist= does not work for you, as a fall back you can try the 
+# remarked out baseurl= line instead.
+#
+#
+ 
+[base]
+name=CentOS-$releasever - Base - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/os/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/os/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/os/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#released updates 
+[updates]
+name=CentOS-$releasever - Updates - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/updates/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/updates/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/updates/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#additional packages that may be useful
+[extras]
+name=CentOS-$releasever - Extras - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/extras/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/extras/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/extras/$basearch/
+gpgcheck=1
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#additional packages that extend functionality of existing packages
+[centosplus]
+name=CentOS-$releasever - Plus - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/centosplus/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/centosplus/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/centosplus/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+ 
+#contrib - packages by Centos Users
+[contrib]
+name=CentOS-$releasever - Contrib - mirrors.aliyun.com
+failovermethod=priority
+baseurl=http://mirrors.aliyun.com/centos/$releasever/contrib/$basearch/
+        http://mirrors.aliyuncs.com/centos/$releasever/contrib/$basearch/
+        http://mirrors.cloud.aliyuncs.com/centos/$releasever/contrib/$basearch/
+gpgcheck=1
+enabled=0
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
+
+```
+
+
+
+
+
+时间同步
+
+```
+yum install ntpdate -y
+ntpdate time.windows.com
+```
+
+
+
+### 3.2 安装Docker
+
+安装docker
+
+```awk
+wget https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo -O /etc/yum.repos.d/docker-ce.repo 
+
+yum -y install docker-ce-18.06.1.ce-3.el7 
+
+systemctl enable docker && systemctl start docker 
+
+docker --version
+```
+
+添加阿里云YUM源
+
+设置仓库地址：[https://help.aliyun.com/docum...](https://link.segmentfault.com/?enc=I4FOWk77s%2Bj9vM%2B6dL5UWQ%3D%3D.EFn2hCzotXO61c1A59Drpmw0Z1CeF0kw483rXGDsbO0vUGhg1eKrGtUefI%2BJ7ChWpQFCrvO%2BRq%2FSjrWQpzOwsA%3D%3D)
+
+```bash
+cat > /etc/docker/daemon.json << EOF
+{ 
+  "registry-mirrors": ["https://xxx.mirror.aliyuncs.com"] 
+}
+EOF
+```
+
+添加 kubernetes.repo 源
+
+```awk
+cat > /etc/yum.repos.d/kubernetes.repo << EOF 
+[kubernetes] 
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64 
+enabled=1 
+gpgcheck=0 
+epo_gpgcheck=0 
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg 
+https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg 
+EOF
+```
+
+### 3.3 安装kubelet kubeadm kubectl
+
+```
+yum install -y kubelet-1.13.1-0 kubectl-1.13.1-0  kubeadm-1.13.1-0
+
+```
+
+
+
+### 3.4下载docker镜像
+
+```
+docker pull mirrorgooglecontainers/kube-apiserver:v1.13.1
+docker pull mirrorgooglecontainers/kube-controller-manager:v1.13.1
+docker pull mirrorgooglecontainers/kube-scheduler:v1.13.1
+docker pull mirrorgooglecontainers/kube-proxy:v1.13.1
+docker pull mirrorgooglecontainers/pause:3.1
+docker pull mirrorgooglecontainers/etcd:3.2.24
+docker pull coredns/coredns:1.2.6
+docker pull registry.cn-shenzhen.aliyuncs.com/cp_m/flannel:v0.10.0-amd64
+
+docker tag mirrorgooglecontainers/kube-apiserver:v1.13.1 k8s.gcr.io/kube-apiserver:v1.13.1
+docker tag mirrorgooglecontainers/kube-controller-manager:v1.13.1 k8s.gcr.io/kube-controller-manager:v1.13.1
+docker tag mirrorgooglecontainers/kube-scheduler:v1.13.1 k8s.gcr.io/kube-scheduler:v1.13.1
+docker tag mirrorgooglecontainers/kube-proxy:v1.13.1 k8s.gcr.io/kube-proxy:v1.13.1
+docker tag mirrorgooglecontainers/pause:3.1 k8s.gcr.io/pause:3.1
+docker tag mirrorgooglecontainers/etcd:3.2.24 k8s.gcr.io/etcd:3.2.24
+docker tag coredns/coredns:1.2.6 k8s.gcr.io/coredns:1.2.6
+docker tag registry.cn-shenzhen.aliyuncs.com/cp_m/flannel:v0.10.0-amd64 quay.io/coreos/flannel:v0.10.0-amd64
+
+docker rmi mirrorgooglecontainers/kube-apiserver:v1.13.1           
+docker rmi mirrorgooglecontainers/kube-controller-manager:v1.13.1  
+docker rmi mirrorgooglecontainers/kube-scheduler:v1.13.1           
+docker rmi mirrorgooglecontainers/kube-proxy:v1.13.1               
+docker rmi mirrorgooglecontainers/pause:3.1                        
+docker rmi mirrorgooglecontainers/etcd:3.2.24                      
+docker rmi coredns/coredns:1.2.6
+docker rmi registry.cn-shenzhen.aliyuncs.com/cp_m/flannel:v0.10.0-amd64
+docker pull registry.cn-qingdao.aliyuncs.com/wangxiaoke/kubernetes-dashboard-amd64:v1.10.0
+docker tag registry.cn-qingdao.aliyuncs.com/wangxiaoke/kubernetes-dashboard-amd64:v1.10.0 k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.0
+docker image rm registry.cn-qingdao.aliyuncs.com/wangxiaoke/kubernetes-dashboard-amd64:v1.10.0
+
+
+
+
+
+
+
+以下是传到harbor处理过程
+# 在外网机上执行
+docker tag k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.0 192.168.66.29:80/google_containers/kubernetes-dashboard-amd64:v1.10.0
+docker tag k8s.gcr.io/kube-proxy:v1.13.1 192.168.66.29:80/google_containers/kube-proxy:v1.13.1
+docker tag k8s.gcr.io/kube-scheduler:v1.13.1 192.168.66.29:80/google_containers/kube-scheduler:v1.13.1
+docker tag k8s.gcr.io/kube-apiserver:v1.13.1 192.168.66.29:80/google_containers/kube-apiserver:v1.13.1
+docker tag k8s.gcr.io/kube-controller-manager:v1.13.1 192.168.66.29:80/google_containers/kube-controller-manager:v1.13.1
+docker tag k8s.gcr.io/coredns:1.2.6 192.168.66.29:80/google_containers/coredns:1.2.6
+docker tag k8s.gcr.io/etcd:3.2.24 192.168.66.29:80/google_containers/etcd:3.2.24
+docker tag quay.io/coreos/flannel:v0.10.0-amd64 192.168.66.29:80/google_containers/flannel:v0.10.0-amd64
+docker tag k8s.gcr.io/pause:3.1 192.168.66.29:80/google_containers/pause:3.1
+
+
+
+docker push 192.168.66.29:80/google_containers/kubernetes-dashboard-amd64:v1.10.0
+docker push 192.168.66.29:80/google_containers/kube-proxy:v1.13.1
+docker push 192.168.66.29:80/google_containers/kube-scheduler:v1.13.1
+docker push 192.168.66.29:80/google_containers/kube-apiserver:v1.13.1
+docker push 192.168.66.29:80/google_containers/kube-controller-manager:v1.13.1
+docker push 192.168.66.29:80/google_containers/coredns:1.2.6
+docker push 192.168.66.29:80/google_containers/etcd:3.2.24
+docker push 192.168.66.29:80/google_containers/flannel:v0.10.0-amd64
+docker push 192.168.66.29:80/google_containers/pause:3.1
+
+
+
+# 在虚拟机上执行
+docker pull 192.168.66.29:80/google_containers/kubernetes-dashboard-amd64:v1.10.0
+docker pull 192.168.66.29:80/google_containers/kube-proxy:v1.13.1
+docker pull 192.168.66.29:80/google_containers/kube-scheduler:v1.13.1
+docker pull 192.168.66.29:80/google_containers/kube-apiserver:v1.13.1
+docker pull 192.168.66.29:80/google_containers/kube-controller-manager:v1.13.1
+docker pull 192.168.66.29:80/google_containers/coredns:1.2.6
+docker pull 192.168.66.29:80/google_containers/etcd:3.2.24
+docker pull 192.168.66.29:80/google_containers/flannel:v0.10.0-amd64
+docker pull 192.168.66.29:80/google_containers/pause:3.1
+
+
+docker tag 192.168.66.29:80/google_containers/kubernetes-dashboard-amd64:v1.10.0  k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.0
+docker tag 192.168.66.29:80/google_containers/kube-proxy:v1.13.1 k8s.gcr.io/kube-proxy:v1.13.1
+docker tag 192.168.66.29:80/google_containers/kube-scheduler:v1.13.1 k8s.gcr.io/kube-scheduler:v1.13.1
+docker tag 192.168.66.29:80/google_containers/kube-apiserver:v1.13.1 k8s.gcr.io/kube-apiserver:v1.13.1
+docker tag 192.168.66.29:80/google_containers/kube-controller-manager:v1.13.1 k8s.gcr.io/kube-controller-manager:v1.13.1
+docker tag 192.168.66.29:80/google_containers/coredns:1.2.6 k8s.gcr.io/coredns:1.2.6
+docker tag 192.168.66.29:80/google_containers/etcd:3.2.24 k8s.gcr.io/etcd:3.2.24
+docker tag 192.168.66.29:80/google_containers/flannel:v0.10.0-amd64  quay.io/coreos/flannel:v0.10.0-amd64
+docker tag 192.168.66.29:80/google_containers/pause:3.1  k8s.gcr.io/pause:3.1
+
+
+
+
+docker rmi 192.168.66.29:80/google_containers/kubernetes-dashboard-amd64:v1.10.0
+docker rmi 192.168.66.29:80/google_containers/kube-proxy:v1.13.1
+docker rmi 192.168.66.29:80/google_containers/kube-scheduler:v1.13.1
+docker rmi 192.168.66.29:80/google_containers/kube-apiserver:v1.13.1
+docker rmi 192.168.66.29:80/google_containers/kube-controller-manager:v1.13.1
+docker rmi 192.168.66.29:80/google_containers/coredns:1.2.6
+docker rmi 192.168.66.29:80/google_containers/etcd:3.2.24
+docker rmi 192.168.66.29:80/google_containers/flannel:v0.10.0-amd64
+docker rmi 192.168.66.29:80/google_containers/pause:3.1
+
+
+```
+
+
+
+### 3.5初始化k8s集群(master节点执行)
+
+```
+kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 10.0.0.5 --pod-network-cidr=10.244.0.0/16
+
+```
+
+
+
+### 3.6配置kubectl 命令行（master节点执行）
+
+```
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+```
+
+### 3.7 配置flannel
+
+kubectl apply -f kube-flannel.yaml
+
+如果/etc/cni/net.d/10-flannel.conflist没有，需要配置下(所有节点)
+
+```
+# kube-flannel.yaml
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: flannel
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/status
+    verbs:
+      - patch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: flannel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flannel
+subjects:
+- kind: ServiceAccount
+  name: flannel
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flannel
+  namespace: kube-system
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kube-flannel-cfg
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+data:
+  cni-conf.json: |
+    {
+      "name": "cbr0",
+      "plugins": [
+        {
+          "type": "flannel",
+          "delegate": {
+            "hairpinMode": true,
+            "isDefaultGateway": true
+          }
+        },
+        {
+          "type": "portmap",
+          "capabilities": {
+            "portMappings": true
+          }
+        }
+      ]
+    }
+  net-conf.json: |
+    {
+      "Network": "10.244.0.0/16",
+      "Backend": {
+        "Type": "vxlan"
+      }
+    }
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds-amd64
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: amd64
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: flannel
+      initContainers:
+      - name: install-cni
+        image: quay.io/coreos/flannel:v0.10.0-amd64
+        command:
+        - cp
+        args:
+        - -f
+        - /etc/kube-flannel/cni-conf.json
+        - /etc/cni/net.d/10-flannel.conflist
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.10.0-amd64
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds-arm64
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: arm64
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: flannel
+      initContainers:
+      - name: install-cni
+        image: quay.io/coreos/flannel:v0.10.0-arm64
+        command:
+        - cp
+        args:
+        - -f
+        - /etc/kube-flannel/cni-conf.json
+        - /etc/cni/net.d/10-flannel.conflist
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.10.0-arm64
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds-arm
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: arm
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: flannel
+      initContainers:
+      - name: install-cni
+        image: quay.io/coreos/flannel:v0.10.0-arm
+        command:
+        - cp
+        args:
+        - -f
+        - /etc/kube-flannel/cni-conf.json
+        - /etc/cni/net.d/10-flannel.conflist
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.10.0-arm
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds-ppc64le
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: ppc64le
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: flannel
+      initContainers:
+      - name: install-cni
+        image: quay.io/coreos/flannel:v0.10.0-ppc64le
+        command:
+        - cp
+        args:
+        - -f
+        - /etc/kube-flannel/cni-conf.json
+        - /etc/cni/net.d/10-flannel.conflist
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.10.0-ppc64le
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds-s390x
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: s390x
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: flannel
+      initContainers:
+      - name: install-cni
+        image: quay.io/coreos/flannel:v0.10.0-s390x
+        command:
+        - cp
+        args:
+        - -f
+        - /etc/kube-flannel/cni-conf.json
+        - /etc/cni/net.d/10-flannel.conflist
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      containers:
+      - name: kube-flannel
+        image: quay.io/coreos/flannel:v0.10.0-s390x
+        command:
+        - /opt/bin/flanneld
+        args:
+        - --ip-masq
+        - --kube-subnet-mgr
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
+```
+
+
+
+
+
+### 3.8 加入集群（node节点执行）
+
+```
+kubeadm join 10.0.0.5:6443 --token ku4h8g.yb3rdsk68jqmzf67 --discovery-token-ca-cert-hash sha256:dcb4516a99c0d5eaae7be5a5e8a9f189e46119e9d9e39aafbee8bfe03a7e86a2
+
+```
+
+
+
+### 3.9 配置dashboard-amd64:v1.10.0
+
+
+
+kubernetes-dashboard.yaml配置文件如下
+
+```
+# Copyright 2017 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ------------------- Dashboard Secret ------------------- #
+
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    k8s-app: kubernetes-dashboard
+  name: kubernetes-dashboard-certs
+  namespace: kube-system
+type: Opaque
+
+---
+# ------------------- Dashboard Service Account ------------------- #
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: kubernetes-dashboard
+  name: kubernetes-dashboard
+  namespace: kube-system
+
+---
+# ------------------- Dashboard Role & Role Binding ------------------- #
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubernetes-dashboard-minimal
+  namespace: kube-system
+rules:
+  # Allow Dashboard to create 'kubernetes-dashboard-key-holder' secret.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+  # Allow Dashboard to create 'kubernetes-dashboard-settings' config map.
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create"]
+  # Allow Dashboard to get, update and delete Dashboard exclusive secrets.
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["kubernetes-dashboard-key-holder", "kubernetes-dashboard-certs"]
+  verbs: ["get", "update", "delete"]
+  # Allow Dashboard to get and update 'kubernetes-dashboard-settings' config map.
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["kubernetes-dashboard-settings"]
+  verbs: ["get", "update"]
+  # Allow Dashboard to get metrics from heapster.
+- apiGroups: [""]
+  resources: ["services"]
+  resourceNames: ["heapster"]
+  verbs: ["proxy"]
+- apiGroups: [""]
+  resources: ["services/proxy"]
+  resourceNames: ["heapster", "http:heapster:", "https:heapster:"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubernetes-dashboard-minimal
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubernetes-dashboard-minimal
+subjects:
+- kind: ServiceAccount
+  name: kubernetes-dashboard
+  namespace: kube-system
+
+---
+# ------------------- Dashboard Deployment ------------------- #
+
+kind: Deployment
+apiVersion: apps/v1beta2
+metadata:
+  labels:
+    k8s-app: kubernetes-dashboard
+  name: kubernetes-dashboard
+  namespace: kube-system
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      k8s-app: kubernetes-dashboard
+  template:
+    metadata:
+      labels:
+        k8s-app: kubernetes-dashboard
+    spec:
+      containers:
+      - name: kubernetes-dashboard
+        image: k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.0
+        ports:
+        - containerPort: 8443
+          protocol: TCP
+        args:
+          - --auto-generate-certificates
+          # Uncomment the following line to manually specify Kubernetes API server Host
+          # If not specified, Dashboard will attempt to auto discover the API server and connect
+          # to it. Uncomment only if the default does not work.
+          # - --apiserver-host=http://my-address:port
+        volumeMounts:
+        - name: kubernetes-dashboard-certs
+          mountPath: /certs
+          # Create on-disk volume to store exec logs
+        - mountPath: /tmp
+          name: tmp-volume
+        livenessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /
+            port: 8443
+          initialDelaySeconds: 30
+          timeoutSeconds: 30
+      volumes:
+      - name: kubernetes-dashboard-certs
+        secret:
+          secretName: kubernetes-dashboard-certs
+      - name: tmp-volume
+        emptyDir: {}
+      serviceAccountName: kubernetes-dashboard
+      # Comment the following tolerations if Dashboard must not be deployed on master
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+
+---
+# ------------------- Dashboard Service ------------------- #
+
+kind: Service
+apiVersion: v1
+metadata:
+  labels:
+    k8s-app: kubernetes-dashboard
+  name: kubernetes-dashboard
+  namespace: kube-system
+spec:
+  ports:
+    - port: 443
+      nodePort: 30001
+      targetPort: 8443
+  type: NodePort
+  selector:
+    k8s-app: kubernetes-dashboard
+
+```
+
+
+
+查看是否创建成功
+
+```
+kubectl get pods --namespace=kube-system
+```
+
+
+
+创建kubernetes-dashboard用户
+
+```
+ kubectl create -f admin-user.yaml 
+```
+
+```
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: admin
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: admin
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    
+```
+
+
+
+### 3.10获取token/登录
+
+```
+kubectl describe secret $(kubectl get secret -n kube-system |grep admin|awk '{print $1}') -n kube-system|grep '^token'|awk '{print $2}'
+
+```
+
+
+
+
+
+
+
+
 
 
 
@@ -627,7 +1798,7 @@ kubectl apply -f kubernetes-dashboard.yaml
 
 ### 1. 节点 NotReady
 
-kubectl describe node 查看信息
+1.1 kubectl describe node 查看信息
 
 参考链接：https://komodor.com/learn/how-to-fix-kubernetes-node-not-ready-error/
 
@@ -646,6 +1817,49 @@ kubectl describe node 查看信息
 [root@k8s-master01 ~]# cat /etc/sysconfig/kubelet  KUBELET_EXTRA_ARGS="--fail-swap-on=false"
 
 ```
+
+查看coredns，状态一直ContainerCreating或者，可能是flannel没有配置好
+
+查看/etc/cni/net.d/10-flannel.conflist
+
+```
+{
+  "name": "cbr0",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "flannel",
+      "delegate": {
+        "hairpinMode": true,
+        "isDefaultGateway": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

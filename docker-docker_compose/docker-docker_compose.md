@@ -90,6 +90,9 @@ docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
 ```
 nsenter -n -t $( docker inspect -f {{.State.Pid}} xxxxxx)   xxxx改成容器名称或者id就行了
 # 可以利用宿主机命令，测试容器内的状况
+
+
+docker login 192.168.66.29 -u admin -p comleader@123
 ```
 
 
