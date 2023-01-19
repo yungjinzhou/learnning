@@ -884,6 +884,13 @@ yum install ntpdate -y
 ntpdate time.windows.com
 ```
 
+安装redis
+
+```javascript
+yum install epel-release vim gcc curl wget net-tools
+yum install -y redis.x86_64
+```
+
 
 
 ### 3.2 安装Docker
@@ -1044,7 +1051,7 @@ docker rmi 192.168.66.29:80/google_containers/pause:3.1
 ### 3.5初始化k8s集群(master节点执行)
 
 ```
-kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 10.0.0.5 --pod-network-cidr=10.244.0.0/16
+kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 192.168.230.41 --pod-network-cidr=10.244.0.0/16
 
 ```
 
@@ -1053,9 +1060,9 @@ kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 10.0.0.5
 ### 3.6配置kubectl 命令行（master节点执行）
 
 ```
-  mkdir -p $HOME/.kube
-  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 ```
 
@@ -1557,6 +1564,8 @@ kubeadm join 10.0.0.5:6443 --token ku4h8g.yb3rdsk68jqmzf67 --discovery-token-ca-
 
 
 kubernetes-dashboard.yaml配置文件如下
+
+kubectl apply -f /home/deploy/kubernetes-dashboard.yaml
 
 ```
 # Copyright 2017 The Kubernetes Authors.
