@@ -352,8 +352,11 @@ export no_proxy="localhost, 127.0.0.1, ::1"
 
 ```
 
-执行dd if=/dev/zero of=/home/junk_files， 把剩余空间全部占满之后
-执行rm -f /home/junk_files
+执行
+dd if=/dev/zero of=/home/junk_files
+， 把剩余空间全部占满之后
+执行
+rm -f /home/junk_files
 
 关机
 
@@ -811,4 +814,23 @@ qemu-img convert -c -O qcow2 CentOS-7-x86_64-GenericCloud1.qcow2 CentOS7k8sv1.13
 
 
 
+
+
+
+
+
+
+1. 原有需求讨论、整理
+2.页面优化设计讨论、整理
+3. k8s dashboardv2.0部署自动化
+4.测试dashbaord中文化：
+    4.1. 修改yaml文件env配置，无效；
+    4.2. 修改dashbaord版本v1.6.3，部署失败；
+    4.3. 降级到dashbaord-amd64:v1.10.0版本，部署成功，但是有部分接口报错；
+    4.4.  降级到dashbaord-amd64:v1.8.3版本，部署成功，但是有部分接口报错；
+    4.5. 降级k8s版本，到1.13.1,然后dashboard-amd64:v1.10.0,部署成功，界面展示正常，只是版本低，可能有些功能没有；"
+5.中文化k8s，镜像制作
+6.中文化k8s实现自动化
+7.中文化k8s脚本撰写、测试、yaml文件撰写，测试
+8.处理遇到的其他云的问题
 
