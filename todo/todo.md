@@ -357,14 +357,16 @@ export no_proxy="localhost, 127.0.0.1, ::1"
 
 ```
 
-执行dd if=/dev/zero of=/home/junk_files， 把剩余空间全部占满之后
-执行rm -f /home/junk_files
+执行
+dd if=/dev/zero of=/home/junk_files
+， 把剩余空间全部占满之后
+执行
+rm -f /home/junk_files
 
 关机
 
 # 压缩镜像
 qemu-img convert -c -O qcow2 CentOS-7-x86_64-GenericCloud.qcow2 CentOS7v6.qcow2
-
 ```
 
 
@@ -746,19 +748,6 @@ virsh dumpxml domain-id
 
 
 
-```
-openstack endpoint create --region RegionOne share public http://192.168.232.107:8786/v1/%\(tenant_id\)s
-openstack endpoint create --region RegionOne   share internal http://192.168.232.107:8786/v1/%\(tenant_id\)s
-openstack endpoint create --region RegionOne   share admin http://192.168.232.107:8786/v1/%\(tenant_id\)s
-openstack endpoint create --region RegionOne   sharev2 public http://192.168.232.107:8786/v2/%\(tenant_id\)s
-openstack endpoint create --region RegionOne   sharev2 internal http://192.168.232.107:8786/v2/%\(tenant_id\)s
-openstack endpoint create --region RegionOne   sharev2 admin http://192.168.232.107:8786/v2/%\(tenant_id\
-```
-
-
-
-
-
 
 
 ### manum相关问题
@@ -803,45 +792,6 @@ http://192.168.66.33/guoqiuxia/MCS-horizon/-/archive/master/MCS-horizon-master.t
 
 生产云上有这两个虚拟机，之前用来制作执行体镜像的，gitlab-runner调试好了，可以迁上去，x86:192.168.67.45  arm：192.168.67.146
 
-
-
-
-
-
-
-环境230.104上测试
-
-使用模板
-
-centos7k8stemplate01
-
-创建cluster名称
-
-clustertest01
-
-失败：报错信息
-
-```
-(pymysql.err.OperationalError) (1213, u'Deadlock: wsrep aborted transaction') (Background on this error at: http://sqlalche.me/e/e3q8)
-```
-
-设置mysql最大连接数151到1024重新测试
-
-
-
-
-
-压缩镜像
-
-
-
-```
-然后执行dd if=/dev/zero of=/home/junk_files， 把剩余空间全部占满之后执行rm -f /home/junk_files
-最后再关机压缩一下镜像
-
-qemu-img convert -c -O qcow2 CentOS-7-x86_64-GenericCloud1.qcow2 CentOS7k8sv1.13.qcow2
-
-```
 
 
 

@@ -50,8 +50,8 @@ EOF
 禁用防火墙：
 
 ```shell
-$ systemctl stop firewalld
-$ systemctl disable firewalld
+systemctl stop firewalld
+systemctl disable firewalld
 ```
 
 禁用SELINUX：
@@ -79,9 +79,12 @@ sed -ri 's/.*swap.*/#&/' /etc/fstab
 创建`/etc/sysctl.d/k8s.conf`文件，添加如下内容：
 
 ```shell
+cat > /etc/sysctl.d/k8s.conf << EOF
 net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
+EOF
+
 ```
 
 执行如下命令使修改生效：
@@ -170,6 +173,12 @@ gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
 
 
 
+```
+yum install -y vim wget curl net-tools epel-rel
+ease
+
+```
+
 
 
 
@@ -243,12 +252,31 @@ yum install -y kubelet-1.18.0 kubeadm-1.18.0 kubectl-1.18.0
 systemctl enable kubelet
 ```
 
+配置swap禁用
+
+```
+ cat /etc/sysconfig/kubelet
+ 
+ KUBELET_EXTRA_ARGS="--fail-swap-on=false"
+ 
+ 
+ 
+ sudo swapoff -a
+```
+
+
+
+
+
 ### 1.5 部署Kubenetes Master
 
 在Master节点执行
 
 ```apache
-kubeadm init --apiserver-advertise-address=10.206.0.15 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+kubeadm init --apiserver-advertise-address=10.0.0.9 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+
 ```
 
 得到返回值，其中有如下内容token
@@ -303,6 +331,41 @@ kubectl apply -f kube-flannel.yml
 
 
 
+查看coredns，状态一直ContainerCreating或者，可能是flannel没有配置好
+
+查看/etc/cni/net.d/10-flannel.conflist
+
+```
+{
+  "name": "cbr0",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "flannel",
+      "delegate": {
+        "hairpinMode": true,
+        "isDefaultGateway": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+
+```
+
+
+
+
+
+
+
+
+
 
 
 #### 1.7.1 注意
@@ -339,6 +402,10 @@ https://github.com/containernetworking/plugins/releases/tag/v0.3.0
 下载一个cni-plugins-linux-amd64-v0.3.0.tgz
 然后将其解压在/opt/cni/bin下就可以了。
 ```
+
+
+
+
 
 
 
@@ -426,7 +493,7 @@ Dashboard 的 GitHub 地址：https://github.com/kubernetes/dashboard
 #### 2.4.1 在线执行安装recommended
 
 ```
-$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
 
 
 以下是console日志
@@ -725,6 +792,46 @@ kubectl apply -f recommended.yaml
 
 
 
+### 2.11 涉及到的docker镜像
+
+```
+registry.aliyuncs.com/google_containers/pause:3.2
+registry.aliyuncs.com/google_containers/coredns:1.6.7
+
+quay.io/coreos/flannel:v0.14.0
+flannel/flannel-cni-plugin:v1.1.2
+flannel/flannel:v0.20.2
+
+registry.aliyuncs.com/google_containers/etcd:3.4.3-0
+
+k8s.gcr.io/kube-scheduler-amd64:v1.10.0
+registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.0
+
+k8s.gcr.io/kube-controller-manager-amd64:v1.10.0
+registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.0
+
+k8s.gcr.io/kube-apiserver-amd64:v1.10.0
+registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.0
+
+k8s.gcr.io/kube-proxy-amd64:v1.10.0
+registry.aliyuncs.com/google_containers/kube-proxy:v1.18.0
+
+kubernetesui/dashboard:v2.0.2
+kubernetesui/metrics-scraper:v1.0.4
+
+k8s.gcr.io/heapster-amd64:v1.4.2
+k8s.gcr.io/heapster-grafana-amd64:v4.4.3
+k8s.gcr.io/heapster-influxdb-amd64:v1.3.3
+
+
+```
+
+
+
+
+
+
+
 ## 三、dashboard-amd:v1.10.0中文部署步骤
 
 >搭建kubeadm1.13版本的k8s和 dashboard-amd64:v1.10.0（中文页面测试）
@@ -884,6 +991,13 @@ yum install ntpdate -y
 ntpdate time.windows.com
 ```
 
+安装redis
+
+```javascript
+yum install epel-release vim gcc curl wget net-tools
+yum install -y redis.x86_64
+```
+
 
 
 ### 3.2 安装Docker
@@ -910,6 +1024,7 @@ cat > /etc/docker/daemon.json << EOF
   "registry-mirrors": ["https://xxx.mirror.aliyuncs.com"] 
 }
 EOF
+
 ```
 
 添加 kubernetes.repo 源
@@ -925,6 +1040,7 @@ epo_gpgcheck=0
 gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg 
 https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg 
 EOF
+
 ```
 
 ### 3.3 安装kubelet kubeadm kubectl
@@ -1044,7 +1160,7 @@ docker rmi 192.168.66.29:80/google_containers/pause:3.1
 ### 3.5初始化k8s集群(master节点执行)
 
 ```
-kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 10.0.0.5 --pod-network-cidr=10.244.0.0/16
+kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 192.168.230.41 --pod-network-cidr=10.244.0.0/16
 
 ```
 
@@ -1053,9 +1169,9 @@ kubeadm init --kubernetes-version=v1.13.1 --apiserver-advertise-address 10.0.0.5
 ### 3.6配置kubectl 命令行（master节点执行）
 
 ```
-  mkdir -p $HOME/.kube
-  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 ```
 
@@ -1558,6 +1674,8 @@ kubeadm join 10.0.0.5:6443 --token ku4h8g.yb3rdsk68jqmzf67 --discovery-token-ca-
 
 kubernetes-dashboard.yaml配置文件如下
 
+kubectl apply -f /home/deploy/kubernetes-dashboard.yaml
+
 ```
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -1777,14 +1895,6 @@ metadata:
 kubectl describe secret $(kubectl get secret -n kube-system |grep admin|awk '{print $1}') -n kube-system|grep '^token'|awk '{print $2}'
 
 ```
-
-
-
-
-
-
-
-
 
 
 
@@ -2484,64 +2594,4 @@ spec:
 ```
 
 
-
-### 5. 涉及到的docker镜像
-
-
-
-```
-registry.aliyuncs.com/google_containers/pause:3.2
-k8s.gcr.io/pause-amd64:3.1
-cnych/pause-amd64:3.1
-k8s.gcr.io/k8s-dns-kube-dns-amd64:1.14.8
-cnych/k8s-dns-kube-dns-amd64:1.14.8
-k8s.gcr.io/k8s-dns-sidecar-amd64:1.14.8
-cnych/k8s-dns-sidecar-amd64:1.14.8
-k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64:1.14.8
-cnych/k8s-dns-dnsmasq-nanny-amd64:1.14.8
-quay.io/coreos/flannel:v0.10.0-amd64
-cnych/flannel:v0.10.0-amd64
-k8s.gcr.io/etcd-amd64:3.1.12
-cnych/etcd-amd64:3.1.12
-cnych/kube-scheduler-amd64:v1.10.0
-k8s.gcr.io/kube-scheduler-amd64:v1.10.0
-k8s.gcr.io/kube-controller-manager-amd64:v1.10.0
-cnych/kube-controller-manager-amd64:v1.10.0
-k8s.gcr.io/kube-apiserver-amd64:v1.10.0
-cnych/kube-apiserver-amd64:v1.10.0
-k8s.gcr.io/kube-proxy-amd64:v1.10.0
-cnych/kube-proxy-amd64:v1.10.0
-registry.aliyuncs.com/google_containers/etcd:3.4.3-0
-registry.aliyuncs.com/google_containers/coredns:1.6.7
-registry.aliyuncs.com/google_containers/pause:3.2
-registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.0
-registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.0
-registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.0
-registry.aliyuncs.com/google_containers/kube-proxy:v1.18.0
-kubernetesui/dashboard:v2.0.2
-quay.io/coreos/flannel:v0.14.0
-rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0
-rancher/mirrored-flannelcni-flannel:v0.19.2
-k8s.gcr.io/heapster-amd64:v1.4.2
-cnych/heapster-amd64:v1.4.2
-k8s.gcr.io/heapster-grafana-amd64:v4.4.3
-cnych/heapster-grafana-amd64:v4.4.3
-k8s.gcr.io/heapster-influxdb-amd64:v1.3.3
-cnych/heapster-influxdb-amd64:v1.3.3
-k8s.gcr.io/pause-amd64:3.1
-cnych/pause-amd64:3.1
-cnych/k8s-dns-kube-dns-amd64:1.14.8
-k8s.gcr.io/kubernetes-dashboard-amd64:v1.8.3
-cnych/kubernetes-dashboard-amd64:v1.8.3
-k8s.gcr.io/kube-proxy-amd64:v1.10.0
-cnych/kube-proxy-amd64:v1.10.0
-registry.aliyuncs.com/google_containers/coredns:1.6.7
-registry.aliyuncs.com/google_containers/pause:3.2
-kubernetesui/metrics-scraper:v1.0.4
-kubernetesui/dashboard:v2.0.2
-quay.io/coreos/flannel:v0.14.0
-rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0
-rancher/mirrored-flannelcni-flannel:v0.19.2
-
-```
 
