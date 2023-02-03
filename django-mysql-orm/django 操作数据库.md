@@ -17,7 +17,7 @@
 node_info = NodeInfo.objects.get(name=host_name)
 node_info.name  # 取出某一项数据
 
-2. 
+2. 取出第一条数据
 node_data = NodeInfo.objects.filter(id=node_id).values().first()
 
 3.
@@ -32,6 +32,12 @@ data_dict[t] = {data.source_tag: data.source_usage for data in d.all()}
 >>> u = User.objects.get(id=1)  
 >>> u_dict = model_to_dict(u)  
 
+
+多个QuerySet对象,使用循环解析成字典
+hot_data_obj = model.objects.filter(xxxxx)
+for obj in hot_data_obj.values():
+      target_dict = obj
+      
 http://www.chenxm.cc/article/350.html
 ```
 
