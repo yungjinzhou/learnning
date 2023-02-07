@@ -39,6 +39,17 @@ for obj in hot_data_obj.values():
       target_dict = obj
       
 http://www.chenxm.cc/article/350.html
+
+
+保存
+hot_data_obj = HotDataStore.objects.filter(uuid=target_uuid, resource_type=resource_type)[0]
+hot_data_obj.name = target_name
+hot_data_obj.save()
+
+
+
+
+
 ```
 
 
