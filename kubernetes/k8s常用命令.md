@@ -91,7 +91,7 @@ kubectl config use-context magedu@kubernetes
 kubectl create role -h   
 kubectl create role pods-reader --verb=get,list,watch --resource=pods --dry-run -o yaml #干跑模式查看role的定义
 
-# 角色帮定操作
+# 角色绑定操作
 kubectl create rolebinding -h 
 kubectl describe rolebinding magedu-read-pods #查看角色绑定的信息，这里可以看到user：magedu绑定到了pods-reader这个角色上
 
@@ -115,5 +115,17 @@ kubectl exec -n ingress-nginx -it nginx-ingress-controller-6bd7c597cb-6pchv -- /
 
 #查看k8s支持的存储类型
 kubectl explain pod.spec.volumes 
+
+
+给node打标签
+label 是 key-value 对，各种资源都可以设置 label，灵活添加各种自定义属性。比如执行如下命令标注 k8s-node1 是配置了 SSD 的节点。
+
+kubectl label node k8s-node1 disktype=ssd
+然后通过 kubectl get node --show-labels 查看节点的 label。
+
+yml文件里的
+在 Pod 模板的 spec 里通过 nodeSelector 指定将此 Pod 部署到具有 label disktype=ssd 的 Node 上。
+
+
 ```
 
