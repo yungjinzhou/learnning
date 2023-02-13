@@ -71,6 +71,26 @@ window.onload = function(){
 
 
 
+##### 列表添加数据位置
+
+```
+data: {
+   persons: [
+   {id:'001', name: "马冬梅", age: 19, sex: '女'},
+   {id:'00', name: "马冬梅1", age: 12, sex: '女'},
+   {id:'003', name: "马冬梅2", age: 23, sex: '男'},
+   {id:'004', name: "马冬梅3", age: 26, sex: '女'},    
+   ],
+    filPersons: []
+}
+methods:{
+  add(){
+  const p = {id:'005', name: "马冬梅4", age: 26, sex: '女'}
+  this.persons.unshift(p) // 添加到列表第一个
+  this.person.push(p) // 添加到列表最后
+  }
+```
+
 
 
 ### Vue.js模板语法
@@ -172,6 +192,42 @@ var vm = new Vue({
 })
 ```
 
+##### 过滤列表
+
+页面过滤框
+
+```
+data: {
+   keyword: '', // 过滤name
+   sortType:0, //0原顺序  1降序   2 升序
+   persons: [
+   {id:'001', name: "马冬梅", age: 19, sex: '女'},
+   {id:'00', name: "马冬梅1", age: 12, sex: '女'},
+   {id:'003', name: "马冬梅2", age: 23, sex: '男'},
+   {id:'004', name: "马冬梅3", age: 26, sex: '女'},    
+   ],
+    filPersons: []
+}
+computed:{
+  filPersons() {
+    const arr = this.persons.filter((p)=>{
+      return p.name.indexOf(this.keyword) !== -1
+    })
+    //判断一下是否需要排序
+    if(this.sortType){
+      arr.sort((p1,p2)=>{
+        return this.sortType === 1 ? p2.age-p1.age : p1.age-p2.age
+      })
+    }
+    return arr
+  }
+}
+```
+
+
+
+
+
 #### 侦听属性
 
 侦听属性的作用是侦听某属性值的变化，从而做相应的操作，侦听属性是一个对象，它的键是要监听的对象或者变量，值一般是函数,当你侦听的元素发生变化时，需要执行的函数，这个函数有两个形参，第一个是当前值，第二个是变化后的值。
@@ -195,6 +251,33 @@ window.onload = function(){
         }
     });
 }
+```
+
+##### 过滤列表
+
+```
+data: {
+   keyword: '', // 过滤name
+   sortType:0, //0原顺序  1降序   2 升序
+   persons: [
+   {id:'001', name: "马冬梅", age: 19, sex: '女'},
+   {id:'00', name: "马冬梅1", age: 12, sex: '女'},
+   {id:'003', name: "马冬梅2", age: 23, sex: '男'},
+   {id:'004', name: "马冬梅3", age: 26, sex: '女'},    
+   ],
+   filPersons: []
+},
+watch:{
+  keyword:{
+    immediate: true,
+    handler(val){
+      this.filPersons = this.persons.filter((p)=>{
+        return p.name.indexOf(val) !== -1
+      })
+    }
+  }
+}
+
 ```
 
 
@@ -448,7 +531,7 @@ var example1 = new Vue({
 
 ### 事件处理
 
-#### 事件绑定方法
+#### 事件绑定方法v-on
 
 可以用 v-on 指令监听 DOM 事件，并在触发时运行一些 JavaScript 代码，事件的处理，简单的逻辑可以写在指令中，复杂的需要在vue对象的methods属性中指定处理函数。
 
@@ -511,9 +594,13 @@ var example2 = new Vue({
 
 
 
-### 表单输入绑定
+### 表单输入绑定v-model
 
 可以用 v-model 指令在表单 <input> 及 <textarea> 元素上创建双向数据绑定。它会根据控件类型自动选取正确的方法来更新元素
+
+
+
+
 
 #### 单行文本框
 
@@ -537,6 +624,7 @@ var example2 = new Vue({
 ```
 <input type="checkbox" id="checkbox" v-model="checked">
 <label for="checkbox">{{ checked }}</label>
+# label的作用是聚焦，点击checked（任意字符串）和点击输入框，都会定位到输入框中
 ```
 
 多个复选框，绑定到同一个数组：
@@ -587,7 +675,7 @@ new Vue({
 
 #### 下拉框
 
-```
+```vue
 <div id="example-5">
   <select v-model="selected">
     <option disabled value="">请选择</option>
@@ -606,6 +694,25 @@ new Vue({
   }
 })
 ```
+
+#### 修饰符
+
+lazy: 失去焦点在收集数据
+number: 输入字符串转换为有效的数字
+trim: 输入首尾空格过滤
+
+```vue
+其他信息：<textarea v-model.lazy="userinfo.other"></textarea>
+
+年龄：<input type="number" v-model.number="userinfo.age"> // 输入框限制输入数字，同时vue数据转换为数字
+
+账号： <input type="text" v-model.trim="userinfo.account">
+
+```
+
+
+
+
 
 
 
