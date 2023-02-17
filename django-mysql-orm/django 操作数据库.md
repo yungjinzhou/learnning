@@ -108,7 +108,28 @@ python manage.py migrate
 
 
 
+## 3.迁移时报表已存在迁移失败
 
+
+
+
+
+```
+把这个表单独迁移
+python manage.py migrate goods --fake
+然后再迁移所有的表
+python manage.py migrate
+
+
+由于手动删除数据库表等操作，导致migration与实际table不一致，–fake 不会执行sql操作，只是对migration做标记，生成django_migrations表的内容。 使migration与table重新一致
+
+
+
+```
+
+
+
+参考链接：https://blog.csdn.net/qq_38992249/article/details/116828497
 
 
 
