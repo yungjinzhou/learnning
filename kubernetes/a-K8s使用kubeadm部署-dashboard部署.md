@@ -273,9 +273,12 @@ systemctl enable kubelet
 在Master节点执行
 
 ```apache
+kubeadm init --apiserver-advertise-address=10.0.0.9 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+# 未替换image repostory或者image镜像没有在本地时，可以用aliyun仓库
+
 kubeadm init --apiserver-advertise-address=10.0.0.9 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
-
-
 
 ```
 
@@ -612,6 +615,23 @@ kubectl get pod -n kubernetes-dashboard
 
 #Step 7: 重启 pod
 kubectl delete pod kubernetes-dashboard-7b5bf5d559-gn4ls  -n kubernetes-dashboard
+
+
+
+
+
+sudo kubectl apply -f /home/deploy/recommended.yaml
+local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
+sudo mkdir key && cd key
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
+sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
+sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
 ```
 
 执行完成之后，再次访问点开高级之后，有个继续前往的链接，点击即可：
@@ -1963,6 +1983,479 @@ kubectl describe secret $(kubectl get secret -n kube-system |grep admin|awk '{pr
 
 
 
+## 四、高可用集群搭建
+
+
+
+配置hostname
+
+```
+hostnamectl set-hostname k8s-master01
+
+hostnamectl set-hostname k8s-master02
+
+hostnamectl set-hostname k8s-master03
+
+hostnamectl set-hostname  k8s-node01
+
+```
+
+
+
+配置hosts
+
+```
+cat > /etc/hosts << EOF
+10.22.10.199 k8s-master01
+10.22.10.80 k8s-master02
+10.22.10.86 k8s-master03
+10.22.10.137 k8s-node01
+127.0.0.1   localhost
+EOF
+
+```
+
+配置网络
+
+```
+export proxy="http://192.168.66.77:3128"
+export http_proxy=$proxy
+export https_proxy=$proxy
+export ftp_proxy=$proxy
+export no_proxy="localhost, 127.0.0.1, ::1"
+```
+
+
+
+禁用防火墙
+
+关闭selinux
+
+关闭swap分区
+
+时间同步
+
+配置ulimt
+
+```
+ulimit -SHn 65535
+```
+
+配置内核参数
+
+```
+[root@localhost ~]# cat >> /etc/sysctl.d/k8s.conf << EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+vm.swappiness=0
+EOF
+[root@localhost ~]# sysctl -p
+```
+
+
+
+
+
+内核升级
+
+```
+wget https://cbs.centos.org/kojifiles/packages/kernel/4.9.220/37.el7/x86_64/kernel-4.9.220-37.el7.x86_64.rpm
+
+rpm -ivh kernel-4.9.220-37.el7.x86_64.rpm
+
+reboot
+
+uname -r
+```
+
+
+
+
+
+安装ipvs
+
+```
+yum install ipvsadm ipset sysstat conntrack libseccomp -y
+```
+
+加载模块
+
+```
+cat > /etc/sysconfig/modules/ipvs.modules <<EOF
+#!/bin/bash
+modprobe -- ip_vs
+modprobe -- ip_vs_rr
+modprobe -- ip_vs_wrr
+modprobe -- ip_vs_sh
+modprobe -- nf_conntrack_ipv4
+modprobe -- ip_tables
+modprobe -- ip_set
+modprobe -- xt_set
+modprobe -- ipt_set
+modprobe -- ipt_rpfilter
+modprobe -- ipt_REJECT
+modprobe -- ipip
+EOF
+
+```
+
+
+
+注意：在内核4.19版本nf_conntrack_ipv4已经改为nf_conntrack
+
+配置重启自动加载
+
+```
+chmod 755 /etc/sysconfig/modules/ipvs.modules && bash /etc/sysconfig/modules/ipvs.modules && lsmod | grep -e ip_vs -e nf_conntrack
+```
+
+
+
+
+
+安装doker-ce
+
+
+
+安装kubernetes
+
+
+
+集群高可用
+
+```
+yum install keepalived haproxy -y
+```
+
+
+
+
+
+配置haproxy.cfg
+
+```
+#---------------------------------------------------------------------
+# Global settings
+#---------------------------------------------------------------------
+global
+    # to have these messages end up in /var/log/haproxy.log you will
+    # need to:
+    #
+    # 1) configure syslog to accept network log events.  This is done
+    #    by adding the '-r' option to the SYSLOGD_OPTIONS in
+    #    /etc/sysconfig/syslog
+    #
+    # 2) configure local2 events to go to the /var/log/haproxy.log
+    #   file. A line like the following can be added to
+    #   /etc/sysconfig/syslog
+    #
+    #    local2.*                       /var/log/haproxy.log
+    #
+    log         127.0.0.1 local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+    # turn on stats unix socket
+    stats socket /var/lib/haproxy/stats
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#---------------------------------------------------------------------
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option http-server-close
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 3000
+#---------------------------------------------------------------------
+# kubernetes apiserver frontend which proxys to the backends
+#---------------------------------------------------------------------
+frontend kubernetes
+    mode                 tcp
+    bind                 *:16443
+    option               tcplog
+    default_backend      kubernetes-apiserver
+#---------------------------------------------------------------------
+# round robin balancing between the various backends
+#---------------------------------------------------------------------
+backend kubernetes-apiserver
+    mode        tcp
+    balance     roundrobin
+    server  k8s-master01 10.22.10.199:6443 check
+    server  k8s-master02 10.22.10.80:6443 check
+    server  k8s-master03 10.22.10.86:6443 check
+
+```
+
+
+
+配置keepalived.conf
+
+master01
+
+```
+[root@k8s-master01 ~]# vim /etc/keepalived/keepalived.conf
+! Configuration File for keepalived
+global_defs {
+   notification_email {
+     acassen@firewall.loc
+     failover@firewall.loc
+     sysadmin@firewall.loc
+   }
+   notification_email_from Alexandre.Cassen@firewall.loc
+   smtp_server 127.0.0.1
+   smtp_connect_timeout 30
+   router_id LVS_DEVEL
+   vrrp_skip_check_adv_addr
+   vrrp_garp_interval 0
+   vrrp_gna_interval 0
+}
+# 定义脚本
+vrrp_script check_apiserver {
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 2
+    weight -5
+    fall 3
+    rise 2
+}
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    virtual_router_id 51
+    priority 100
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass comleader@123
+    }
+    virtual_ipaddress {
+    10.22.10.254
+    }
+    # 调用脚本
+    #track_script {
+    #    check_apiserver
+    #}
+}
+```
+
+
+
+master2
+
+```
+[root@k8s-master01 ~]# vim /etc/keepalived/keepalived.conf
+! Configuration File for keepalived
+global_defs {
+   notification_email {
+     acassen@firewall.loc
+     failover@firewall.loc
+     sysadmin@firewall.loc
+   }
+   notification_email_from Alexandre.Cassen@firewall.loc
+   smtp_server 127.0.0.1
+   smtp_connect_timeout 30
+   router_id LVS_DEVEL
+   vrrp_skip_check_adv_addr
+   vrrp_garp_interval 0
+   vrrp_gna_interval 0
+}
+# 定义脚本
+vrrp_script check_apiserver {
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 2
+    weight -5
+    fall 3
+    rise 2
+}
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    virtual_router_id 51
+    priority 99
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass comleader@123
+    }
+    virtual_ipaddress {
+    10.22.10.254
+    }
+    # 调用脚本
+    #track_script {
+    #    check_apiserver
+    #}
+}
+```
+
+
+
+master3
+
+```
+[root@k8s-master01 ~]# vim /etc/keepalived/keepalived.conf
+! Configuration File for keepalived
+global_defs {
+   notification_email {
+     acassen@firewall.loc
+     failover@firewall.loc
+     sysadmin@firewall.loc
+   }
+   notification_email_from Alexandre.Cassen@firewall.loc
+   smtp_server 127.0.0.1
+   smtp_connect_timeout 30
+   router_id LVS_DEVEL
+   vrrp_skip_check_adv_addr
+   vrrp_garp_interval 0
+   vrrp_gna_interval 0
+}
+# 定义脚本
+vrrp_script check_apiserver {
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 2
+    weight -5
+    fall 3
+    rise 2
+}
+vrrp_instance VI_1 {
+    state MASTER
+    interface eth0
+    virtual_router_id 51
+    priority 98
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass comleader@123
+    }
+    virtual_ipaddress {
+    10.22.10.254
+    }
+    # 调用脚本
+    #track_script {
+    #    check_apiserver
+    #}
+}
+
+```
+
+
+
+健康检查脚本
+
+```
+[root@k8s-master01 ~]# vim /etc/keepalived/check-apiserver.sh
+#!/bin/bash
+function check_apiserver(){
+ for ((i=0;i<5;i++))
+ do
+  apiserver_job_id=${pgrep kube-apiserver}
+  if [[ ! -z ${apiserver_job_id} ]];then
+   return
+  else
+   sleep 2
+  fi
+  apiserver_job_id=0
+ done
+}
+# 1->running    0->stopped
+check_apiserver
+if [[ $apiserver_job_id -eq 0 ]];then
+ /usr/bin/systemctl stop keepalived
+ exit 1
+else
+ exit 0
+fi
+```
+
+
+
+启动
+
+```
+systemctl enable --now keepalived haproxy
+systemctl start keepalived haproxy
+systemctl status keepalived haproxy
+
+```
+
+
+
+```
+cat >> kubeadm.yaml <<EOF
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+kubernetesVersion: v1.18.0
+imageRepository: k8s.gcr.io
+controlPlaneEndpoint: "10.22.10.254:16443"
+networking:
+  dnsDomain: cluster.local
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/12
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+featureGates:
+  SupportIPVSProxyMode: true
+mode: ipvs
+EOF
+```
+
+
+
+```
+kubeadm init --config kubeadm.yaml --upload-certs
+```
+
+
+
+
+
+```
+kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-token-ca-cert-hash sha256:3130fea56b3ab36ea8bb606a26da6d049c51226a1e862ce59ff9d0ab0f61960b --control-plane --certificate-key fb90dca1614c9483aeb962de3972bc3ffae6b1d472eabc640ca1bf94f7d9a17d
+
+    
+    
+    
+kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-token-ca-cert-hash sha256:3130fea56b3ab36ea8bb606a26da6d049c51226a1e862ce59ff9d0ab0f61960b
+```
+
+
+
+
+
+
+
+
+
+
+
+```
+
+kubeadm init  --control-plane-endpoint 192.168.230.40:16443 --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+kubeadm init  --control-plane-endpoint 10.22.10.254:16443 --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+kubeadm init  --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+
+kubeadm init  --control-plane-endpoint 10.22.10.254:16443 --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16 --upload-certs
+```
 
 
 
@@ -1975,7 +2468,14 @@ kubectl describe secret $(kubectl get secret -n kube-system |grep admin|awk '{pr
 
 
 
-## 附录及配置文件
+
+
+
+
+
+
+
+## 末、附录及配置文件
 
 
 
@@ -2592,6 +3092,8 @@ spec:
           name: kube-flannel-cfg
 
 ```
+
+
 
 
 

@@ -261,7 +261,7 @@ data: {
    sortType:0, //0原顺序  1降序   2 升序
    persons: [
    {id:'001', name: "马冬梅", age: 19, sex: '女'},
-   {id:'00', name: "马冬梅1", age: 12, sex: '女'},
+   {id:'002', name: "马冬梅1", age: 12, sex: '女'},
    {id:'003', name: "马冬梅2", age: 23, sex: '男'},
    {id:'004', name: "马冬梅3", age: 26, sex: '女'},    
    ],
