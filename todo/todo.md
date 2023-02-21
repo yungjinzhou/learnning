@@ -264,15 +264,16 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 - k8s界面问题
   - 非完全中文化，未处理，看是否升级及以后处理
-  - 如何运行pod容器，或如何查看dashobar代码，定制dashboard镜像
+  - 如何运行pod容器，或如何查看dashobar代码，定制dashboard镜像（kubernetes-dashboard二次开发）
   
   
   
 - - k8s问题
   - 通过apiserver访问dashboard
-  - prometheus监控部署调研
-  - k8s挂载卷问题
-  - k8s多master高可用实现
+  - k8s挂载卷问题（持久化存储）
+  - k8s多master高可用实现（存储master ip信息；修改配置文件haproxy；修改hosts文件；修改priority数值、vip数值；存储加入master命令、加入节点命令；修改kubeadm.yaml文件、）
+  - prometheus监控部署调研、日志调研（涉及helm部署、持久化存储存储监控数据、日志等）
+  - 
   - 
   - api请求（类似horizon/rainbond设计）
   - k8s云管接口设计（已完成）
