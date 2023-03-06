@@ -1987,7 +1987,9 @@ kubectl describe secret $(kubectl get secret -n kube-system |grep admin|awk '{pr
 
 
 
-配置hostname
+### 4.1. 配置hostname
+
+除了hostname，还需要准备vip
 
 ```
 hostnamectl set-hostname k8s-master01
@@ -2002,7 +2004,7 @@ hostnamectl set-hostname  k8s-node01
 
 
 
-配置hosts
+### 4.2.配置hosts
 
 ```
 cat > /etc/hosts << EOF
@@ -2015,7 +2017,7 @@ EOF
 
 ```
 
-配置网络
+### 4.3.配置网络
 
 ```
 export proxy="http://192.168.66.77:3128"
@@ -2027,6 +2029,8 @@ export no_proxy="localhost, 127.0.0.1, ::1"
 
 
 
+**以下设置参考单节点集群配置**
+
 禁用防火墙
 
 关闭selinux
@@ -2035,13 +2039,13 @@ export no_proxy="localhost, 127.0.0.1, ::1"
 
 时间同步
 
-配置ulimt
+**配置ulimt**
 
 ```
 ulimit -SHn 65535
 ```
 
-配置内核参数
+### 4.4. 配置内核参数
 
 ```
 [root@localhost ~]# cat >> /etc/sysctl.d/k8s.conf << EOF
@@ -2057,16 +2061,14 @@ EOF
 
 
 
-内核升级
+### 4.5. 内核升级
 
 ```
 wget https://cbs.centos.org/kojifiles/packages/kernel/4.9.220/37.el7/x86_64/kernel-4.9.220-37.el7.x86_64.rpm
 
-rpm -ivh kernel-4.9.220-37.el7.x86_64.rpm
-
-
 yum install -y linux-firmware(>=20140911)
 实际安装linux-firmware-20200421
+rpm -ivh kernel-4.9.220-37.el7.x86_64.rpm
 
 
 reboot
@@ -2078,7 +2080,7 @@ uname -r
 
 
 
-安装ipvs
+### 4.6 安装ipvs
 
 ```
 yum install ipvsadm ipset sysstat conntrack libseccomp -y
@@ -2127,7 +2129,7 @@ chmod 755 /etc/sysconfig/modules/ipvs.modules && bash /etc/sysconfig/modules/ipv
 
 
 
-集群高可用
+### 4.7集群高可用
 
 ```
 yum install keepalived haproxy -y
@@ -2137,7 +2139,7 @@ yum install keepalived haproxy -y
 
 
 
-配置haproxy.cfg
+#### 4.7.1 配置haproxy.cfg
 
 ```
 #---------------------------------------------------------------------
@@ -2208,7 +2210,7 @@ backend kubernetes-apiserver
 
 
 
-配置keepalived.conf
+#### 4.7.2配置keepalived.conf
 
 master01
 
@@ -2387,7 +2389,7 @@ fi
 
 
 
-启动
+#### 4.7.3 启动
 
 ```
 systemctl enable --now keepalived haproxy
@@ -2420,55 +2422,56 @@ EOF
 
 
 
+
+
+### 4.8 启动k8s服务
+
 ```
 kubeadm init --config kubeadm.yaml --upload-certs
 ```
 
 
 
+kubeadm.yaml配置如下
+
+```
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+kubernetesVersion: v1.18.0
+imageRepository: k8s.gcr.io
+controlPlaneEndpoint: "vip:16443"
+networking:
+  dnsDomain: cluster.local
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/12
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+featureGates:
+  SupportIPVSProxyMode: true
+mode: ipvs
+
+```
+
+
+
+
+
+
+
+
+
 
 
 ```
+# master加入cluster
 kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-token-ca-cert-hash sha256:3130fea56b3ab36ea8bb606a26da6d049c51226a1e862ce59ff9d0ab0f61960b --control-plane --certificate-key fb90dca1614c9483aeb962de3972bc3ffae6b1d472eabc640ca1bf94f7d9a17d
 
     
     
-    
+# worker 加入master 
 kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-token-ca-cert-hash sha256:3130fea56b3ab36ea8bb606a26da6d049c51226a1e862ce59ff9d0ab0f61960b
 ```
-
-
-
-
-
-
-
-
-
-
-
-```
-
-kubeadm init  --control-plane-endpoint 192.168.230.40:16443 --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
-
-
-kubeadm init  --control-plane-endpoint 10.22.10.254:16443 --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
-
-
-kubeadm init  --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
-
-
-
-kubeadm init  --control-plane-endpoint 10.22.10.254:16443 --v=6 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16 --upload-certs
-```
-
-
-
-
-
-
-
-
 
 
 
