@@ -2064,6 +2064,11 @@ wget https://cbs.centos.org/kojifiles/packages/kernel/4.9.220/37.el7/x86_64/kern
 
 rpm -ivh kernel-4.9.220-37.el7.x86_64.rpm
 
+
+yum install -y linux-firmware(>=20140911)
+实际安装linux-firmware-20200421
+
+
 reboot
 
 uname -r

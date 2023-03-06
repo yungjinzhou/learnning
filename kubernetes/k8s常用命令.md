@@ -55,9 +55,13 @@ kubectl describe replicaset net-test-5767cb94df　　
 
 # pod信息
 kubectl get pod　　#获取Pod信息，可以看到2个副本都处于Running状态
-kubectl get pod -o wide
-kubect lget pod --output wide # 指定输出格式
+kubectl get pod -o wide 
+kubectl get pod --output wide # 指定输出格式
 kubectl describe pod net-test-5767cb94df-djt98 #查看pod的详细信息
+kubectl get pods -A -o wide  # 获取所有pod列表
+
+kubectl logs  posrsxxxx -n kubernetes-dashboard
+# 查看namespace kubernetes-dashboard下 指定pod的日志
 
 
  

@@ -80,7 +80,7 @@ python manage.py migrate --fake MODEL_NAME zero
 python manage.py makemigrations MODEL_NAME
 ```
 
-### 第三步：
+### 第三步：0
 
 通过执行下面命令重新在数据库 django_migrations 中生成新的迁移记录，这时候记录就只有一个了。
 
