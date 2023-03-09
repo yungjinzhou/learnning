@@ -2475,7 +2475,21 @@ kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-toke
 
 
 
+### 4.9测试集群
 
+```
+curl  https://masterip:6443/version -k
+{
+  "major": "1",
+  "minor": "18",
+  "gitVersion": "v1.18.0",
+  "gitCommit": "52c56ce7a8272c798dbc29846288d7cd9fbae032",
+  "gitTreeState": "clean",
+  "buildDate": "2020-04-16T11:48:36Z",
+  "goVersion": "go1.13.9",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+```
 
 
 
