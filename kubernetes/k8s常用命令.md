@@ -5,6 +5,12 @@
 
 
 ```
+#在master上执行验证API Server是否正常访问（需要负载均衡正确配置完成） 
+curl  https://apiserver-lb:6443/version -k
+
+# 重新生成join命令
+kubeadm token create --print-join-command
+
 # 命令行创建
 kubectl run net-test --image=alpine --replicas=2 sleep 36000　　#创建名称为net-test的应用，镜像指定为alpine，副本数为2个
 # 修改镜像，升级

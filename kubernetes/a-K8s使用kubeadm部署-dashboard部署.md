@@ -2471,6 +2471,23 @@ kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-toke
     
 # worker 加入master 
 kubeadm join 10.22.10.254:16443 --token q1242k.7udwnyy7pk8zyljr --discovery-token-ca-cert-hash sha256:3130fea56b3ab36ea8bb606a26da6d049c51226a1e862ce59ff9d0ab0f61960b
+
+
+
+
+如果token 和cert过期，重新生成后，组合使用
+
+在master1上重新生成token和cert：
+# kubeadm init phase upload-certs --upload-certs
+W0514 13:22:23.433664     656 configset.go:202] WARNING: kubeadm cannot validate component configs for API groups [kubelet.config.k8s.io kubeproxy.config.k8s.io]
+[upload-certs] Storing the certificates in Secret "kubeadm-certs" in the "kube-system" Namespace
+[upload-certs] Using certificate key:
+b55acff8cd105fe152c7de6e49372f9ccde71fc74bdf6ec22a08feaf9f00eba4
+
+# kubeadm token create --print-join-command
+W0514 13:22:41.748101     955 configset.go:202] WARNING: kubeadm cannot validate component configs for API groups [kubelet.config.k8s.io kubeproxy.config.k8s.io]
+kubeadm join apiserver-lb:6443 --token 1iznqy.ulvp986lej4zcace     --discovery-token-ca-
+
 ```
 
 
@@ -3118,4 +3135,137 @@ spec:
 
 
 
+
+### 5. 使用localhost proxy访问方式
+
+
+
+使用原生recommend.yaml文件，不用修改
+
+部署步骤
+
+```
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
+
+local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
+sudo mkdir key && cd key
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
+sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
+sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
+
+在代理节点命令行执行 
+kubectl proxy
+
+在代理节点浏览器(用的火狐浏览器)访问
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+获取token进入访问即可
+```
+
+
+
+
+
+
+
+### 6. 使用apiserver方式访问
+
+
+
+
+
+```
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
+
+local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
+sudo mkdir key && cd key
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
+sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
+sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
+
+
+```
+
+
+
+直接访问
+
+```
+https://masterip:6443/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+```
+
+
+
+会报错
+
+```
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {
+
+  },
+  "status": "Failure",
+  "message": "services \"https:kubernetes-dashboard:\" is forbidden: User \"system:anonymous\" cannot get services/proxy in the namespace \"kube-system\"",
+  "reason": "Forbidden",
+  "details": {
+    "name": "https:kubernetes-dashboard:",
+    "kind": "services"
+  },
+  "code": 403
+}
+```
+
+
+
+可以通过以下两种方式解决
+
+
+
+#### 6.1 用户名密码
+
+```
+
+修改/etc/kubernetes/manifests/kube-apiserver.yaml
+增加anonymous-auth=false
+  --authorization-mode=Node,RBAC \
+  --anonymous-auth=false \
+
+kubectl appy -f /etc/kubernetes/manifests/kube-apiserver.yaml
+
+然后参考配置用户名、密码的部分，配置好后，用用户名密码登录
+
+
+参考链接：
+https://cloud.tencent.com/developer/article/1140064
+通过链接中皮质
+```
+
+
+
+#### 6.2 放开anonymous用户权限
+
+```
+
+绑定一个 cluster-admin 的权限
+
+kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin –user=system:anonymous
+
+```
+
+直接访问就行
 

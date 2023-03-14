@@ -262,7 +262,7 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 - Monitor-cache，自动化部署后，启动问题处理
 
-- 
+- 鹤壁环境处理
 
 - 
 
@@ -769,4 +769,19 @@ https://github.com/aylei/kubectl-debug/releases/download/v0.2.0-rc/kubectl-debug
 192.168.66.29:80/google_containers/debug-agent:latest
 
 
+
+
+
+
+
+```
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'mymysql';
+flush privileges;
+
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'mymysql';
+flush privileges;
+
+update mysql.user set host = '%',plugin='mysql_native_password' where user='root';
+flush privileges;
+```
 
