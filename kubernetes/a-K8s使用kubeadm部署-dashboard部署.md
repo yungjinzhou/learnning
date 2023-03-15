@@ -964,18 +964,44 @@ kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin 
 +  hostNetwork: true
 
 
-
-
-
 kubectl apply -f /home/deploy/ingress-nginx-0.29.0.yaml
+
+```
+
+部署websocket资源，建立后端转发长链接
+
+kubectl apply -f /home/deploy/ingress-websocket.yaml
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: websocket
+  namespace: default
+  annotations:
+    nginx.ingress.kuberntetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kuberntetes.io/proxy-rend-timeout: "3600"
+    nginx.ingress.kuberntetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kuberntetes.io/upstream-hash-by: "$http_x_forwarded_for"
+spec:
+  rules:
+    - host: testvipk8s.com
+      http:
+        paths:
+          - backend:
+              serviceName: websocket
+              servicePort: 8080
+            path: /websoket
 
 ```
 
 
 
-#### 2.13.1 dashboard 80端口改动
 
-修改recommended.yaml文件
+
+#### 2.13.1 后端dashboard 80端口改动
+
+##### 2.13.1.1 修改/home/deploy/recommended.yaml文件
 
 ```
 -- a/aio/deploy/recommended.yaml
@@ -993,6 +1019,17 @@ kubectl apply -f /home/deploy/ingress-nginx-0.29.0.yaml
 +      targetPort: 9090
    selector:
      k8s-app: kubernetes-dashboard
+
+
++ #apiVersion: v1
++ #kind: Secret
++ #metadata:
++ #  labels:
++ #    k8s-app: kubernetes-dashboard
++ #  name: kubernetes-dashboard-certs
++ #  namespace: kubernetes-dashboard
++ #type: Opaque
+
 
 @@ -188,13 +192,21 @@ spec:
        containers:
@@ -1042,23 +1079,38 @@ kubectl apply -f /home/deploy/ingress-nginx-0.29.0.yaml
                protocol: TCP
 ## 按照上述git对比出来的变化进行修改
 
-# kubectl create -f /home/deploy/recommended.yaml
-
 ```
 
 
 
+##### 2.13.1.2 生成自定义域名的自签名证书
+
+```
+sudo mkdir $HOME/certs && cd $HOME/certs
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/C=CN/ST=HN/L=ZZ/O=XDWY/OU=zh/CN=testvipk8s.com/emailAddress=yjz01@ieucd.com.cn'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt -days 3650
+```
+
+##### 2.13.1.3 部署dashboard
+
+```
+kubectl create namespace kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=$HOME/certs -n kubernetes-dashboard
+
+kubectl apply -f /home/deploy/recommended.yaml
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
+cd $HOME/certs
+sudo kubectl create secret tls k8svip --key dashboard.key --cert dashboard.crt -n kubernetes-dashboard
+```
 
 
-建立证书
 
+##### 2.13.1.4 创建ingress对象到k8s-cluster上
 
-
-
-
-
-
-创建ingress对象到k8s-cluster上
+注意backend-protocol使用的是http因为后端服务暴露的是80端口，不是https
 
 ```
 cat <<EOF > /home/deploy/dashbaord-ingress.yaml
@@ -1068,16 +1120,18 @@ metadata:
   name: kubernetes-dashboard
   namespace: kubernetes-dashboard
   annotations:
-    nginx.ingress.kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/secure-backends: "true"
-    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 spec:
   tls:
   - hosts:
-    - dashboard.kubernetes.singhwang.com
+    - testvipk8s.com
     secretName: kubernetes-dashboard-secret
   rules:
-    - host: dashboard.kubernetes.singhwang.com
+    - host: testvipk8s.com
       http:
         paths:
         - path: /
@@ -1092,57 +1146,140 @@ kubectl apply -f /home/deploy/dashbaord-ingress.yaml
 
 
 
-域名映射处理
+##### 2.13.1.5 域名映射处理
 
 ```
-
 # kubectl get ingress -n kubernetes-dashboard -o wide
-NAME                   HOSTS                                ADDRESS                           PORTS     AGE
-kubernetes-dashboard   dashboard.kubernetes.singhwang.com   192.168.112.129,192.168.112.130   80, 443   27s
+NAME                    CLASS    HOSTS            ADDRESS         PORTS     AGE
+k8s-dashboard-ingress   <none>   testvipk8s.com   10.109.236.60   80, 443   49m
 
-## 访问端或者访问端的DNS中配置域名 dashboard.kubernetes.singhwang.com 解析为地址 192.168.112.129 或者 192.168.112.130
+## 访问端或者访问端的DNS中配置域名 testvipk8s.com 解析为地址 10.109.236.60 
 
+```
+
+##### 2.13.1.6 域名访问
+
+将dashboard.crt导入浏览器
+
+访问域名https://testvipk8s.com，获取token登录
+
+
+
+
+
+
+
+#### 2.13.2 后端dashboard 443端口 
+
+##### 2.13.2.1 修改/home/deploy/recommended.yaml文件
+
+```
+在原始2.0.2 recommended.yaml文件基础（已修改镜像下载地址或者本地已有镜像）上，修改内容如下
+
+
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  labels:
+#    k8s-app: kubernetes-dashboard
+#  name: kubernetes-dashboard-certs
+#  namespace: kubernetes-dashboard
+#type: Opaque
+
+
+。。。。。。。。
+            - name: ACCEPT_LANGUAGE
+              value: zh-CN
+          args:
+            - --auto-generate-certificates
+            - --namespace=kubernetes-dashboard
+            
+            - --tls-cert-file=dashboard.crt
+            - --tls-key-file=dashboard.key
+            - --token-ttl=43200
+。。。。。。。
 ```
 
 
 
-访问域名，获取token登录
-
-
-
-
-
-
-
-#### 2.13.2 dashboard 443   文件改动
+##### 2.13.2.2 生成自定义域名的自签名证书
 
 ```
+sudo mkdir $HOME/certs && cd $HOME/certs
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/C=CN/ST=HN/L=ZZ/O=XDWY/OU=zh/CN=testvipk8s.com/emailAddress=yjz01@ieucd.com.cn'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt -days 3650
 ```
 
-
-
-
-
-
-
-
-
-Ingress-nginx-0.30.0
-
-
+##### 2.13.2.3 部署dashboard443
 
 ```
-docker tag docker.io/rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0 192.168.66.29:80/google_containers/mirrored-flannelcni-flannel-cni-plugin:v1.1.0
+kubectl create namespace kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=$HOME/certs -n kubernetes-dashboard
 
+kubectl apply -f /home/deploy/recommended.yaml
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
 
-docker pull docker.io/rancher/mirrored-flannelcni-flannel:v0.19.2v0.19.2
+cd $HOME/certs
+sudo kubectl create secret tls k8svip --key dashboard.key --cert dashboard.crt -n kubernetes-dashboard
 ```
 
 
 
+##### 2.13.2.4 创建ingress对象到k8s-cluster上
+
+注意backend-protocol使用的是http因为后端服务暴露的是80端口，不是https
+
+```
+cat <<EOF > /home/deploy/dashbaord-ingress.yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  tls:
+  - hosts:
+    - testvipk8s.com
+    secretName: kubernetes-dashboard-secret
+  rules:
+    - host: testvipk8s.com
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: kubernetes-dashboard
+            servicePort: 443
+EOF
+
+kubectl apply -f /home/deploy/dashbaord-ingress.yaml
+```
 
 
 
+##### 2.13.2.5 域名映射处理
+
+```
+# kubectl get ingress -n kubernetes-dashboard -o wide
+NAME                    CLASS    HOSTS            ADDRESS         PORTS     AGE
+k8s-dashboard-ingress   <none>   testvipk8s.com   10.109.236.60   80, 443   49m
+
+## 访问端或者访问端的DNS中配置域名 testvipk8s.com 解析为地址 10.109.236.60 
+
+```
+
+##### 2.13.2.6 域名访问
+
+将dashboard.crt导入浏览器
+
+访问域名https://testvipk8s.com，获取token登录
 
 
 
@@ -3473,8 +3610,6 @@ spec:
 
 
 ### 5. Ingress-nginx-0.29.0.yaml配置文件
-
-
 
 
 
