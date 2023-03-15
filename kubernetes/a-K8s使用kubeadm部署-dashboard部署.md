@@ -3269,3 +3269,22 @@ kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin 
 
 直接访问就行
 
+
+
+
+
+7. ingress访问方式
+
+
+
+Ingress-nginx-0.30.0
+
+
+
+```
+docker tag docker.io/rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0 192.168.66.29:80/google_containers/mirrored-flannelcni-flannel-cni-plugin:v1.1.0
+
+
+docker pull docker.io/rancher/mirrored-flannelcni-flannel:v0.19.2v0.19.2
+```
+
