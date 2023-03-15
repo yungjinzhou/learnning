@@ -1283,6 +1283,43 @@ k8s-dashboard-ingress   <none>   testvipk8s.com   10.109.236.60   80, 443   49m
 
 
 
+#### 2.13.3 给后端服务配置路径
+
+以dashboard为例，修改ingress创建的dashbioard资源
+
+```
+cat <<EOF > /home/deploy/dashbaord-ingress.yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  tls:
+  - hosts:
+    - testvipk8s.com
+    secretName: kubernetes-dashboard-secret
+  rules:
+    - host: testvipk8s.com
+      http:
+        paths:
+        - path: /dashboard(/|$)(.*)
+          backend:
+            serviceName: kubernetes-dashboard
+            servicePort: 443
+EOF
+```
+
+重新更新kubectl apply -f /home/deploy/dashbaord-ingress.yaml
+
+访问https://testvipk8s.com/dashboard/即可
+
 
 
 ### 2.14 涉及到的docker镜像
