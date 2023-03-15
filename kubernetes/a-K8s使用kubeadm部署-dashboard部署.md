@@ -812,7 +812,343 @@ kubectl apply -f recommended.yaml
 
 
 
-### 2.11 涉及到的docker镜像
+
+
+
+
+### 2.11 使用localhost proxy访问方式
+
+
+
+使用原生recommend.yaml文件，不用修改
+
+部署步骤
+
+```
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
+
+local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
+sudo mkdir key && cd key
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
+sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
+sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
+
+在代理节点命令行执行 
+kubectl proxy
+
+在代理节点浏览器(用的火狐浏览器)访问
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+获取token进入访问即可
+```
+
+
+
+
+
+
+
+### 2.12 使用apiserver方式访问
+
+
+
+
+
+```
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
+
+local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
+sudo mkdir key && cd key
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
+sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
+sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
+
+
+```
+
+
+
+直接访问
+
+```
+https://masterip:6443/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+```
+
+
+
+会报错
+
+```
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {
+
+  },
+  "status": "Failure",
+  "message": "services \"https:kubernetes-dashboard:\" is forbidden: User \"system:anonymous\" cannot get services/proxy in the namespace \"kube-system\"",
+  "reason": "Forbidden",
+  "details": {
+    "name": "https:kubernetes-dashboard:",
+    "kind": "services"
+  },
+  "code": 403
+}
+```
+
+
+
+可以通过以下两种方式解决
+
+
+
+#### 2.12.1 用户名密码
+
+```
+修改/etc/kubernetes/manifests/kube-apiserver.yaml
+增加anonymous-auth=false
+  --authorization-mode=Node,RBAC \
+  --anonymous-auth=false \
+
+kubectl appy -f /etc/kubernetes/manifests/kube-apiserver.yaml
+
+然后参考配置用户名、密码的部分，配置好后，用用户名密码登录
+
+
+参考链接：
+https://cloud.tencent.com/developer/article/1140064
+通过链接中皮质
+```
+
+
+
+#### 2.12.2 放开anonymous用户权限
+
+```
+绑定一个 cluster-admin 的权限
+
+kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin –user=system:anonymous
+
+```
+
+直接访问就行
+
+
+
+
+
+### 2.13 ingress访问方式
+
+安装ingress-nginx-controller-0.29.0
+
+```
+## kubernetes node 上拉取镜像
+# docker pull quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.29.0
+# docker pull mirrorgooglecontainers/defaultbackend-amd64:1.5
+-    repository: k8s.gcr.io/defaultbackend-amd64
+
+修改ingress-nginx配置
+-  hostNetwork: false
++  hostNetwork: true
+
+
+
+
+
+kubectl apply -f /home/deploy/ingress-nginx-0.29.0.yaml
+
+```
+
+
+
+#### 2.13.1 dashboard 80端口改动
+
+修改recommended.yaml文件
+
+```
+-- a/aio/deploy/recommended.yaml
++++ b/aio/deploy/recommended.yaml
+@@ -38,8 +38,12 @@ metadata:
+   namespace: kubernetes-dashboard
+ spec:
+   ports:
+-    - port: 443
++    - name: https
++      port: 443
+       targetPort: 8443
++    - name: http
++      port: 80
++      targetPort: 9090
+   selector:
+     k8s-app: kubernetes-dashboard
+
+@@ -188,13 +192,21 @@ spec:
+       containers:
+         - name: kubernetes-dashboard
+-          imagePullPolicy: Always
++          imagePullPolicy: IfNotPresent
+           ports:
+             - containerPort: 8443
+               protocol: TCP
++              name: https
++            - containerPort: 9090
++              protocol: TCP
++              name: http
+           args:
+-            - --auto-generate-certificates
++            # - --auto-generate-certificates
+             - --namespace=kubernetes-dashboard
++            # - --insecure-port=9090
++            # - --port=8443
++            # - --insecure-bind-address=0.0.0.0
++            - --enable-insecure-login
+             # Uncomment the following line to manually specify Kubernetes API server Host
+             # If not specified, Dashboard will attempt to auto discover the API server and connect
+             # to it. Uncomment only if the default does not work.
+@@ -207,9 +219,12 @@ spec:
+               name: tmp-volume
+           livenessProbe:
+             httpGet:
+-              scheme: HTTPS
++              # scheme: HTTPS
++              # path: /
++              # port: 8443
++              scheme: HTTP
+               path: /
+-              port: 8443
++              port: 9090
+             initialDelaySeconds: 30
+             timeoutSeconds: 30
+           securityContext:
+@@ -272,6 +287,7 @@ spec:
+       containers:
+         - name: dashboard-metrics-scraper
+           image: kubernetesui/metrics-scraper:v1.0.3
++          imagePullPolicy: IfNotPresent
+           ports:
+             - containerPort: 8000
+               protocol: TCP
+## 按照上述git对比出来的变化进行修改
+
+# kubectl create -f /home/deploy/recommended.yaml
+
+```
+
+
+
+
+
+建立证书
+
+
+
+
+
+
+
+创建ingress对象到k8s-cluster上
+
+```
+cat <<EOF > /home/deploy/dashbaord-ingress.yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  annotations:
+    nginx.ingress.kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/secure-backends: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+spec:
+  tls:
+  - hosts:
+    - dashboard.kubernetes.singhwang.com
+    secretName: kubernetes-dashboard-secret
+  rules:
+    - host: dashboard.kubernetes.singhwang.com
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: kubernetes-dashboard
+            servicePort: 80
+EOF
+
+
+kubectl apply -f /home/deploy/dashbaord-ingress.yaml
+```
+
+
+
+域名映射处理
+
+```
+
+# kubectl get ingress -n kubernetes-dashboard -o wide
+NAME                   HOSTS                                ADDRESS                           PORTS     AGE
+kubernetes-dashboard   dashboard.kubernetes.singhwang.com   192.168.112.129,192.168.112.130   80, 443   27s
+
+## 访问端或者访问端的DNS中配置域名 dashboard.kubernetes.singhwang.com 解析为地址 192.168.112.129 或者 192.168.112.130
+
+```
+
+
+
+访问域名，获取token登录
+
+
+
+
+
+
+
+#### 2.13.2 dashboard 443   文件改动
+
+```
+```
+
+
+
+
+
+
+
+
+
+Ingress-nginx-0.30.0
+
+
+
+```
+docker tag docker.io/rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0 192.168.66.29:80/google_containers/mirrored-flannelcni-flannel-cni-plugin:v1.1.0
+
+
+docker pull docker.io/rancher/mirrored-flannelcni-flannel:v0.19.2v0.19.2
+```
+
+
+
+
+
+
+
+
+
+
+
+### 2.14 涉及到的docker镜像
 
 ```
 registry.aliyuncs.com/google_containers/pause:3.2
@@ -3136,155 +3472,383 @@ spec:
 
 
 
-### 5. 使用localhost proxy访问方式
-
-
-
-使用原生recommend.yaml文件，不用修改
-
-部署步骤
-
-```
-
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
-
-local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
-sudo mkdir key && cd key
-sudo openssl genrsa -out dashboard.key 2048
-sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
-sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
-sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
-sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
-sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
-sudo kubectl create -f /home/deploy/admin-user.yaml
-sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
-
-
-在代理节点命令行执行 
-kubectl proxy
-
-在代理节点浏览器(用的火狐浏览器)访问
-http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
-
-获取token进入访问即可
-```
-
-
-
-
-
-
-
-### 6. 使用apiserver方式访问
+### 5. Ingress-nginx-0.29.0.yaml配置文件
 
 
 
 
 
 ```
-
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.2/aio/deploy/recommended.yaml
-
-local_ip=`ifconfig -a|grep inet|grep -v 127.0.0.1 | grep -v 172.17.0.1  |grep -v inet6|awk '{print $2}'|tr -d "addr:"`
-sudo mkdir key && cd key
-sudo openssl genrsa -out dashboard.key 2048
-sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/CN=$local_ip'
-sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt
-sudo kubectl delete secret kubernetes-dashboard-certs -n kubernetes-dashboard
-sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=dashboard.key --from-file=dashboard.crt -n kubernetes-dashboard
-sudo kubectl get pod -n kubernetes-dashboard | grep "kubernetes-dashboard" | awk '{print $1}' | xargs kubectl delete pod  -n kubernetes-dashboard
-sudo kubectl create -f /home/deploy/admin-user.yaml
-sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
-
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-configuration
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: tcp-services
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: udp-services
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+#kind: Daemonset
+metadata:
+  name: default-http-backend
+  labels:
+    app: default-http-backend
+  namespace: ingress-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: default-http-backend
+  template:
+    metadata:
+      labels:
+       app: default-http-backend
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: default-http-backend
+        image:  192.168.66.29:80/google_containers/defaultbackend-amd64:1.5      #建议提前在node节点下载镜像；
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 8080
+        resources:
+         # 这里调整了cpu和memory的大小，可能不同集群限制的最小值不同，看部署失败的原因就清楚
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: default-http-backend
+  # namespace: ingress-nginx
+  namespace: ingress-nginx
+  labels:
+    app: default-http-backend
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: default-http-backend
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx-ingress-serviceaccount
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: nginx-ingress-clusterrole
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - endpoints
+      - nodes
+      - pods
+      - secrets
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - "extensions"
+      - "networking.k8s.io"
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "extensions"
+      - "networking.k8s.io"
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  name: nginx-ingress-role
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - pods
+      - secrets
+      - namespaces
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      # Defaults to "<election-id>-<ingress-class>"
+      # Here: "<ingress-controller-leader>-<nginx>"
+      # This has to be adapted if you change either parameter
+      # when launching the nginx-ingress-controller.
+      - "ingress-controller-leader-nginx"
+    verbs:
+      - get
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: nginx-ingress-role-nisa-binding
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nginx-ingress-role
+subjects:
+  - kind: ServiceAccount
+    name: nginx-ingress-serviceaccount
+    namespace: ingress-nginx
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: nginx-ingress-clusterrole-nisa-binding
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nginx-ingress-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: nginx-ingress-serviceaccount
+    namespace: ingress-nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+#kind: DaemonSet
+metadata:
+  name: nginx-ingress-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/part-of: ingress-nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingress-nginx
+        app.kubernetes.io/part-of: ingress-nginx
+      annotations:
+        prometheus.io/port: "10254"
+        prometheus.io/scrape: "true"
+    spec:
+      # wait up to five minutes for the drain of connections
+      hostNetwork: true
+      terminationGracePeriodSeconds: 300
+      serviceAccountName: nginx-ingress-serviceaccount
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: nginx-ingress-controller
+          image: 192.168.66.29:80/google_containers/nginx-ingress-controller:0.29.0   #建议提前在node节点下载镜像；
+          args:
+            - /nginx-ingress-controller
+            - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
+            - --configmap=$(POD_NAMESPACE)/nginx-configuration
+            - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services
+            - --udp-services-configmap=$(POD_NAMESPACE)/udp-services
+            - --publish-service=$(POD_NAMESPACE)/ingress-nginx
+            - --annotations-prefix=nginx.ingress.kubernetes.io
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+            # www-data -> 101
+            runAsUser: 101
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10254
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 10254
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /wait-shutdown
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  limits:
+  - min:
+      memory: 90Mi
+      cpu: 100m
+    type: Container
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  type: NodePort
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+      # HTTP
+      nodePort: 32080
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
+     # HTTPS
+      nodePort: 32443
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
 
 
 ```
 
 
 
-直接访问
 
-```
-https://masterip:6443/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
-```
-
-
-
-会报错
-
-```
-{
-  "kind": "Status",
-  "apiVersion": "v1",
-  "metadata": {
-
-  },
-  "status": "Failure",
-  "message": "services \"https:kubernetes-dashboard:\" is forbidden: User \"system:anonymous\" cannot get services/proxy in the namespace \"kube-system\"",
-  "reason": "Forbidden",
-  "details": {
-    "name": "https:kubernetes-dashboard:",
-    "kind": "services"
-  },
-  "code": 403
-}
-```
-
-
-
-可以通过以下两种方式解决
-
-
-
-#### 6.1 用户名密码
-
-```
-
-修改/etc/kubernetes/manifests/kube-apiserver.yaml
-增加anonymous-auth=false
-  --authorization-mode=Node,RBAC \
-  --anonymous-auth=false \
-
-kubectl appy -f /etc/kubernetes/manifests/kube-apiserver.yaml
-
-然后参考配置用户名、密码的部分，配置好后，用用户名密码登录
-
-
-参考链接：
-https://cloud.tencent.com/developer/article/1140064
-通过链接中皮质
-```
-
-
-
-#### 6.2 放开anonymous用户权限
-
-```
-
-绑定一个 cluster-admin 的权限
-
-kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin –user=system:anonymous
-
-```
-
-直接访问就行
-
-
-
-
-
-7. ingress访问方式
-
-
-
-Ingress-nginx-0.30.0
-
-
-
-```
-docker tag docker.io/rancher/mirrored-flannelcni-flannel-cni-plugin:v1.1.0 192.168.66.29:80/google_containers/mirrored-flannelcni-flannel-cni-plugin:v1.1.0
-
-
-docker pull docker.io/rancher/mirrored-flannelcni-flannel:v0.19.2v0.19.2
-```
 

@@ -260,9 +260,7 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 - heat编排，stack查询模板名称，做的marker标记，优化
 
-- Monitor-cache，自动化部署后，启动问题处理
-
-- 鹤壁环境处理
+- 
 
 - 
 
@@ -274,8 +272,8 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
   
 - - k8s问题
   - k8s挂载卷问题（持久化存储，使用cinder https://blog.csdn.net/jiangmingfei/article/details/85294863     ,  使用cephfs， nfs方式挂载）
-  - k8s -dashboard高可用实现（修改访问方式等 访问方式nodeport/apiserver(需要能直接访访问到，并不适用内网环境)/loadbalance(针对的是访问入口nginx高可用，并不是后面的服务)，调研nodeport问题（当dashboard所在节点异常后，重新拉起来的服务，不可用），ingress调研）
-  - quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.30.0
+  - k8s -dashboard高可用实现（ingress调研，websocket部署，backendservice 80和443两种方式部署dashboard,使用ingress-nginx访问dashboard）
+  - flannel和calico学习调研
   - prometheus监控部署调研、日志调研（涉及helm部署、持久化存储存储监控数据、日志等）
   - 
   - 
