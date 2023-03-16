@@ -272,7 +272,8 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
   
 - - k8s问题
   - k8s挂载卷问题（持久化存储，使用cinder https://blog.csdn.net/jiangmingfei/article/details/85294863     ,  使用cephfs， nfs方式挂载）
-  - k8s -dashboard高可用实现（ingress调研，websocket部署，backendservice 80和443两种方式部署dashboard,使用ingress-nginx访问dashboard）apiserver访问方式高可用
+  - k8s -dashboard高可用实现（ingress调研，websocket部署，backendservice 80和443两种方式部署dashboard,使用ingress-nginx访问dashboard）
+  - apiserver访问方式高可用
   - ingress-nginx如何通过path区分不同服务，如何实现访问
   - flannel和calico学习调研
   - prometheus监控部署调研、日志调研（涉及helm部署、持久化存储存储监控数据、日志等）

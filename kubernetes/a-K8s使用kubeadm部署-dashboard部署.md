@@ -949,7 +949,9 @@ kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin 
 
 
 
-### 2.13 ingress访问方式
+### 2.13 ingress访问方式(nodePort方式)
+
+要求ingress-nginx-controller 的pod所在节点可以直接被访问到
 
 安装ingress-nginx-controller-0.29.0
 
@@ -965,7 +967,7 @@ kubectl create clusterrolebinding system:anonymous –clusterrole=cluster-admin 
 
 
 kubectl apply -f /home/deploy/ingress-nginx-0.29.0.yaml
-
+# ingress-nginx-0.29.0.yaml见附件
 ```
 
 部署websocket资源，建立后端转发长链接
@@ -1148,6 +1150,10 @@ kubectl apply -f /home/deploy/dashbaord-ingress.yaml
 
 ##### 2.13.1.5 域名映射处理
 
+**本机访问**
+
+
+
 ```
 # kubectl get ingress -n kubernetes-dashboard -o wide
 NAME                    CLASS    HOSTS            ADDRESS         PORTS     AGE
@@ -1156,6 +1162,14 @@ k8s-dashboard-ingress   <none>   testvipk8s.com   10.109.236.60   80, 443   49m
 ## 访问端或者访问端的DNS中配置域名 testvipk8s.com 解析为地址 10.109.236.60 
 
 ```
+
+
+
+**节点访问**
+
+访问端或者访问端的DNS中配置域名 testvipk8s.com 解析为
+
+将https://testvipk8s.com域名在本地做hosts解析，解析的ip为ingress-controller这个pod所在的node机器外网地址，
 
 ##### 2.13.1.6 域名访问
 
@@ -1285,7 +1299,7 @@ k8s-dashboard-ingress   <none>   testvipk8s.com   10.109.236.60   80, 443   49m
 
 #### 2.13.3 给后端服务配置路径
 
-以dashboard为例，修改ingress创建的dashbioard资源
+以dashboard为例，修改ingress创建的dashboard资源
 
 ```
 cat <<EOF > /home/deploy/dashbaord-ingress.yaml
@@ -1318,11 +1332,29 @@ EOF
 
 重新更新kubectl apply -f /home/deploy/dashbaord-ingress.yaml
 
+
+
+访问端或者访问端的DNS中配置域名 testvipk8s.com 解析为
+
+将https://testvipk8s.com域名在本地做hosts解析，解析的ip为ingress-controller这个pod所在的node机器外网地址，
+
 访问https://testvipk8s.com/dashboard/即可
 
 
 
-### 2.14 涉及到的docker镜像
+### 2.14 ingress访问方式(Daemon方式)
+
+#### 4. DaemonSet+HostNetwork+nodeSelector模式
+
+参考链接：
+
+https://www.cnblogs.com/baoshu/p/13255909.html
+
+要求ingress-nginx-controller 的pod所在节点可以直接被访问到
+
+
+
+### 2.15 涉及到的docker镜像
 
 ```
 registry.aliyuncs.com/google_containers/pause:3.2
@@ -4005,13 +4037,11 @@ spec:
       port: 80
       targetPort: 80
       protocol: TCP
-      # HTTP
       nodePort: 32080
     - name: https
       port: 443
       targetPort: 443
       protocol: TCP
-     # HTTPS
       nodePort: 32443
   selector:
     app.kubernetes.io/name: ingress-nginx
