@@ -785,3 +785,25 @@ update mysql.user set host = '%',plugin='mysql_native_password' where user='root
 flush privileges;
 ```
 
+
+
+
+
+
+
+```
+- k8s -dashboard高可用实现（ingress调研，websocket部署，backendservice 80和443两种方式部署dashboard,使用ingress-nginx访问dashboard）
+- apiserver访问方式高可用
+- ingress-nginx如何通过path区分不同服务，如何实现访问
+
+
+1. 自动化部署环境调试测试；
+2. k8s-dashbaord  apiserver方式访问高可用实现；
+3. k8s-dashboard ingress-nginx 域名配置服务调研实现；
+4. k8s-dashboard ingress-nginx 域名加路径对应服务调研实现；
+5. ingress-inginx调研，三种使用方式(loadbalancer/nodeport/daemonset)，目前不适用于云上k8s（需要ingress-nginx  pod所在宿主机/高可用宿主机群可直接访问）;
+6. 自动化部署k8s 接口代码梳理。
+
+
+```
+

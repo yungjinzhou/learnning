@@ -1354,7 +1354,313 @@ https://www.cnblogs.com/baoshu/p/13255909.html
 
 
 
-### 2.15 涉及到的docker镜像
+### 2.15 针对云平台模式的ingress-nginx访问dashboard方式(Daemon方式)
+
+
+
+**DaemonSet+HostNetwork+nodeSelector模式(推荐)**
+
+首先准备边缘节点(worker节点，最好是多个，做高可用)，打上标签
+
+```
+kubectl label nodes worker01 
+```
+
+
+
+#### 2.15..1 前言
+
+为了配置`kubernetes`中的`ingress`的高可用，对于`kubernetes`集群以外只暴露一个访问入口，需要使用`keepalived`排除单点问题。需要使用`daemonset`方式将`ingress-controller`部署在边缘节点上。
+
+#### 2.15.2 边缘节点
+
+首先解释下什么叫边缘节点`Edge Node`，所谓的边缘节点即集群内部用来向集群外暴露服务能力的节点，集群外部的服务通过该节点来调用集群内部的服务，边缘节点是集群内外交流的一个Endpoint
+
+**边缘节点要考虑两个问题**
+
+- 边缘节点的高可用，不能有单点故障，否则整个kubernetes集群将不可用
+- 对外的一致暴露端口，即只能有一个外网访问IP和端口
+
+#### 2.15.3 架构
+
+为了满足边缘节点的以上需求，我们使用`keepalived`来实现。
+
+在`Kubernetes`中添加了`ingress`后，在`DNS`中添加`A记录`，域名为你的`ingress`中host的内容，IP为你的keepalived的VIP，这样集群外部就可以通过域名来访问你的服务，也解决了单点故障。
+
+选择Kubernetes的node作为边缘节点，并安装`keepalived`。
+
+#### 2.15.4 安装keepalived服务
+
+**注意**：keepalived服务，每个想要当作边缘节点的机器都要安装，一般是node节点
+
+1. 安装keeplived
+
+```shell
+yum install -y keepalived
+```
+
+创建用于ingress-nginx高可用的vip端口，配置keepalived，
+
+
+
+1. 启动keeplived并设置为开机启动
+
+```shell
+systemctl start keepalived
+systemctl enable keepalived
+```
+
+给边缘节点所在端口配置vip可用地址对，将vip配置到每个边缘节点的ip端口上
+
+
+
+将边缘节点的label配置修改为`edgenode`
+
+```
+kubectl label nodes k8s-node01 edgenode=true
+kubectl label nodes k8s-node02 edgenode=true
+```
+
+
+
+#### 2.15.5 安装ingress-nginx-controller
+
+1. daemonset形式安装ingress-nginx-controller
+
+   ingress-nginx-0.29.0.yaml见附件
+
+- 创建资源清单，并命名为`ingress-nginx.yaml`
+
+```
+只展示修改位置
+
+---
+apiVersion: apps/v1
+- # kind: Deployment
++ kind: DaemonSet
+metadata:
+  name: nginx-ingress-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+- #  replicas: 1
+  selector:
+      ........
+  template:
+    ........
+    metadata:
+      .....
+    spec:
+      # wait up to five minutes for the drain of connections
++      hostNetwork: true
+      terminationGracePeriodSeconds: 300
+      serviceAccountName: nginx-ingress-serviceaccount
+      nodeSelector:
+        kubernetes.io/os: linux
++        edgenode: "true"
+      containers:
+      ........
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  type: NodePort
+  ports:
+    ......
++  externalIPs:
++    - vip
++  sessionAffinity: None
++  externalTrafficPolicy: Cluster
++  # type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+
+
+```
+
+
+
+#### 2.15.6 部署websocket资源
+
+，建立后端转发长链接
+
+kubectl apply -f /home/deploy/ingress-websocket.yaml
+
+由于节点位于内网，无法直接访问，而且采用的externalIP的方式访问，所以rules里的host注释掉，内网通过vip访问
+
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: websocket
+  namespace: default
+  annotations:
+    nginx.ingress.kuberntetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kuberntetes.io/proxy-rend-timeout: "3600"
+    nginx.ingress.kuberntetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kuberntetes.io/upstream-hash-by: "$http_x_forwarded_for"
+spec:
+  rules:
+-  #  - host: testvipk8s.com
+    -  http:
+        paths:
+          - backend:
+              serviceName: websocket
+              servicePort: 8080
+            path: /websoket
+
+```
+
+
+
+#### 2.15.7 部署dashbaord
+
+
+
+##### 1 生成自定义域名的自签名证书
+
+```
+sudo mkdir $HOME/certs && cd $HOME/certs
+sudo openssl genrsa -out dashboard.key 2048
+sudo openssl req -new -out dashboard.csr -key dashboard.key -subj '/C=CN/ST=HN/L=ZZ/O=XDWY/OU=zh/CN=testvipk8s.com/emailAddress=yjz01@ieucd.com.cn'
+sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.crt -days 3650
+```
+
+##### 2部署dashboard443
+
+
+
+Kubectl apply -f /home/deploy/recommended.yaml
+
+```
+# /home/deploy/recommended.yaml
+
+
+在原始2.0.2 recommended.yaml文件基础（已修改镜像下载地址或者本地已有镜像）上，修改内容如下
+
+
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  labels:
+#    k8s-app: kubernetes-dashboard
+#  name: kubernetes-dashboard-certs
+#  namespace: kubernetes-dashboard
+#type: Opaque
+
+
+。。。。。。。。
+            - name: ACCEPT_LANGUAGE
+              value: zh-CN
+          args:
+            - --auto-generate-certificates
+            - --namespace=kubernetes-dashboard
+            
+            - --tls-cert-file=dashboard.crt
+            - --tls-key-file=dashboard.key
+            - --token-ttl=43200
+。。。。。。。
+
+```
+
+
+
+```
+kubectl create namespace kubernetes-dashboard
+sudo kubectl create secret generic kubernetes-dashboard-certs --from-file=$HOME/certs -n kubernetes-dashboard
+
+kubectl apply -f /home/deploy/recommended.yaml
+sudo kubectl create -f /home/deploy/admin-user.yaml
+sudo kubectl create -f /home/deploy/admin-user-role-binding.yaml
+
+cd $HOME/certs
+sudo kubectl create secret tls k8svip --key dashboard.key --cert dashboard.crt -n kubernetes-dashboard
+```
+
+
+
+#### 2.15.8 创建dashboard服务的ingress资源对象
+
+注意backend-protocol使用的是https因为后端服务暴露的是443端口，不是http
+
+注释掉host参数，如果节点可以直接在浏览器访问，也可以用域名访问服务
+
+```
+cat <<EOF > /home/deploy/dashbaord-ingress.yaml
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  tls:
+ #   - 
+  #  	hosts:
+   #   	- testvipk8s.com
+    -
+      secretName: kubernetes-dashboard-secret
+  rules:
+  #  - host: testvipk8s.com
+    - http:
+        paths:
+        - path: /
+          backend:
+            serviceName: kubernetes-dashboard
+            servicePort: 443
+EOF
+
+kubectl apply -f /home/deploy/dashbaord-ingress.yaml
+```
+
+
+
+#### 2.15.9 将浮动ip绑定到vip上
+
+通过yaml或者页面操作
+
+```
+```
+
+
+
+#### 2..15.10 浮动ip访问
+
+#### https://192.168.230.34/dashboard/
+
+
+
+不同服务根据path路径区分即可
+
+
+
+
+
+参考链接：
+
+https://www.cnblogs.com/baoshu/p/13255909.html
+
+
+
+
+
+
+
+### 2.16 涉及到的docker镜像
 
 ```
 registry.aliyuncs.com/google_containers/pause:3.2
