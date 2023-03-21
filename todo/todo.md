@@ -260,7 +260,15 @@ mimic_switch只有两个值，on/off，代表拟态开关的打开/关闭状态
 
 - heat编排，stack查询模板名称，做的marker标记，优化
 
-- 
+- k8s部署模板增删改查接口开发---接口文档撰写
+
+- k8s部署接口增删改查开发--接口文档撰写
+
+- 鹤壁云大屏展示问题处理
+
+- 大屏展示部署时间接口优化
+
+- 梳理部署文档，撰写技术文档
 
 - 
 
@@ -687,7 +695,7 @@ virsh dumpxml domain-id
 
 
 
-### manum相关问题
+### 临时
 
 
 
@@ -733,47 +741,6 @@ http://192.168.66.33/guoqiuxia/MCS-horizon/-/archive/master/MCS-horizon-master.t
 
 
 
-
-
-
-
-```
-2022.10 之后云管改动较大的代码总结
-
-1. 通过云硬盘、云硬盘快照创建云主机
-2. 编排删除修改限制
-3. k8s部分代码
-4. 操作日志、监控服务等模块中文化显示
-5. 迁移文件优化
-6. 证书问题（现场生成证书）
-7. 热数据缓存问题（云主机、容器、云硬盘、云硬盘快照）
-8. 项目配额模块优化
-9. 监控网卡状态优化
-10. 
-```
-
-
-
-
-
-k8s新增
-
-
-
-https://github.com/aylei/kubectl-debug/releases/download/v0.2.0-rc/kubectl-debug_0.2.0-rc_linux_amd64.tar.gz
-
-/usr/local/bin/
-
-镜像：aylei/debug-agent:latest
-
-192.168.66.29:80/google_containers/debug-agent:latest
-
-
-
-
-
-
-
 ```
 ALTER USER 'root'@'localhost' IDENTIFIED BY 'mymysql';
 flush privileges;
@@ -789,21 +756,9 @@ flush privileges;
 
 
 
+网络二层
 
+子网三层
 
-```
-- k8s -dashboard高可用实现（ingress调研，websocket部署，backendservice 80和443两种方式部署dashboard,使用ingress-nginx访问dashboard）
-- apiserver访问方式高可用
-- ingress-nginx如何通过path区分不同服务，如何实现访问
-
-
-1. 自动化部署环境调试测试；
-2. k8s-dashbaord  apiserver方式访问高可用实现；
-3. k8s-dashboard ingress-nginx 域名配置服务调研实现；
-4. k8s-dashboard ingress-nginx 域名加路径对应服务调研实现；
-5. ingress-inginx调研，三种使用方式(loadbalancer/nodeport/daemonset)，目前不适用于云上k8s（需要ingress-nginx  pod所在宿主机/高可用宿主机群可直接访问）;
-6. 自动化部署k8s 接口代码梳理。
-
-
-```
+端口？
 

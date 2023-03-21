@@ -49,6 +49,10 @@ hot_data_obj.save()
 
 
 
+# 批量删除
+HotDataStore.objects.filter(in__uuid=target_uuid_list).delete()
+# 单独删除
+HotDataStore.objects.filter(uuid=target_uuid).delete()
 
 ```
 
