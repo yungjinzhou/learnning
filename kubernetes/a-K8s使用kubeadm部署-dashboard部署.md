@@ -401,9 +401,10 @@ NetworkPluginNotReady message:docker: network plugin is not ready: cni config un
 sudo mkdir -p /opt/cni/bin
 cd /opt/cni/bin
 然后接下来去下载相应的压缩包
-https://github.com/containernetworking/plugins/releases/tag/v0.3.0
-下载一个cni-plugins-linux-amd64-v0.3.0.tgz
+https://github.com/containernetworking/plugins/releases/download/v1.1.0/cni-plugins-linux-amd64-v0.3.0.tgz
+https://github.com/containernetworking/plugins/releases/download/v1.1.0/cni-plugin-flannel-linux-amd64-v1.1.0.tgz
 然后将其解压在/opt/cni/bin下就可以了。
+可以修改名字flannel-amd64为flannel
 ```
 
 
@@ -1536,8 +1537,6 @@ sudo openssl x509 -req -in dashboard.csr -signkey dashboard.key -out dashboard.c
 ```
 
 ##### 2部署dashboard443
-
-
 
 Kubectl apply -f /home/deploy/recommended.yaml
 
@@ -4356,7 +4355,32 @@ spec:
 
 ```
 
+### 6. admin-user.yaml
+
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+```
 
 
 
+### 7. admin-user-role-binding.yaml
+
+```
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+```
 
