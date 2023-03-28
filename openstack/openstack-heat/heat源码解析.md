@@ -102,6 +102,8 @@ OS::Heat::SoftwareConfig和OS::Heat::SoftwareDeployment协同工作，需要一�
 
 在magnum中调用heatclient ，向heatapi发送请求，请求连接：http://controller:8004/v1/b5a1eb4ee8374fa1aa88cd4b59afda98/stacks，下面对heat代码进行解析
 
+### heatapi入口
+
 ```
 heat-api入口
 heat/api/openstack/v1/__init__.py
@@ -137,6 +139,8 @@ heat/api/openstack/v1/__init__.py
 
 
 ```
+
+### rpc传给heat-engine
 
 调用rpc_client发送到heat-engine服务
 
@@ -199,6 +203,8 @@ class EngineClient(object):
                                 template_id=template_id),
             version='1.36')
 ```
+
+### engine接收create_task方法
 
 create_task由engine接收
 
@@ -293,6 +299,8 @@ class EngineService(service.ServiceBase):
 
 
 ```
+
+#### 调用converge_stack
 
 convergence   openstack N版本后，默认convergence=Ture
 
@@ -441,6 +449,273 @@ convergence   openstack N版本后，默认convergence=Ture
         u'api_address_lb_switch': <heat.engine.resources.template_resource.TemplateResource object at 0x7f47e34f8150>, 
         u'secgroup_rule_udp_kube_minion': <heat.engine.resources.openstack.neutron.security_group_rule.SecurityGroupRule object at 0x7f47e2da8b50>, 
         u'network': <heat.engine.resources.template_resource.TemplateResource object at 0x7f47e2d9a990>}
+
+
+
+#### 调用check_resource
+
+worker_client.check_resource具体调用
+
+```
+# heat/engine/worker.py
+
+
+    @context.request_context
+    @log_exceptions
+    def check_resource(self, cnxt, resource_id, current_traversal, data,
+                       is_update, adopt_stack_data, converge=False):
+        """Process a node in the dependency graph.
+
+        The node may be associated with either an update or a cleanup of its
+        associated resource.
+        """
+        in_data = sync_point.deserialize_input_data(data)
+        resource_data = node_data.load_resources_data(in_data if is_update
+                                                      else {})
+        # rsource_data: {u'kube_master_eth0': <heat.engine.node_data.NodeData object at 0x7f2881f5d328>, u'kube_master_init': <heat.engine.node_data.NodeData object at 0x7f2881f5db48>}
+        rsrc, stk_defn, stack = check_resource.load_resource(cnxt, resource_id,
+                                                             resource_data,
+                                                             current_traversal,
+                                                             is_update)
+
+        if rsrc is None:
+            return
+
+        rsrc.converge = converge
+
+        msg_queue = eventlet.queue.LightQueue()
+        try:
+            self.thread_group_mgr.add_msg_queue(stack.id, msg_queue)
+            cr = check_resource.CheckResource(self.engine_id,
+                                              self._rpc_client,
+                                              self.thread_group_mgr,
+                                              msg_queue, in_data)
+            if current_traversal != stack.current_traversal:
+                LOG.debug('[%s] Traversal cancelled; re-trigerring.',
+                          current_traversal)
+                self._retrigger_replaced(is_update, rsrc, stack, cr)
+            else:
+                cr.check(cnxt, resource_id, current_traversal, resource_data,
+                         is_update, adopt_stack_data, rsrc, stack)
+        finally:
+            self.thread_group_mgr.remove_msg_queue(None,
+                                                   stack.id, msg_queue)
+```
+
+#### 调用check
+
+cr = check_resource.CheckResource结合 cr.check
+
+调用checkResource类的check方法
+
+```
+# heat/engine/check_resource.py
+
+    def check(self, cnxt, resource_id, current_traversal,
+              resource_data, is_update, adopt_stack_data,
+              rsrc, stack):
+        """Process a node in the dependency graph.
+
+        The node may be associated with either an update or a cleanup of its
+        associated resource.
+        """
+        if stack.has_timed_out():
+            self._handle_stack_timeout(cnxt, stack)
+            return
+
+        tmpl = stack.t
+        stack.adopt_stack_data = adopt_stack_data
+        stack.thread_group_mgr = self.thread_group_mgr
+
+        try:
+            check_resource_done = self._do_check_resource(cnxt,
+                                                          current_traversal,
+                                                          tmpl, resource_data,
+                                                          is_update,
+                                                          rsrc, stack,
+                                                          adopt_stack_data)
+
+            if check_resource_done:
+                # initiate check on next set of resources from graph
+                self._initiate_propagate_resource(cnxt, resource_id,
+                                                  current_traversal, is_update,
+                                                  rsrc, stack)
+        except BaseException as exc:
+            with excutils.save_and_reraise_exception():
+                msg = six.text_type(exc)
+                LOG.exception("Unexpected exception in resource check.")
+                self._handle_resource_failure(cnxt, is_update, rsrc.id,
+                                              stack, msg)
+
+
+```
+
+#### create_convergence
+
+调用do_check_resource，最终调用create_convergence方法
+
+```
+# heat/engine/check_resource.py
+
+def check_resource_update(rsrc, template_id, requires, engine_id,
+                          stack, msg_queue):
+    """Create or update the Resource if appropriate."""
+    check_message = functools.partial(_check_for_message, msg_queue)
+    if rsrc.action == resource.Resource.INIT:
+        rsrc.create_convergence(template_id, requires, engine_id,
+                                stack.time_remaining(), check_message)
+    else:
+        rsrc.update_convergence(template_id, requires, engine_id,
+                                stack.time_remaining(), stack,
+                                check_message)
+```
+
+
+
+调用 resource.py中 create_convergence方法
+
+```
+# heat/engine/resource.py
+
+
+    
+     def create_convergence(self, template_id, requires, engine_id,
+                           timeout, progress_callback=None):
+        """Creates the resource by invoking the scheduler TaskRunner."""
+        self._calling_engine_id = engine_id
+        self.requires = requires
+        self.current_template_id = template_id
+        if self.stack.adopt_stack_data is None:
+            runner = scheduler.TaskRunner(self.create)
+        else:
+            adopt_data = self.stack._adopt_kwargs(self)
+            runner = scheduler.TaskRunner(self.adopt, **adopt_data)
+
+        runner(timeout=timeout, progress_callback=progress_callback)
+```
+
+#### 调度创建任务
+
+
+
+```
+# heat/engine/resource.py
+
+    @scheduler.wrappertask
+    def create(self):
+        """Create the resource.
+
+        Subclasses should provide a handle_create() method to customise
+        creation.
+        """
+        action = self.CREATE
+        if (self.action, self.status) != (self.INIT, self.COMPLETE):
+            exc = exception.Error(_('State %s invalid for create')
+                                  % six.text_type(self.state))
+            raise exception.ResourceFailure(exc, self, action)
+
+        if self.external_id is not None:
+            yield self._do_action(self.ADOPT,
+                                  resource_data={
+                                      'resource_id': self.external_id})
+            self.check()
+            return
+
+        # This method can be called when we replace a resource, too. In that
+        # case, a hook has already been dealt with in `Resource.update` so we
+        # shouldn't do it here again:
+        if self.stack.action == self.stack.CREATE:
+            yield self._break_if_required(
+                self.CREATE, environment.HOOK_PRE_CREATE)
+
+        LOG.info('creating %s', self)
+
+        # Re-resolve the template, since if the resource Ref's
+        # the StackId pseudo parameter, it will change after
+        # the parser.Stack is stored (which is after the resources
+        # are __init__'d, but before they are create()'d). We also
+        # do client lookups for RESOLVE translation rules here.
+
+        self.reparse()
+        self._update_stored_properties()
+
+        count = {self.CREATE: 0, self.DELETE: 0}
+
+        retry_limit = max(cfg.CONF.action_retry_limit, 0)
+        first_failure = None
+
+        while (count[self.CREATE] <= retry_limit and
+               count[self.DELETE] <= retry_limit):
+            pre_func = None
+            if count[action] > 0:
+                delay = timeutils.retry_backoff_delay(count[action],
+                                                      jitter_max=2.0)
+                waiter = scheduler.TaskRunner(self.pause)
+                yield waiter.as_task(timeout=delay)
+            elif action == self.CREATE:
+                # Only validate properties in first create call.
+                pre_func = self.properties.validate
+
+            try:
+                yield self._do_action(action, pre_func)
+                if action == self.CREATE:
+                    first_failure = None
+                    break
+                else:
+                    action = self.CREATE
+            except exception.ResourceFailure as failure:
+                exc = failure.exc
+                if isinstance(exc, exception.StackValidationFailed):
+                    path = [self.t.name]
+                    path.extend(exc.path)
+                    raise exception.ResourceFailure(
+                        exception_or_error=exception.StackValidationFailed(
+                            error=exc.error,
+                            path=path,
+                            message=exc.error_message
+                        ),
+                        resource=failure.resource,
+                        action=failure.action
+                    )
+                if not (isinstance(exc, exception.ResourceInError) or
+                        self._default_client_plugin().is_conflict(exc)):
+                    raise failure
+
+                count[action] += 1
+                if action == self.CREATE:
+                    action = self.DELETE
+                    count[action] = 0
+
+                if first_failure is None:
+                    # Save the first exception
+                    first_failure = failure
+
+        if first_failure:
+            raise first_failure
+
+        if self.stack.action == self.stack.CREATE:
+            yield self._break_if_required(
+                self.CREATE, environment.HOOK_POST_CREATE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
