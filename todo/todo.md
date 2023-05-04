@@ -51,7 +51,6 @@
 ### 新增任务
 
 - 大镜像上传问题处理 
-- 新调度策略下，license/celery运行情况（新处理登录时要同步一次，只靠beat有时间间隔）
 
 - 云主机，软删除，恢复，软删除，恢复，然后对该云主机创建原生快照，提示状态为soft_delete，无发创建
 
@@ -75,28 +74,9 @@
 
 - libvirt获取磁盘利用率(可靠性)
 
-- 应用中心（编排模板）（先定设计，制定步骤，按照步骤深入研究）
-
-  - 含有nginx的虚拟机编排
-  - 能修改nginx配置并启动服务的虚拟机编排
-  - 指定网络(网络-子网-dhcp-静态ip地址)的虚拟机编排
-  - 含有mysql服务的虚拟机编排
-  - 能修改mysql配置并可控制服务启动的虚拟机编排
-  - 含有redis服务的虚拟机编排
-  - 可修改redis配置并控制服务的虚拟机编排
-  - 其他常用服务（先单独研究）
-  - 固定组合（nginx-mysql、等）编排
-  - 
-
 - 兼容超融合（多云管理）、vmware、华为云（在上层，设计，可选云或者超融合等）（多云管理，云的相互用）
   
-- magnum容器编排
-  
-- rpm包打包(node_info/ceilometer/gnocchi)
-  
 - openstack tacker
-  
-- nova主机管理，底层不支持向上分页
   
 - nova云主机，查询参数ip，设置
   
@@ -116,31 +96,43 @@
 
 
 
-#### 大镜像上传问题
+#### 鹤壁问题
+
+##### 鹤壁监控
+
+5.4号监控问题
+
+计算节点，两天前ceilometer停止收集数据，最后一条数据日志如下
+
+236.21   kp-compute
+
+2023-05-02 08:48:04.644 13451 WARNING ceilometer.polling.manager [-] No valid pollsters can be loaded from ['compute'] namespaces
+
+查看服务发现日志
+
+5月 02 08:48:04 kp-compute ceilometer-polling[12873]: libvirt: XML-RPC error : Failed to connect socket to '/var/run/libvirt/libvirt-sock-ro': No such file or directory
+
+重启openstack-ceilometer-compute.service服务后，看日志收集服务恢复正常
 
 
 
-分片上传
 
-断点续传
 
-大镜像上传
+236.25   ft-compute
 
-1.容器创建接口修改，增加创建容器时挂载已有硬盘的情况；
-2.大镜像上传问题调研，目前根据搜集的资料有三种方案（可行性需要调研与测试）；
- 2.1 nginx接收切片，利用nginx的handler处理或合并请求，然后上传后调用glanceapi上传（可能需要开发nginx模块或者适配，调研中）；
- 2.2 改造glance接口，前端处理切片，glance接收后合并，然后调用glanceapi上传（改动代码量大，另外glanceapi改造后需要测试是否影响其他功能）；
- 2.3 前端分片上传，在控制节点写一个服务，接收分片，重组后，调用glanceapi上传镜像（增加了服务组件）；
- 2.4 基于ftp服务，上传到ftp等服务器，然后控制节点拉取镜像然后上传(需要控制节点写服务)。
+无日志
 
+查看服务发现日志
+
+5月 02 08:48:04 kp-compute ceilometer-polling[12873]: libvirt: XML-RPC error : Failed to connect socket to '/var/run/libvirt/libvirt-sock-ro': No such file or directory
+
+重启openstack-ceilometer-compute.service服务后，看日志收集服务恢复正常
 
 
 
+Openstack-ceilometer-notification.service服务，没有发现异常，但是重启该服务后，数据恢复，需要进一步定位
 
-1. nginx负责切片功能，保证上传成功，上传后调用glanceapi上传；
-2. 改造glance，前端切片，glance接收，然后合并后调用glanceapi上传；
-3. 前端分片上传，在控制节点写一个服务，接收分片，重组后，调用glanceapi上传镜像；
-4. 
+
 
 
 

@@ -164,9 +164,23 @@ total = Article.objects.filter(btype=stype).count()
 
 ```cobol
 target_data = Article.objects.filter(btype=stype)[start:end].values("id","title")
+      target_data = Article.objects.filter(btype=stype)[start:end].values()
 ```
 
 
+
+<b><font color=red face="微软雅黑" size=3>切片需要再过滤条件使用之后，values之前使用，否则报错切片的queryset不可操作</font></b>
+
+
+
+注意使用索引返回的新的结果集，依然是惰性求值，不会立即查询。
+
+```python
+qs = User.objects.all()[20:40]
+# LIMIT 20 OFFSET 20
+qs = User.objects.all()[20:30]
+# LIMIT 10 OFFSET 20
+```
 
 
 
