@@ -137,7 +137,34 @@ python manage.py migrate
 
 
 
+## 4. 分页查询，优化查询
 
+当遇到数据量大时进行分页查询，不要全部查询出来在切片处理，要先切片处理，在进一步处理数据
+
+
+
+比如页数为page
+
+每页个数为limit
+
+```
+start=(page-1)*limit
+end=start+limit
+```
+
+
+
+获取总数
+
+```
+total = Article.objects.filter(btype=stype).count()
+```
+
+获取指定页数的数据（有过滤）
+
+```cobol
+target_data = Article.objects.filter(btype=stype)[start:end].values("id","title")
+```
 
 
 
