@@ -704,6 +704,10 @@ virsh dumpxml domain-id
 
 
 
+
+
+
+
 harbor登录
 
 ```
@@ -711,32 +715,6 @@ docker login 192.168.66.29:80 -u admin -p comleader@123
 ```
 
 配置daemon.json里的地址，应该与登录的地址一致，包括端口
-
-
-
-
-
-```
-$ atomic --debug pull --storage ostree http:internal-url/namespace/image:tag
-```
-
-
-
-atomic install --system-package no --system --storage docker--name=etcd 192.168.66.29:80/openstack_magnum/etcd:v3.2.7
-
-
-
-atomic --debug install --system-package no --system --storage docker  --name=etcd 192.168.66.29:80/openstack_magnum/etcd:v3.2.7
-
-
-
-docker run -id  --name=etcd 192.168.66.29:80/openstack_magnum/etcd:v3.2.7
-
-
-
-http://192.168.66.33/guoqiuxia/MCS-horizon/-/archive/master/MCS-horizon-master.tar.gz
-
-
 
 
 
@@ -761,9 +739,21 @@ flush privileges;
 
 
 
-网络二层
+目前第二季度工作
 
-子网三层
+- 生产云升级及测试（监控告警、云平台）
+- 鹤壁云运维及技术支持
+- 裸机监控调研
+- 多云管理调研
+- 云管所有列表页统计与优化
+- 云主机页面、云硬盘页面部分资源跳转支持及优化
+- 可用域方案设计
 
-端口？
+
+
+感兴趣的方向：
+
+计算模块/容器云/saltstack部署
+
+
 
