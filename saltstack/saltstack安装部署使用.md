@@ -252,7 +252,16 @@ mkdir -p /srv/salt
 
 
 
-### 11、sys模块操作
+### 11、grains模块使用
+
+```
+可以使用’grains.ls’模块列出可用的grains：
+salt '*' grains.ls
+而grains 的数据则可以使用 ‘grains.items’ 模块查看:
+salt '*' grains.items
+```
+
+### 12、sys模块操作
 
 ```
 # 查看模块文档
@@ -261,7 +270,7 @@ salt '*' sys.doc pkg           #查看pkg模块文档
 
 
 
-### 12、更多模块参考
+### 13、更多模块参考
 
 ```
 # salt内置的执行模块列表
