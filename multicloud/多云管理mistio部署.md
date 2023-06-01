@@ -102,7 +102,23 @@ docker compose up -d
 docker-compose exec api sh
 
 ./bin/adduser --admin admin@example.com
+
+
+./bin/adduser --admin admin@123 -p
+添加用户admin@123，并且角色设置为admin，同时设置密码
 ```
+
+
+
+
+
+
+
+### 9.添加openstack云
+
+登录后，添加openstack 云
+
+![image-20230531175201404](./mistio添加openstack参数.png)
 
 
 

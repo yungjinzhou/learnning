@@ -58,9 +58,68 @@ docker load -i docker.tar
 #### 1.5 本地容器镜像上传到私有仓库(harbor)
 
 ```
+1. 首先配置docker
+vim /etc/docker/daemon.json
+在 daemon.json 文件中添加如下内容（假设您的私有仓库地址为 registry.example.com:5000）：
+{
+    "insecure-registries": ["http://192.168.66.29:80"]
+}
+2. 重启docker服务
+systemctl restart docker
+
+3. 登录私有仓库
+docker login 192.168.66.29:80 -u admin -p comleader@123
+
+
+4.给现有镜像打tag为私有仓库地址
+现有镜像名称openstack/magnum/kubernetes-kubelet:v1.11.6
+
+docker tag openstack/magnum/kubernetes-kubelet:v1.11.6 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
+
+5. 推送到私有仓库
+推送之前，需要确定私有仓库对应的名称已经创建好（比如openstack_magnum）
 docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
 docker push 镜像:tag   # 镜像地址为harbor地址
 ```
+
+
+
+##### 1.5.1 批量处理导入私有镜像
+
+```
+过滤镜像的repo名称
+docker image list|grep -v "192"| grep -v TAG| awk '{print $1}' > repo.txt
+过滤镜像的tag名
+docker image list | grep -v TAG| grep -v '192' |awk '{print $2}' >tag.txt
+
+
+拼接完整的repo:tag
+paste repo.txt tag.txt | tr -d ' ' | tr '\t' ':' > repotag.txt
+
+
+构建harbor地址的repo:tag
+sed ‘s/^/192.168.66.29:80\/mistio\//’ repotag.txt >> repotaghabor.txt
+
+
+拼接docker tag 文件
+paste repotag.txt repotaghabor.txt | tr -d ' ' | tr '\t' ' ' > dockertagtmp.txt
+
+批量打tag
+sed ‘s/^/docker tag /’ dockertagtmp.txt > dockertag.txt
+xargs -I {} bash -c "{}" < dockertag.txt
+
+
+
+批量推送
+sed ‘s/^/docker push /’ repotaghabor.txt > dockerpush.txt
+xargs -I {} bash -c "{}" < dockerpush.txt
+
+
+```
+
+
+
+
 
 
 

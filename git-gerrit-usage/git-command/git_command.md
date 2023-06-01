@@ -142,3 +142,22 @@ git log --author=mengfanxiao --since=2019-01-01 --until=2021-02-01 --format='%aN
 ```
 
 
+
+### git下载仓库的子模块
+
+```
+当 Git 仓库中包含子模块时，使用 git clone 命令只会下载主仓库的代码，并不会下载子模块的代码。为了下载包括子模块在内的全部代码，你可以使用以下命令：
+
+git clone --recursive <repository_url>
+
+其中，--recursive 参数告诉 Git 在克隆主仓库的同时递归地克隆其包含的所有子模块，确保所有代码都被下载到本地。
+
+如果你已经克隆了主仓库，但未进行子模块的初始化和更新，则需要执行以下两个命令：
+
+git submodule init
+git submodule update
+其中，git submodule init 命令用于初始化子模块，会在本地创建对应的 .gitmodules 文件，记录所有子模块的信息；git submodule update 命令则用于从远程仓库拉取最新版本的子模块内容，并将其更新到本地。
+
+如果子模块还有自己的子模块，则需要添加 --recursive 参数，以便递归地拉取所有子模块的代码。
+```
+
