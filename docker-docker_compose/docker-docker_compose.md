@@ -112,6 +112,12 @@ xargs -I {} bash -c "{}" < dockertag.txt
 
 批量推送
 sed ‘s/^/docker push /’ repotaghabor.txt > dockerpush.txt
+
+配置docker私有仓库：见1.5
+
+登录私有仓库
+docker login 192.168.66.29:80 -u admin -p comleader@123
+
 xargs -I {} bash -c "{}" < dockerpush.txt
 
 

@@ -374,7 +374,7 @@ systemctl restart docker
 
 
 
-centos配置代理
+### centos配置代理
 
 
 
@@ -385,6 +385,10 @@ export https_proxy=$proxy
 export ftp_proxy=$proxy
 export no_proxy="localhost, 127.0.0.1, ::1"
 ```
+
+
+
+
 
 
 
@@ -407,6 +411,10 @@ rm -f /home/junk_files
 # 压缩镜像
 qemu-img convert -c -O qcow2 CentOS-7-x86_64-GenericCloud.qcow2 CentOS7v6.qcow2
 ```
+
+
+
+### 创建云主机时候设置密码
 
 
 

@@ -94,6 +94,11 @@ $ ls -alh docker-compose.yml
 
 # 运行服务
 $ docker compose up -d
+
+等服务启动完成后，就可以登陆 https://<本机ip> 访问前端服务，默认登陆用户密码为：admin 和 admin@123 。
+
+
+
 ```
 
 ### 7. 登陆 climc 命令行容器
@@ -109,6 +114,25 @@ Please exec 'climc' to get started
 bash-5.1# source /etc/yunion/rcadmin
 bash-5.1# climc user-list
 ```
+
+
+
+登录加入openstack云后，发现不能识别别名配置，比如nova_proxy，有些请求会异常，
+
+可以登录到容器compose-region-1中，配置hosts，就可以发现云主机等资源的信息了
+
+```
+docker exec -it compose-region-1 sh
+
+echo "192.168.232.106 nova_proxy" >> /etc/hosts
+echo "192.168.232.107 controller" >> /etc/hosts
+```
+
+
+
+
+
+
 
 
 
