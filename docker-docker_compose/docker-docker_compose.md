@@ -153,12 +153,39 @@ docker push 192.168.66.29:80/openstack_magnum/kubernetes-kubelet:v1.11.6
 #### 1.7 docker常用命令
 
 ```
-nsenter -n -t $( docker inspect -f {{.State.Pid}} xxxxxx)   xxxx改成容器名称或者id就行了
-# 可以利用宿主机命令，测试容器内的状况
+# 通过运行该命令，即可进入容器内部的网络命名空间，并在其中执行指定的命令。
+nsenter -n -t $( docker inspect -f {{.State.Pid}} container_name_or_id) command 
+# container_name_or_id改成容器名称或者id就行了
+比如nsenter -n -t $( docker inspect -f {{.State.Pid}} mimic-horizon) ping 192.168.232.106
 
-
+# harbor登录命令
 docker login 192.168.66.29 -u admin -p comleader@123
+
+
 ```
+
+
+
+
+
+#### 1.8 查看容器command
+
+```
+要查看正在运行的容器的 command，可以使用 docker container inspect 命令。具体命令如下：
+
+docker container inspect --format '{{.Path}} {{.Args}}' <container-id>
+其中，--format '{{.Path}} {{.Args}}' 参数指定了输出格式，{{.Path}} 表示容器中执行的命令，{{.Args}} 表示传递给命令的参数，<container-id> 是容器的 ID 或者名称。
+
+例如，如果要查看名为 my-container 的容器的命令和参数，可以使用以下命令：
+
+docker container inspect --format '{{.Path}} {{.Args}}' my-container
+这个命令会输出类似如下的信息：
+
+/usr/bin/python3 ["/usr/local/bin/my-script.py"]
+这表示在容器中执行了 /usr/bin/python3 命令，并传递了 /usr/local/bin/my-script.py 参数。
+```
+
+
 
 
 
