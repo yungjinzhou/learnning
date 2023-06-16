@@ -418,6 +418,15 @@ qemu-img convert -c -O qcow2 CentOS-7-x86_64-GenericCloud.qcow2 CentOS7v6.qcow2
 
 
 
+```
+#!/bin/sh
+passwd root << EOF
+comleader@123
+comleader@123
+EOF
+
+```
+
 
 
 
@@ -593,8 +602,10 @@ virt-sysprep --root-password password:comleader@123 -a CentOS-7-x86_64-GenericCl
 
 ### tolearn
 
-aiohttp/asyncio/webserver
-rpc服务构建/aysncio/aiohttp
+云计算：rpc消息队列；neutron
+
+python:  设计、架构
+
 network analysis
 go/k8s
 vue/html/css

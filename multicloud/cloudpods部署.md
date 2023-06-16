@@ -101,6 +101,25 @@ $ docker compose up -d
 
 ```
 
+
+
+登录加入openstack云后，发现不能识别别名配置，比如nova_proxy，有些请求会异常，
+
+可以登录到容器compose-region-1中，配置hosts，就可以发现云主机等资源的信息了
+
+```
+docker exec -it compose-region-1 sh
+
+echo "192.168.232.106 nova_proxy" >> /etc/hosts
+echo "192.168.232.107 controller" >> /etc/hosts
+```
+
+
+
+
+
+
+
 ### 7. 登陆 climc 命令行容器
 
 如果要使用命令行工具对平台做操作，可以使用下面的方法进入容器：
@@ -113,19 +132,6 @@ Please exec 'climc' to get started
 # source 认证信息
 bash-5.1# source /etc/yunion/rcadmin
 bash-5.1# climc user-list
-```
-
-
-
-登录加入openstack云后，发现不能识别别名配置，比如nova_proxy，有些请求会异常，
-
-可以登录到容器compose-region-1中，配置hosts，就可以发现云主机等资源的信息了
-
-```
-docker exec -it compose-region-1 sh
-
-echo "192.168.232.106 nova_proxy" >> /etc/hosts
-echo "192.168.232.107 controller" >> /etc/hosts
 ```
 
 

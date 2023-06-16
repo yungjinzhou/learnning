@@ -718,6 +718,47 @@ docker-compose up
 docker-compose up -d
 ```
 
+#### 3、日志查看
+
+当容器在后台运行的时候，可以通过`docker-compose logs`查看所有容器的日志输出，也可以用`docker-compose logs 服务名称`查看指定容器的日志，这里的`服务名称`是指`docker-compose.yml`里的`services`的子节点名称
+
+```
+docker-compose logs -f 
+
+
+docker-compose logs -f service_name
+
+
+# 查看所有服务的日志：
+docker-compose logs
+
+# 查看指定服务的日志：
+docker-compose logs <service_name>
+
+# 查看最后 N 行日志：
+docker-compose logs --tail=N （其中 N 为需要显示的行数）
+
+# 实时跟踪日志输出：
+docker-compose logs -f 或 docker-compose logs --follow
+
+
+# 输出内容增加时间戳：
+docker-compose logs -t 或 docker-compose logs --timestamps
+
+# 输出服务名：
+docker-compose logs --no-color --format "service {{.Service}}: {{.Message}}"
+
+# 输出具体容器 ID：
+docker-compose logs --no-color --format "container {{.ID}}: {{.Message}}"
+
+需要注意的是，默认情况下 docker-compose logs 只会显示在当前终端中启动的容器的日志。如果某个服务的容器在后台运行，您需要使用 docker-compose logs -f 或 docker-compose logs --follow 命令来实时跟踪日志输出。
+
+另外，在使用 docker-compose 命令时，您可以通过 -p 或 --project-name 选项来指定项目名称。在使用 docker-compose logs 命令时，如果没有指定服务名称，则会输出所有属于该项目的服务的日志。如果指定了服务名称，则只会输出该服务的日志。
+
+```
+
+
+
 
 
 ### 3.5 yml 配置指令详细

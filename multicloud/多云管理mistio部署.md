@@ -106,6 +106,10 @@ docker-compose exec api sh
 
 ./bin/adduser --admin admin@123 -p
 添加用户admin@123，并且角色设置为admin，同时设置密码
+
+访问 http://localhost
+
+
 ```
 
 
@@ -554,7 +558,7 @@ sentry_sdk 是一个用于 Python 应用程序的开源错误跟踪工具，可�
 下面是使用 sentry_sdk 的简单示例：
 
 ```
-pythonCopy Codeimport sentry_sdk
+import sentry_sdk
 
 sentry_sdk.init("your-sentry-dsn")
 
