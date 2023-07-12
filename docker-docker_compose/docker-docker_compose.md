@@ -187,6 +187,21 @@ docker container inspect --format '{{.Path}} {{.Args}}' my-container
 
 
 
+1.9 docker设置国内镜像，配置systemd
+
+```
+安装dockder ，安装了最新的，默认驱动是cgroups
+
+需要修改为systemd模式
+
+vim /etc/docker/daemon.json
+
+{
+  "registry-mirrors": ["https://registry.docker-cn.com", "https://hub-mirror.c.163.com","https://docker.mirrors.ustc.edu.cn/", "https://wghlmi3i.mirror.aliyuncs.com"],
+  "exec-opts": ["native.cgroupdriver=systemd"]
+}
+```
+
 
 
 

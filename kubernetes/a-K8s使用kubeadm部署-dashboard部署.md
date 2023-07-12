@@ -255,13 +255,13 @@ systemctl enable kubelet
 配置swap禁用
 
 ```
- cat /etc/sysconfig/kubelet
+cat /etc/sysconfig/kubelet
  
- KUBELET_EXTRA_ARGS="--fail-swap-on=false"
+KUBELET_EXTRA_ARGS="--fail-swap-on=false"
  
+
+sudo swapoff -a
  
- 
- sudo swapoff -a
 ```
 
 
@@ -273,12 +273,12 @@ systemctl enable kubelet
 在Master节点执行
 
 ```apache
-kubeadm init --apiserver-advertise-address=10.0.0.9 --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+kubeadm init --apiserver-advertise-address=10.211.55.6 --kubernetes-version v1.27.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 
 
 # 未替换image repostory或者image镜像没有在本地时，可以用aliyun仓库
 
-kubeadm init --apiserver-advertise-address=10.0.0.9 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+kubeadm init --apiserver-advertise-address=10.211.55.6 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.27.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 
 ```
 
@@ -3361,6 +3361,325 @@ curl  https://masterip:6443/version -k
 
 
 
+## 五、centos7  arm架构安装k8s
+
+
+
+### 5.1基础配置
+
+```
+echo 'centos7.template' > /etc/hostname
+
+# 3、关闭防火墙
+systemctl stop firewalld.service
+systemctl disable firewalld.service
+
+# 4、关闭SeLinux        
+sed -i 's#SELINUX=enforcing#SELINUX=disabled#g' /etc/selinux/config
+grep -n 'SELINUX='  /etc/selinux/config 
+
+
+
+
+# 关闭交换分区
+sudo swapoff -a
+
+# 5、安装常用的软件包
+yum install -y vim net-tools wget lrzsz tree screen lsof tcpdump nmap mlocate
+
+# 6、命令提示符颜色
+echo "PS1='[\[\e[31m\]\u\[\e[m\]@\[\e[36m\]\H\[\e[33m\] \W\[\e[m\]]\[\e[35m\]\\$ \[\e[m\]'" >>/etc/bashrc
+source /etc/bashrc
+```
+
+
+
+
+
+
+
+### 5.2 网络配置
+
+
+
+遇到配置文件中是enp0s5，ip a 查询到的是eth0，
+
+需要ncmil 添加网络接口eth0
+
+```
+nmcli connection add con-name eth0 type ethernet ifname eth0
+```
+
+
+
+修改ifcfg-eth0，配置ip gateway等，
+
+```
+# ifcfg-eth0
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=static
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+NAME=eth0
+UUID=1cdb08ed-c4a6-4b67-b938-9f74bf208690
+DEVICE=eth0
+ONBOOT=yes
+IPADDR=10.211.55.6
+NETMASK=255.255.255.0
+GATEWAY=10.211.55.1
+HWADDR=00:1c:42:98:44:4b
+DNS1=114.114.114.114
+```
+
+
+
+重启网络
+
+```
+systemctl stop NetworkManager && systemctl diable NetworkManager
+systemctl restart network
+```
+
+
+
+### 5.3 docker配置
+
+
+
+```
+yum remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-selinux docker-engine-selinux docker-engine
+yum install -y yum-utils device-mapper-persistent-data lvm2
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum-config-manager --enable docker-ce-edge
+yum-config-manager --enable docker-ce-test
+yum-config-manager --disable docker-ce-edge
+
+yum install -y docker-ce-20.10.7 docker-ce-cli-20.10.7  containerd.io-1.4.6
+
+```
+
+
+
+安装dockder ，安装了最新的，默认驱动是cgroups
+
+需要修改为systemd模式
+
+```
+vim /etc/docker/daemon.json
+{
+  "insecure-registries": ["192.168.66.29:80"],
+  "registry-mirrors": ["https://registry.docker-cn.com", "https://hub-mirror.c.163.com","https://docker.mirrors.ustc.edu.cn/", "https://wghlmi3i.mirror.aliyuncs.com"],
+  "exec-opts": ["native.cgroupdriver=systemd"]
+}
+
+```
+
+
+
+### 5.4 k8s配置源
+
+```
+vim /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-aarch64/
+enabled=1
+gpgcheck=0
+epo_gpgcheck=0
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
+https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+```
+
+
+
+### 5.5 安装部署k8s
+
+```
+yum install -y kubelet-1.22.0 kubeadm-1.22.0 kubectl-1.22.0
+systemctl enable kubelet
+```
+
+配置swap禁用
+
+```
+vim /etc/sysconfig/kubelet
+
+echo "KUBELET_EXTRA_ARGS=\"--fail-swap-on=false\"" > /etc/sysconfig/kubelet
+ 
+sudo swapoff -a
+
+# 开启iptables转发
+echo 1 >  /proc/sys/net/bridge/bridge-nf-call-iptables
+```
+
+
+
+在Master节点执行
+
+```apache
+kubeadm init --apiserver-advertise-address=10.211.55.10 --kubernetes-version v1.22.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+
+# 未替换image repostory或者image镜像没有在本地时，可以用aliyun仓库
+
+kubeadm init --apiserver-advertise-address=10.211.55.10 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.22.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
+```
+
+得到返回值，其中有如下内容token
+
+```mipsasm
+kubeadm join 10.206.0.15:6443 --token iv8baz.f2yagtk257ilmanr 
+    --discovery-token-ca-cert-hash sha256:b43a11c9feeab057ee3d6ee91fd7e96dfc75859911f96ff1e89e9578d0801c23 
+```
+
+
+
+提示使用kubectl工具
+
+```bash
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+kubectl get nodes  # (未部署cni时候，节点都是NotReady的状态)
+```
+
+### 5.6 安装Node节点
+
+执行kubeadm join
+
+```mipsasm
+kubeadm join 10.211.55.10:6443 --token pk3gjz.0qun6482dtgrjgfn \
+	--discovery-token-ca-cert-hash sha256:2e63dee4f20c9edbab31fe825b3792bde0adc0154913bd93f6e8c3abf2d6a1ea
+```
+
+### 5.7 部署CNI网络插件
+
+在master节点测试
+
+```awk
+# 在线方式
+wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+#手动拉取镜像
+docker pull quay.io/coreos/flannel:v0.14.0
+
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+```
+
+本地方式
+
+<a href="#cni-flannel">kube-flannel.yaml文件内容</a> <a name="cni-flannel1">.</a>
+
+```
+#手动拉取镜像
+docker pull quay.io/coreos/flannel:v0.14.0
+kubectl apply -f kube-flannel.yml
+```
+
+
+
+查看coredns，状态一直ContainerCreating或者，可能是flannel没有配置好
+
+查看/etc/cni/net.d/10-flannel.conflist
+
+```
+{
+  "name": "cbr0",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "flannel",
+      "delegate": {
+        "hairpinMode": true,
+        "isDefaultGateway": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+#### 1.7.1 注意
+
+查看flannel 的pod，如果启动失败，后面 nodes节点的状态是NotReady，
+需要看coredns是否是pending的状态，如果是，那么flannel部署的有问题。
+
+可能报错1
+
+```
+kubectl describe pod coredns-xxxx -n kube-system查看原因
+
+下面错误信息
+cni config uninitialized KubeletNotReady runtime network not ready: NetworkReady=false reason:NetworkPluginNotReady message:docker: network plugin is not ready: cni config uninitialized
+
+```
+
+可能报错2
+
+```
+kubectl describe node
+
+错误信息
+NetworkPluginNotReady message:docker: network plugin is not ready: cni config uninitialized
+```
+
+这个时候也许是因为你的node节点中没有安装相应的cni模块。这个时候需要做如下操作:
+
+```
+sudo mkdir -p /opt/cni/bin
+cd /opt/cni/bin
+然后接下来去下载相应的压缩包
+https://github.com/containernetworking/plugins/releases/download/v1.1.0/cni-plugins-linux-amd64-v0.3.0.tgz
+https://github.com/containernetworking/plugins/releases/download/v1.1.0/cni-plugin-flannel-linux-amd64-v1.1.0.tgz
+然后将其解压在/opt/cni/bin下就可以了。
+可以修改名字flannel-amd64为flannel
+```
+
+
+
+
+
+
+
+部署成功
+
+```apache
+kubectl get pods -n kube-system
+
+NAME                                 READY   STATUS     RESTARTS   AGE
+kube-flannel-ds-2lzv7                0/1     Init:0/1   0          3m9s
+kube-flannel-ds-2qh8t                0/1     Init:0/1   0          3m9s
+kube-flannel-ds-72fb7                0/1     Init:0/1   0          3m9s
+```
+
+
+
+
+
 ## 末、附录及配置文件
 
 
@@ -4383,4 +4702,6 @@ subjects:
   name: admin-user
   namespace: kubernetes-dashboard
 ```
+
+
 

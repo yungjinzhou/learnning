@@ -612,6 +612,14 @@ vue/html/css
 
 
 
+### mac网卡增加ip地址
+
+```
+sudo ifconfig en5 inet 192.168.100.49 netmask 255.255.255.0 alias
+```
+
+
+
 
 
 ### 修改
