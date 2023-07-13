@@ -1311,10 +1311,6 @@ net.ipv4.tcp_keepalive_intvl = 75
 
 
 
-
-
-
-
 ### 2.7 0.0.0.0地址
 
 是的，"0.0.0.0" 是一个合法的 IP 地址，它通常被用作一个通配符地址。在网络编程中，"0.0.0.0" 表示所有可能的 IP 地址或任何可用的网络接口。
@@ -1336,7 +1332,48 @@ net.ipv4.tcp_keepalive_intvl = 75
 
 
 
-syn攻击、半连接
+### 2.8 syn攻击、半连接
+
+#### 2.8.1 半连接队列
+
+服务器第一次收到客户端的SYN之后，就会处于**SYN_RCVD**（同步已接收）状态，此时双方还没有完全建立连接，服务器会把此种状态下请求连接放在一队列里，我们把这种队列称为半连接队列。
+
+#### 2.8.2 SYN FLood 攻击
+
+客户大量伪造 IP 发送 SYN 包，服务端回复的 ACK+SYN 去到了一个 【未知】的地址，势必造成服务端大量的链接处于 SYN_RCVD 状态，而服务端的半链接队列大小也是有限的，如果半链接队列满了，就会导致出现无法处理正常请求的情况。
+
+这种利用TCP建立连接时3次握手的“漏洞”，通过原始套接字发送源地址虚假的SYN报文，使目标主机永远无法完成3次握手，占满了系统的协议栈队列，资源得不到释放，进而拒绝服务，是互联网中最主要的DDOS攻击形式之一。
+
+如下图所示:
+
+![image.png](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/7c4c06305ecb4816990131e8abc2bcbc~tplv-k3u1fbpfcp-zoom-in-crop-mark:4536:0:0:0.awebp?)
+
+#### 2.8.3 抵御 SYN Flood 攻击
+
+##### 1. 增大半连接队列
+
+不能只增大tcp_max_syn_backlog,还需要一同增大somaconn和backlog，也就是增大全连接队列
+
+##### 2. 开启tcp_syncookies功能
+
+开启tcp_syncookies就可以在不使用syn半连接队列的情况下建立连接（自己理解是这样的请求不进入半连接队列）
+
+syncookies在接收到客户端的syn报文时，计算出一个值，放到syn+ack报文中发出。当客户端返回ack报文时，取出该值验证，成功则建立连接，如下图：
+
+![img](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/5ce7ac39b88e4eae9c7e4e1da0201ee5~tplv-k3u1fbpfcp-zoom-in-crop-mark:4536:0:0:0.awebp)
+
+##### 3. 减少ack+syn报文的重传次数
+
+因为我们在收到syn攻击时，服务端会重传syn+ack报文到最大次数，才会断开连接。针对syn攻击的场景，我们可以减少ack+syn报文的重传次数，使处于syn_recv状态的它们更快断开连接
+
+参考链接：https://juejin.cn/post/7152170421788344351
+
+
+
+
+
+
+
 
 
 
@@ -1376,7 +1413,7 @@ mysql引擎，各个引擎之间有什么区别
 
 索引的原理
 
-mysql  B+索引、优缺点
+mysql  B+索引、优缺点,  B树索引
 
 mysql索引类型
 
