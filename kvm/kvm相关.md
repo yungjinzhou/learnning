@@ -26,6 +26,10 @@ virsh attach-interface snale --type bridge --source br0  --target vnet1 --live  
 virsh attach-interface <domain-name> --type bridge --source <net-bridge> --model virtio --config --live
 
 说明：type类型，一般是桥接bridge，还有network类型
+domain-name: 虚拟机名称或ID
+net-bridge：网桥名称
+–config：写入配置文件
+–live：在线添加（表面上添加了，实际上网络不通，需要重启网卡）
 source，桥接到哪个网桥
 target：不要重复，先brctl show查看一下；，或者自定义名字，可以在宿主机上查看
 
