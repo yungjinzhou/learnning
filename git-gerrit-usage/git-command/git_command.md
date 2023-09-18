@@ -161,3 +161,27 @@ git submodule update
 如果子模块还有自己的子模块，则需要添加 --recursive 参数，以便递归地拉取所有子模块的代码。
 ```
 
+
+### git提交时设置行尾crlf/lf
+```shell
+# 在不同系统上配置core.autocrlf
+# 本地 --push--> 远端 --pull--> 本地
+ 
+# ??? --push--> LF --pull--> CRLF,适用于Windows
+$ git config --global core.autocrlf true
+ 
+# ??? --push--> LF --pull--> LF,适用于MacOS/Linux/Unix
+$ git config --global core.autocrlf input
+ 
+# ??? --push--> ??? --pull--> ???,不做任何转换，不建议使用
+$ git config --global core.autocrlf false
+If core.autocrlf=true, 添加文件到 git 仓库时，git 将其视为文本文件，将 CRLF 变成 LF。适用于windows系统使用。
+
+If core.autocrlf=input，添加文件git仓库时，git 把 CRLF 变成 LF。当有人 Check 代码时还 是LF 方式。适用于MacOs/Linux/Unix系统使用，但在 window操作系统不要使用这个设置。
+
+If core.autocrlf=false，line-endings 将不做转换操作。文本文件保持原来的样子。不建议使用。
+
+# 查看配置项
+git config -l
+
+```

@@ -2,9 +2,9 @@
 
 
 
+### virsh命令
 
-
-、查看虚拟机原有网卡信息
+查看虚拟机原有网卡信息
 
 ```cobol
 [root@room1pc01 ~]# virsh domiflist kylin-wd
@@ -81,6 +81,155 @@ kvm镜像路径
 ```
 /var/lib/libvirt/image/
 ```
+
+
+
+
+
+
+
+### virt-install命令
+
+
+
+```
+qemu-img create -f qcow2 /qcow/cloudexploer-ubuntu.qcow2  200G
+
+
+virt-install --name=cloudexploer-ubuntu --vcpus=8 --ram=16384 --disk path=/qcow/cloudexploer-ubuntu.qcow2 --cdrom /ISO/ubuntu-20.04.4-live-server-amd64.iso --network bridge=br1,model=virtio --network bridge=nm-bridge,model=virtio --force --autostart --graphics vnc --osinfo detect=on,name=generic
+
+
+
+
+
+qemu-img create -f qcow2 /qcow/cloudexploer-ubuntu.qcow2  200G
+
+virt-install --name=cloudexploer-ubuntu --vcpus=8 --ram=16384 --disk path=/qcow/cloudexploer-ubuntu.qcow2 --cdrom /ISO/ubuntu-20.04.4-live-server-amd64.iso --network bridge=br1,model=virtio --network bridge=nm-bridge,model=virtio --force --autostart --graphics vnc --osinfo detect=on,name=generic
+
+
+
+
+qemu-img create -f qcow2 /home/qcow2/kylin-01.qcow2  20G
+
+virt-install --name=kylin-01 --vcpus=8 --ram=16384 --disk path=/home/qcow2/kylin-01.qcow2 --cdrom /home/exec/Kylin-4.0.2-server.iso --network bridge=br1,model=virtio --force --autostart --graphics vnc --osinfo detect=on,name=generic
+```
+
+
+
+
+
+
+
+
+
+### Virt-sysprep
+
+给qcow2格式的镜像修改密码
+
+
+
+```
+yum install -y libguestfs-tools-c
+virt-sysprep --root-password password:comleader@123 -a my-image.qcow2
+```
+
+
+
+
+
+
+
+### mount
+
+
+
+在云上创建了规格为1T硬盘的虚拟机，但是由于制作的qcow2虚拟机磁盘是200G，还有800G未识别，下面是操作步骤
+
+```
+# 查看现有分区
+fdisk -l 
+
+# 创建新分区
+fdisk /dev/vda
+# 依次输入m/n/p/回车/回车/w保存，
+# 查看，会有800G的新分区vda4
+fdisk -l
+
+# 创建目录
+mkdir /data
+
+# 格式化新分区
+sudo mkfs.ext4 /dev/vda4
+
+# 挂盘
+mount /dev/vda4 /data
+```
+
+
+
+
+
+
+
+### qemu-img
+
+```
+
+qemu-img create -f qcow2 /qcow/cloudexploer-ubuntu.qcow2  200G
+
+
+virt-install --name=cloudexploer-ubuntu --vcpus=8 --ram=16384 --disk path=/qcow/cloudexploer-ubuntu.qcow2 --cdrom /ISO/ubuntu-20.04.4-live-server-amd64.iso --network bridge=br1,model=virtio --network bridge=nm-bridge,model=virtio --force --autostart --graphics vnc --osinfo detect=on,name=generic
+
+
+
+
+
+qemu-img create -f qcow2 /qcow/cloudexploer-ubuntu.qcow2  200G
+
+virt-install --name=cloudexploer-ubuntu --vcpus=8 --ram=16384 --disk path=/qcow/cloudexploer-ubuntu.qcow2 --cdrom /ISO/ubuntu-20.04.4-live-server-amd64.iso --network bridge=br1,model=virtio --network bridge=nm-bridge,model=virtio --force --autostart --graphics vnc --osinfo detect=on,name=generic
+
+
+
+
+qemu-img create -f qcow2 /home/qcow2/kylin-01.qcow2  20G
+
+virt-install --name=kylin-01 --vcpus=8 --ram=16384 --disk path=/home/qcow2/kylin-01.qcow2 --cdrom /home/exec/Kylin-4.0.2-server.iso --network bridge=br1,model=virtio --force --autostart --graphics vnc --osinfo detect=on,name=generic
+```
+
+
+
+
+
+### nmcli
+
+# 
+
+```
+# 更改网络名称
+nmcli connection modify <OLD_CONNECTION_NAME> connection.id <NEW_CONNECTION_NAME>
+
+
+
+# 查看连接
+nmcli connection show
+
+
+# 生成网卡配置： 
+<DEVICE_NAME> 接口名称， <CONNECTION_NAME> 新连接的名称。
+nmcli connection add type ethernet con-name <CONNECTION_NAME> ifname <DEVICE_NAME>
+
+# 配置网络参数：
+nmcli connection modify <CONNECTION_NAME> ipv4.method manual ipv4.addresses <IP_ADDRESS>/<SUBNET_MASK> ipv4.gateway <GATEWAY> ipv4.dns <DNS_SERVERS>
+
+```
+
+
+
+
+
+
+
+
 
 
 
