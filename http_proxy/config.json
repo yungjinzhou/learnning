@@ -1,0 +1,16 @@
+{
+  "inbounds": [
+    {
+      "port": 10010, // 服务器监听端口
+      "protocol": "http",
+      "settings": {
+        
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom"
+    }
+  ]
+}
