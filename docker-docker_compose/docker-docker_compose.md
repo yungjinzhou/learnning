@@ -158,6 +158,8 @@ nsenter -n -t $( docker inspect -f {{.State.Pid}} container_name_or_id) command
 # container_name_or_id改成容器名称或者id就行了
 比如nsenter -n -t $( docker inspect -f {{.State.Pid}} mimic-horizon) ping 192.168.232.106
 
+nsenter -t pid -n cmd
+
 # harbor登录命令
 docker login 192.168.66.29 -u admin -p comleader@123
 
@@ -627,6 +629,16 @@ services:
 
 
 
+docker-compose 常用命令
+
+
+
+
+
+
+
+
+
 ### 3.1 Compose 简介
 
 Compose 是用于定义和运行多容器 Docker 应用程序的工具。通过 Compose，您可以使用 YML 文件来配置应用程序需要的所有服务。然后，使用一个命令，就可以从 YML 文件配置中创建并启动所有服务。
@@ -771,6 +783,28 @@ docker-compose logs --no-color --format "container {{.ID}}: {{.Message}}"
 另外，在使用 docker-compose 命令时，您可以通过 -p 或 --project-name 选项来指定项目名称。在使用 docker-compose logs 命令时，如果没有指定服务名称，则会输出所有属于该项目的服务的日志。如果指定了服务名称，则只会输出该服务的日志。
 
 ```
+
+
+
+#### 4、常用命令
+
+```
+# 重建镜像（如果已有，可能会使用缓存，不更新）
+docker-compose build
+# 强制重建所有
+docker-compose up --build
+
+# 不使用缓存构建指定镜像
+docker-compose build --no-cache <service-name>
+在这个命令中，--no-cache 标志指示构建过程中不使用缓存，以便强制重新构建镜像。<service-name> 是要构建镜像的服务名称。
+
+
+
+
+
+```
+
+
 
 
 
