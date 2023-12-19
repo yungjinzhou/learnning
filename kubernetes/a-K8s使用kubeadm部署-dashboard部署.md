@@ -70,6 +70,7 @@ setenforce 0
 # 临时
 swapoff -a  
 
+
 # 永久
 sed -ri 's/.*swap.*/#&/' /etc/fstab
 ```
@@ -174,8 +175,7 @@ gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-7
 
 
 ```
-yum install -y vim wget curl net-tools epel-rel
-ease
+yum install -y vim wget curl net-tools epel-release
 
 ```
 
@@ -279,6 +279,7 @@ kubeadm init --apiserver-advertise-address=10.211.55.6 --kubernetes-version v1.2
 # 未替换image repostory或者image镜像没有在本地时，可以用aliyun仓库
 
 kubeadm init --apiserver-advertise-address=10.211.55.6 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.27.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+
 
 ```
 
