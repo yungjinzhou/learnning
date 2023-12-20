@@ -25,6 +25,8 @@ kubectl apply -f nginx-deployment.yaml
 kubectl rollout history deployment/nginx-deployment 
 查看具体某一个版本的升级历史
 kubectl rollout history deployment/nginx-deployment --revision=1
+# 查看更新状态变化
+kubectl rollout status deployment/nginx-deployment
 
 
 # 回滚上一个版本
@@ -42,7 +44,7 @@ kubectl scale deployment nginx-deployment --replicas 5
 
 
 #查看部署服务的信息。
-kubectl get deployment
+kubectl get deployments
 
 # 查看详细信息
 kubectl describe deployment net-test  
@@ -52,6 +54,7 @@ kubectl describe deployment net-test
 
 #获取副本集信息
 kubectl get replicaset　　
+kubectl get rs
 
 #查看副本集的详细信息
 kubectl describe replicaset net-test-5767cb94df　　
