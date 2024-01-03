@@ -21,47 +21,17 @@
 ### 本周任务
 
 - 跟进超融合项目
-- - 根据老师要求，和乙方沟通软件整改问题，针对整改，提出所有要修改的点并一一标识出来
-  - 异构可视化和加速平台两个软件的设计、部署、说明书、文档、测试报告、验收报告、二次开发手册等文档修改
-  - 纸质材料打印并统一胶装处理，源码软件、电子版文件刻盘处理
-  - 比对所有验收材料，审核后交付给学校老师，学校老师验收
-  - 跟乙方开会沟通，后面软件功能事项，把没有开发的功能补齐
-  - 跟乙方提供功能点拆分要求，为满足学校后面验收，对材料和软件功能做要求
-  - 周报，项目周报，更新okr
+- - 
   - 
-  - 
-- 调研调度器遇到多应用场景的方案(todo)
-  - 方案一：根据应用启动多个scheduler容器，可行性调研中
-  - - 配置文件yaml中增加appname字段
-    - docker-compose的yaml文件中，针对每个应用，修改外部映射配置文件名称、位置和监听端口（如此会导致左右括号根据应用个数部署多个）
-    - 代码中，修改相应的key(redis的key)，改动未知
-  - 方案二：一个scheduler进程，管理多个应用，可行性调研中
-  - - 代码改动量未知
-    - 性能问题未测试
-    - 
-  - 方案三：监听是单独进程，每个应用占用一个进程进行处理，可行性调研中
-  - - 代码改动量未知，
-    - 开发难度未知，调研中
-    - yaml文件和redis db如何拆分？
-    - 
-  - 方案四：插件化服务
-  - 方案五：看左右括号针对多应用，如何处理
-  - 
+- 
 - 调度器，清理执行体时会重置字段，放到待清洗执行体后，如何确定是哪个机器上的哪个容器（todo）
 - 存储在redis中的key，增加app_name (todo)
-- 一个应用，多个部分，每个部分有镜像的问题（todo），调研docker-compose
 - 官网应用调试
 - 调度器黑白名单设置
 - 一个镜像，暴露多个端口，有多个服务的场景
-- 调度器
-- 保密教育培训
-- 梳理科技部项目调度器代码、文档，上传git
-- 梳理容器版调度器代码，
-- 邮件项目配合金仓构建镜像kylin-based/mysql-based
-- 邮件项目nfs
-- 邮件项目 pod  nfs
-- 邮件项目nfs多目录共享
-- 
+- 调研兼容性
+- - 运行执行体命令
+  - 
 
 
 
@@ -250,39 +220,15 @@ c++语言
 2. 调试调度脚本；
 3. 超融合环境，应用环境配合调试；
 4. 
+```
 
 
 
-参会人员
-test3
-20232817
-初始密码:qwer1234
-目前密码：ylt20232817
 
 
-
-系统管理员
-admin
-qwer1234
-
-会议发布人员
-zxgly
-kjb123!@#
-
-参会人员
-test3
-20232817
-qwer1234
-
-
-
-kubeadm init --apiserver-advertise-address=10.21.16.43 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.18.0 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16 --v=5
-
-
- echo "10.21.16.43:/home/test /nfs nfs4 defaults 0 0" >> /etc/fstab
- mount -av
- 
- mount "10.21.16.43:/home/test/ /mnt/
-
+```
+docker run -d --name registry-web --restart=always -p 8000:8080 
+-v /root/docker-registry/registry-web.yml:/conf/config.yml 
+hyper/docker-registry-web
 ```
 
