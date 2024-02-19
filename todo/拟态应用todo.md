@@ -327,28 +327,12 @@ hyper/docker-registry-web
 
 
 
-docker run -d -p 3000:3000  -e OPENAI_API_KEY="sess-dvGHJ2GxYuSgNslbyhKKeQCz3MMaeWGvjAFdddda
-" -e CODE="123456"  yidadaa/chatgpt-next-web
+docker run -d -p 3000:3000  -e OPENAI_API_KEY="sess-dvGHJ2GxYuSgNslbyhKKeQCz3MMaeWGvjAFdddda" -e CODE="123456"  yidadaa/chatgpt-next-web
 ```
 
 
 
 
-
-```
-
-免费接收短信平台
-https://www.free-sms-receive.com/message/61485812834.html
-
-
-我的yungjinzhou@gmail.com
-openai-api-key
-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
-
-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
-
-
-```
 
 
 
