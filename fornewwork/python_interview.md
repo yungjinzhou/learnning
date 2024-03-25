@@ -3802,21 +3802,74 @@ https://juejin.cn/post/7067744227127459871
 
 
 
-django中如何在model保存前做一定的固定操作，比如写一句日志（signal Dispatcher）
+#### 6.3.6 django中如何在model保存前做一定的固定操作
+
+，比如写一句日志（signal Dispatcher）
+
+在 Django 中，您可以通过重写模型（Model）的 `save()` 方法来在模型保存前执行一定的固定操作。下面是一个示例，演示如何在模型保存前写入日志：
+
+1. 在您的应用程序中的 models.py 文件中定义您的模型，并重写 save() 方法：
+
+```python
+from django.db import models
+import logging
+
+logger = logging.getLogger(__name__)
+
+class YourModelName(models.Model):
+    # 定义您的模型字段
+
+    def save(self, *args, **kwargs):
+        logger.info(f"About to save {self} of {self.__class__.__name__}")
+        super(YourModelName, self).save(*args, **kwargs)
+```
+
+1. 在上述代码中，您可以在 `save()` 方法中添加您希望执行的任何固定操作。在这个示例中，我们在保存模型前写入了一条日志。
+
+通过重写模型的 `save()` 方法，您可以在保存模型之前执行任何自定义的操作。请注意，如果您在 `save()` 方法中进行了更改，确保调用 `super().save(*args, **kwargs)` 来确保模型的保存操作正常执行。
+
+这种方法适用于需要在特定模型的保存操作中执行固定操作的情况。
 
 
 
-django中间件的使用
+#### 6.3.7 select_related和prefetch_related
+
+在 Django ORM 中，`select_related` 和 `prefetch_related` 是用于优化查询性能的两种方法，用于处理数据库查询中的关联查询。它们的主要区别在于查询的方式和效果：
+
+`select_related`：
+
+1. `select_related` 用于在查询时一次性获取主对象和相关对象的数据，通过使用 SQL 的 JOIN 操作来减少数据库查询次数。
+2. 当您需要获取外键关联对象的字段数据时，可以使用 `select_related` 来避免多次查询数据库。
+3. `select_related` 适合用于一对一（OneToOne）和多对一（ForeignKey）关系。
+
+示例使用 `select_related`：
+
+```python
+# 查询文章及其作者信息，使用 select_related 优化查询
+article = Article.objects.select_related('author').get(id=1)
+```
+
+`prefetch_related`：
+
+1. `prefetch_related` 用于在查询时获取主对象的数据，并在单独的查询中获取关联对象的数据，然后将关联对象的数据与主对象关联起来。
+2. 当您需要获取多对多（ManyToMany）关系对象的数据时，通常会使用 `prefetch_related`。
+3. `prefetch_related` 适合用于多对多关系或反向关系的优化。
+
+示例使用 `prefetch_related`：
+
+```python
+# 查询文章及其评论信息，使用 prefetch_related 优化查询
+articles = Article.objects.prefetch_related('comments').all()
+```
+
+区别总结：
+
+- `select_related` 适用于一对一和多对一关系，通过 JOIN 操作一次性获取所有相关对象的数据，减少数据库查询次数。
+- `prefetch_related` 适用于多对多关系或反向关系，可以在单独的查询中获取关联对象的数据，然后将其与主对象关联起来，避免多次查询数据库。
+
+根据您的数据模型和查询需求，选择适当的方法可以提高查询性能并减少数据库负担。
 
 
-
-django  ORM查询中  select_related和prefetch_related的区别
-
-
-
-
-
-cookie和session的区别
 
 
 
