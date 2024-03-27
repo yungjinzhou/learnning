@@ -140,17 +140,11 @@
 
 ### 本周任务
 
-- kjb项目-调度器事件循环代码兼容性优化(done)
-
-- kjb项目-调度器代码加密调研以及测试(done)
-
-- 
-
 - kjb项目-构建调度器x86、arm镜像，提供部署文档
 
-- 在windows上安装arm虚拟机
+- 在windows上安装arm虚拟机(done)
 
-- 在arm机器上构建调度器镜像及测试
+- 在arm机器上构建调度器镜像及测试(done)
 
 - 调度器相关立项资料撰写
 
@@ -160,31 +154,17 @@
 
 - 加密部分资料
 
-- 大云鹤壁云-license证书处理(done)
-
-- kjb项目-调度器代码目录结构优化(done)
-
-- kjb项目-日志结构优化，输出日志格式（done）
-
 - 超融合异构内生安全支撑平台-数据平面加速平台测试方案修改
 
 - 裁决异常后执行体清洗逻辑开发（是否保留异常执行体，保留个数，保留时长等处理）
 
-- kjb项目-右括号调度器联动针对文件防篡改方案对调度器代码进行优化(done)
-
 - 调度器重置时执行体被清理的代码逻辑测试
-
-- kjb项目-解决测试过程中redis同步数据时异常（done）
 
 - kjb项目-解决初始化过程中执行体一直异常的情况
 
 - 定时监测任务间隔时长优化，可配置
 
-- kjb项目-调度器适配selector平台兼容性优化（done）
-
 - 调研缩小scheduler调度器的镜像大小，尝试使用alpine镜像，测试安装问题较多，且安装后镜像大小没有显著减少
-
-- 在x86电脑上 构建arm环境，用于后续调度器arm镜像打包测试等（调研，未成功）
 
 - 更新调度器代码打包成镜像进行测试
 
@@ -195,18 +175,6 @@
 - 
 
   
-
-```
-1. kjb项目-调度器事件循环代码兼容性优化;
-2. kjb项目-调度器代码加密调研以及测试;
-3. 大云鹤壁云-license证书处理;
-4. kjb项目-调度器代码目录结构优化;
-5. kjb项目-日志结构优化，输出日志格式（done）;
-6. kjb项目-右括号调度器联动针对文件防篡改方案对调度器代码进行优化;
-7. kjb项目-解决测试过程中redis同步数据时异常（done）;
-8. kjb项目-调度器适配selector平台兼容性优化（done）;
-9. 在x86电脑上 构建arm环境，用于后续调度器arm镜像打包测试等（调研，未成功实现）;
-```
 
 
 
@@ -424,48 +392,6 @@ hyper/docker-registry-web
 
 docker run -d -p 3000:3000  -e OPENAI_API_KEY="sess-dvGHJ2GxYuSgNslbyhKKeQCz3MMaeWGvjAFdddda" -e CODE="123456"  yidadaa/chatgpt-next-web
 
-
-.\qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=D:\aarch64vm\sourcefiles\Kylin-Server-V10-SP3-General-Release-2303-LoongArch64.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom  -net nic -net user,hostfwd=tcp::2222-:22
-
-
-.\qemu-system-aarch64.exe -m 8192 -cpu cortex-a72 -smp 8,sockets=4,cores=2 -M virt -bios H:\vm\arm64\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=H:\vm\arm64\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom -net nic -net user,hostfwd=tcp::2222-:22
-
-
-.\qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom  -net nic -net user,hostfwd=tcp::2222-:22
-
-
-qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=D:\aarch64vm\sourcefiles\Kylin-Server-V10-SP3-General-Release-2303-LoongArch64.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom  -net nic -net tap,ifname-tap0
-
-
-qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=D:\aarch64vm\sourcefiles\Kylin-Server-10-SP2-Release-Build09-20210524-arm64.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom  -net nic -net user,hostfwd=tcp::2222-:22 -net nic -net tap,ifname=tap0
-
-
-
-
-qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom  -net nic -net user,hostfwd=tcp::2222-:22 -net nic -net tap,ifname=tap0
-
-
-
-
-qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=D:\aarch64vm\sourcefiles\Kylin-Server-10-SP2-Release-Build09-20210524-arm64.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom -net nic -net tap,ifname=tap0
-
-
-
-qemu-system-aarch64.exe -m 4096 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios D:\aarch64vm\sourcefiles\QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=D:\aarch64vm\sourcefiles\kylindisk.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom -net nic -net tap,ifname=tap0
-
-
-
-qemu-system-aarch64 -m 1024 -cpu cortex-a57 -smp 2 -M virt -bios /usr/share/AAVMF/AAVMF_CODE.fd -nographic -drive if=none,file=/opt/os/CentOS-7-aarch64-Minimal-2009.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom -drive if=none,file=/var/lib/libvirt/images/test.img,id=hd0 -device virtio-blk-device,drive=hd0
-
-
-
-qemu-system-aarch64 -m 1024 -cpu cortex-a57 -smp 2 -M virt -bios /usr/share/AAVMF/AAVMF_CODE.fd -nographic -drive if=none,file=/opt/os/CentOS-7-aarch64-Minimal-2009.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom -drive if=none,file=/var/lib/libvirt/images/test.img,id=hd0 -device virtio-blk-device,drive=hd0
-
-
-
-
-
-qemu-system-aarch64 -m 2048 -cpu cortex-a72 -smp 4,sockets=2,cores=2 -M virt -bios /home/armsystest/QEMU_EFI.fd -device VGA -device nec-usb-xhci -device usb-mouse -device usb-kbd -drive if=none,file=/home/armsystest/kylinarm.qcow2,id=hd0 -device virtio-blk-device,drive=hd0 -drive if=none,file=/home/armsystest/Kylin-Server-10-SP2-Release-Build09-20210524-aarch64.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 ```
 
 
