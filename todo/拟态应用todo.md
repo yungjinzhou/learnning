@@ -83,7 +83,7 @@
   - 左括号-调度器对接任务
   - 左括号性能优化(静态文件缓存、图片缓存）
   - 数据缓存与传输压缩加速功能调试
-  - 裁决异常发现、黑白名单管理
+  - 裁决异常发现、黑白名单管理。
   - 裁决上报接口适配&调度轮换清洗调试
   - <font color=red>裁决执行体清洗逻辑优化（一次三个还是一次1个）</font>
   - <font color=red>故障转移优化，平均分配，快速分配</font>
@@ -152,7 +152,11 @@
 
 - 定位拟态环境中redis服务异常的原因
 
-- app_check_cmd参数优化
+- app_check_cmd参数优化(done)
+
+- redis服务容器化及测试，redis部署文档撰写(done)
+
+- EXECUTOR_INFO和PHYSICAL_HOST_INFO配置优化（方便统一部署）
 
 - 
 
@@ -404,6 +408,9 @@ hyper/docker-registry-web
 
 docker run -d -p 3000:3000  -e OPENAI_API_KEY="sess-dvGHJ2GxYuSgNslbyhKKeQCz3MMaeWGvjAFdddda" -e CODE="123456"  yidadaa/chatgpt-next-web
 
+
+
+检查应用启动状态uri，/test/、/status/，如直接ip:port访问，默认空值即可，通过请求该uri，能够返回应用启动正常的状态码
 ```
 
 

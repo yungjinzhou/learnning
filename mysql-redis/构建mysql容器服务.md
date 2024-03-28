@@ -1,6 +1,6 @@
 # mysql 容器化
 
-
+### 1. 构建dockerfile
 
 dockerfile
 
@@ -10,16 +10,16 @@ COPY my.cnf /etc/my.cnf
 RUN cd /docker-entrypoint-initdb.d && rm -rf *
 # COPY mail.sql /docker-entrypoint-initdb.d/mail.sql
 
-#ENV MYSQL_ALLOW_EMPTY_PASSWORD yes
-#COPY setup.sh /mysql/setup.sh
-#COPY privileges.sql /mysql/privileges.sql
-
-ENV MYSQL_ROOT_PASSWORD=eetrust123 MYSQL_DATABASE=mail
+ENV MYSQL_ROOT_PASSWORD=comleader MYSQL_DATABASE=test
 ENV LANG=en_US.UTF-8
 EXPOSE 3306
 RUN echo lower_case_table_names=1 >> /etc/mysql/conf.d/docker.cnf
 
 ```
+
+EXPOSE 3306需要和my.cnf中的端口保持一致，默认容器内都用3306即可，在运行容器时做端口映射就行
+
+
 
 
 
@@ -51,6 +51,7 @@ datadir=/var/lib/mysql
 socket=/var/run/mysqld/mysqld.sock
 secure-file-priv=/var/lib/mysql-files
 #user=mysql
+# bind-address设置为0.0.0.0允许外部访问
 bind-address=0.0.0.0
 
 # Disabling symbolic-links is recommended to prevent assorted security risks
@@ -65,7 +66,7 @@ socket=/var/run/mysqld/mysqld.sock
 !includedir /etc/mysql/mysql.conf.d/
 ```
 
-
+### 2. 构建镜像及运行
 
 运行docker
 
@@ -74,6 +75,15 @@ docker rm -f mysqltest
 docker rmi mysqltest:v1
 docker build -t mysqltest:v1 .
 docker run -itd --name mysqltest -p 33060:3306 mysqltest:v1
-#mysql -uroot -peetrust123 -P 33060:3306 -h 10.201.4.31
+
+```
+
+
+
+### 3. 外部访问测试
+
+```
+mysql -uroot -pcomleader -P 33060:3306 -h 10.201.4.31 
+
 ```
 
