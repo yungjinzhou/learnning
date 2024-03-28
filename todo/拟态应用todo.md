@@ -142,11 +142,19 @@
 
 - kjb项目-构建调度器x86、arm镜像，提供部署文档
 
-- 在windows上安装arm虚拟机(done)
+- 在windows上安装arm虚拟机方案及部署测试(done)
 
-- 在arm机器上构建调度器镜像及测试(done)
+- 在构建的虚拟机arm机器上构建调度器arm版本镜像及测试(done)
 
 - 调度器相关立项资料撰写
+
+- 更新调度器设计方案中配置文件及其说明
+
+- 定位拟态环境中redis服务异常的原因
+
+- app_check_cmd参数优化
+
+- 
 
 - 
 
@@ -182,7 +190,11 @@
 
 
 
+```
+CREATE TABLE IF NOT EXISTS tb_jsr (id INT PRIMARY KEY AUTO_INCREMENT,name VARCHAR(15) NOT NULL,sex CHAR(2) DEFAULT NULL,age INT(11) DEFAULT NULL,tel VARCHAR(20) DEFAULT NULL,enable INT(11) NOT NULL,PRIMARY KEY (id))
 
+
+```
 
 
 
